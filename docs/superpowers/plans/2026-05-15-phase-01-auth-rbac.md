@@ -2,9 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Port the Python FastAPI auth + RBAC stack to Go. Stand up versioned SQL migrations for `roles`, `users`, `user_roles`; ship JWT login/refresh/logout, password hashing, permission registry, JWT middleware, `RequirePerms` middleware, and an idempotent boot-time seed for system roles + super admin user. End the phase with a `/api/v1/auth/login` + `/api/v1/roles/permissions` flow verified end-to-end against a running server.
+**Goal:** Port the Python FastAPI auth + RBAC stack to Go AND stand up the HR data shape (`employees`, `dependents`) that every subsequent phase will reference for `employee_id` ownership / HR fields. Stand up versioned SQL migrations for `roles`, `users`, `user_roles`, `employees`, `dependents`; ship JWT login/refresh/logout, password hashing, permission registry, JWT middleware, `RequirePerms` middleware, and an idempotent boot-time seed for system roles + super admin user + super admin employee row. End the phase with a `/api/v1/auth/login` + `/api/v1/roles/permissions` flow verified end-to-end against a running server.
 
-**Architecture:** Layered (handlers → services → repositories → GORM/Postgres). Permissions are JSONB arrays on `roles`; `user_roles` is a join table with audit columns; permission gating is per-route via `middleware.RequirePerms(...)` inline at route declaration (mirroring FastAPI's `Depends(require_permissions(...))`). Wildcard `*` bypasses all checks. JWT is HS256 with `{sub, type, exp, iat}`; session-invalidation fields (`email_changed_at`, `password_reset_at`) are compared against `iat` on every request.
+**Architecture:** Layered (handlers → services → repositories → GORM/Postgres). The user/employee model is **split across 3 tables** (mirroring `exn-hr/backend`, NOT the Python source which uses one combined document):
+
+- `users` — auth-only: `id`, `email`, `password_hash`, `is_active`, session-invalidation timestamps (`email_changed_at`, `password_reset_at`), audit cols. **No** `full_name`, **no** `department_id`, **no** `position_id`, **no** role-string column.
+- `employees` — HR/personal info, 1-1 with `users` via `user_id` (UNIQUE). Holds `full_name`, `phone`, `personal_email`, `gender`, addresses, `dob`, nationality, ID card fields, `avatar_url`, education, marital status, emergency contact, work info (`department_id` / `position_id` / `manager_id`), contract & salary & banking. `department_id` / `position_id` are nullable UUIDs with **no FK constraint yet** — the constraints are added in Phase 3 when those tables exist. `manager_id` is a self-referential FK to `employees(id)`.
+- `dependents` — 1-N with `employees` (child / parent / spouse / other) via `employee_id` with `ON DELETE CASCADE`.
+
+Permissions are JSONB arrays on `roles`; `user_roles` is a join table with audit columns; permission gating is per-route via `middleware.RequirePerms(...)` inline at route declaration (mirroring FastAPI's `Depends(require_permissions(...))`). Wildcard `*` bypasses all checks. JWT is HS256 with `{sub, type, exp, iat}`; session-invalidation fields (`email_changed_at`, `password_reset_at`) are compared against `iat` on every request. Login responses embed the user's `employee` profile (full_name, avatar_url, department_id, position_id, manager_id) so the frontend never has to fetch `full_name` from `users`.
 
 **Tech Stack:** Go 1.24, Gin, GORM (`gorm.io/driver/postgres`), Postgres (`citext`, `pgcrypto`, `uuid-ossp`), `golang-migrate/migrate/v4`, `golang-jwt/jwt/v5`, `golang.org/x/crypto/bcrypt`, `swaggo/swag`, `testify`, real Postgres test DB.
 
@@ -12,7 +18,7 @@
 
 **Assumptions about Phase 0 (foundation already complete):**
 - `go.mod` declares module `github.com/exnodes/hrm-api` and Go 1.24.
-- `internal/config/config.go` loads env vars (DB DSN, `JWT_SECRET_KEY`, `JWT_ACCESS_TTL_MINUTES`, `JWT_REFRESH_TTL_DAYS`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`) via `godotenv`.
+- `internal/config/config.go` loads env vars (DB DSN, `JWT_SECRET_KEY`, `JWT_ACCESS_TTL_MINUTES`, `JWT_REFRESH_TTL_DAYS`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_NAME`) via `godotenv`.
 - `internal/config/db.go` exposes `Connect(cfg *Config) (*gorm.DB, error)`.
 - `internal/models/base.go` provides `BaseModel` (UUID PK, audit cols) + `NotDeleted` scope.
 - `internal/errors/errors.go` provides `AppError` + `ErrNotFound`, `ErrBadRequest`, `ErrConflict`, `ErrForbidden`, `ErrUnauthorized` constructors.
@@ -43,13 +49,17 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
 
 ---
 
-### Task 1: Migration `000002_create_roles_users` (up + down)
+### Task 1: Migrations `000002_create_roles_users` + `000003_create_employees_dependents`
 
 **Files:**
 - Create: `migrations/000002_create_roles_users.up.sql`
 - Create: `migrations/000002_create_roles_users.down.sql`
+- Create: `migrations/000003_create_employees_dependents.up.sql`
+- Create: `migrations/000003_create_employees_dependents.down.sql`
 
-- [ ] **Step 1.1: Write `up.sql`.**
+This task lands the full Phase 1 schema in two migrations (cleaner than one combined file): the auth tables first, then the HR-info tables that depend on `users`.
+
+- [ ] **Step 1.1: Write `000002_create_roles_users.up.sql`.**
 
   Create file `migrations/000002_create_roles_users.up.sql` with exactly this content:
 
@@ -57,9 +67,8 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   -- =========================================================================
   -- 000002_create_roles_users
   -- roles, users, user_roles + audit columns + triggers + indexes
-  -- NOTE: department_id and position_id on users are NULLABLE and intentionally
-  -- have NO FK constraint here. The departments/positions tables are introduced
-  -- in Phase 3 (migration 000003); the FK constraints are added in that phase.
+  -- users is LEAN (auth only). HR fields live on the employees table created
+  -- in 000003.
   -- =========================================================================
 
   -- ---------------- roles ----------------
@@ -80,14 +89,13 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       BEFORE UPDATE ON roles
       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-  -- ---------------- users ----------------
+  -- ---------------- users (AUTH ONLY) ----------------
+  -- No full_name, no department_id, no position_id, no role string.
+  -- HR / profile fields live on the employees table (000003).
   CREATE TABLE users (
       id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       email               CITEXT NOT NULL UNIQUE,
-      password_hash       TEXT NOT NULL DEFAULT '',
-      full_name           TEXT NOT NULL DEFAULT '',
-      department_id       UUID NULL,
-      position_id         UUID NULL,
+      password_hash       TEXT NOT NULL,
       is_active           BOOLEAN NOT NULL DEFAULT TRUE,
       email_changed_at    TIMESTAMPTZ NULL,
       password_reset_at   TIMESTAMPTZ NULL,
@@ -97,8 +105,6 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       deleted_at          TIMESTAMPTZ NULL
   );
   CREATE INDEX idx_users_is_deleted ON users (is_deleted);
-  CREATE INDEX idx_users_department_id ON users (department_id);
-  CREATE INDEX idx_users_position_id ON users (position_id);
   CREATE TRIGGER trg_users_set_updated_at
       BEFORE UPDATE ON users
       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
@@ -120,7 +126,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
   ```
 
-- [ ] **Step 1.2: Write `down.sql`.**
+- [ ] **Step 1.2: Write `000002_create_roles_users.down.sql`.**
 
   Create file `migrations/000002_create_roles_users.down.sql` with exactly this content:
 
@@ -133,7 +139,115 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   DROP TABLE IF EXISTS roles;
   ```
 
-- [ ] **Step 1.3: Apply and roll back to confirm both files work.**
+- [ ] **Step 1.3: Write `000003_create_employees_dependents.up.sql`.**
+
+  Create file `migrations/000003_create_employees_dependents.up.sql` with exactly this content:
+
+  ```sql
+  -- =========================================================================
+  -- 000003_create_employees_dependents
+  -- employees (1-1 with users), dependents (1-N with employees).
+  --
+  -- NOTE: department_id and position_id on employees are NULLABLE and
+  -- intentionally have NO FK CONSTRAINT here. The departments / positions
+  -- tables are introduced in Phase 3; the FK constraints are added in that
+  -- phase (ALTER TABLE employees ADD CONSTRAINT ...).
+  -- =========================================================================
+
+  -- ---------------- employees ----------------
+  CREATE TABLE employees (
+      id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id                     UUID NOT NULL UNIQUE REFERENCES users(id),
+
+      -- Personal info
+      full_name                   TEXT NOT NULL,
+      phone                       TEXT NULL,
+      personal_email              CITEXT NULL,
+      gender                      TEXT NULL,                 -- male / female / other
+      permanent_address           TEXT NULL,
+      current_address             TEXT NULL,
+      dob                         DATE NULL,
+      nationality                 TEXT NULL,
+      id_number                   TEXT NULL,
+      id_issue_date               DATE NULL,
+      id_front_image              TEXT NULL,
+      id_back_image               TEXT NULL,
+      avatar_url                  TEXT NULL,
+      education                   TEXT NULL,                 -- high_school / college / university / master
+      marital_status              TEXT NULL,                 -- single / married / other
+
+      -- Emergency contact
+      emergency_contact_name      TEXT NULL,
+      emergency_contact_relation  TEXT NULL,
+      emergency_contact_phone     TEXT NULL,
+
+      -- Work info
+      -- department_id / position_id: NO FK yet — added in Phase 3.
+      department_id               UUID NULL,
+      position_id                 UUID NULL,
+      manager_id                  UUID NULL REFERENCES employees(id),
+      join_date                   DATE NULL,
+      contract_type               TEXT NOT NULL DEFAULT 'official',  -- probation / official
+      contract_sign_date          DATE NULL,
+      contract_end_date           DATE NULL,
+      contract_renewal            INT  NOT NULL DEFAULT 1,
+
+      -- Salary & insurance
+      basic_salary                NUMERIC(18,2) NOT NULL DEFAULT 0,
+      insurance_salary            NUMERIC(18,2) NOT NULL DEFAULT 0,
+
+      -- Banking
+      bank_account                TEXT NULL,
+      bank_name                   TEXT NULL,
+      bank_holder_name            TEXT NULL,
+      payment_method              TEXT NOT NULL DEFAULT 'bank_transfer',  -- bank_transfer / cash
+
+      created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      is_deleted                  BOOLEAN NOT NULL DEFAULT FALSE,
+      deleted_at                  TIMESTAMPTZ NULL
+  );
+  CREATE INDEX idx_employees_is_deleted     ON employees (is_deleted);
+  CREATE INDEX idx_employees_department_id  ON employees (department_id);
+  CREATE INDEX idx_employees_position_id    ON employees (position_id);
+  CREATE INDEX idx_employees_manager_id     ON employees (manager_id);
+  -- (user_id already has a UNIQUE index by virtue of UNIQUE on the column)
+  CREATE TRIGGER trg_employees_set_updated_at
+      BEFORE UPDATE ON employees
+      FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+  -- ---------------- dependents ----------------
+  CREATE TABLE dependents (
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      employee_id     UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+      full_name       TEXT NOT NULL,
+      dob             DATE NULL,
+      gender          TEXT NULL,           -- male / female / other
+      relationship    TEXT NOT NULL,       -- child / parent / spouse / other
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
+      deleted_at      TIMESTAMPTZ NULL
+  );
+  CREATE INDEX idx_dependents_is_deleted  ON dependents (is_deleted);
+  CREATE INDEX idx_dependents_employee_id ON dependents (employee_id);
+  CREATE TRIGGER trg_dependents_set_updated_at
+      BEFORE UPDATE ON dependents
+      FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  ```
+
+- [ ] **Step 1.4: Write `000003_create_employees_dependents.down.sql`.**
+
+  Create file `migrations/000003_create_employees_dependents.down.sql` with exactly this content:
+
+  ```sql
+  DROP TRIGGER IF EXISTS trg_dependents_set_updated_at ON dependents;
+  DROP TABLE IF EXISTS dependents;
+  DROP TRIGGER IF EXISTS trg_employees_set_updated_at ON employees;
+  DROP TABLE IF EXISTS employees;
+  ```
+
+- [ ] **Step 1.5: Apply and roll back to confirm all four files work.**
 
   Run:
   ```
@@ -142,22 +256,32 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   make migrate-up
   ```
 
-  Expected: each command prints the migration version it moved to and exits 0. After the final `migrate-up`, `psql $DATABASE_URL -c '\dt'` lists `roles`, `users`, `user_roles`, plus the migrate metadata table.
+  Expected: each command prints the migration version it moved to and exits 0. After the final `migrate-up`, `psql $DATABASE_URL -c '\dt'` lists `roles`, `users`, `user_roles`, `employees`, `dependents`, plus the migrate metadata table.
 
-- [ ] **Step 1.4: Commit.**
+  Spot-check column shape:
+  ```
+  psql $DATABASE_URL -c '\d employees' | head -40
+  psql $DATABASE_URL -c '\d dependents'
+  ```
+  Expected: `employees` shows `full_name TEXT NOT NULL`, `department_id UUID NULL` (no FK), `manager_id UUID NULL` (FK to employees), `basic_salary NUMERIC(18,2) NOT NULL DEFAULT 0`, all 4 audit cols, and `trg_employees_set_updated_at` trigger. `dependents` shows `employee_id UUID NOT NULL` with `ON DELETE CASCADE` to employees.
+
+- [ ] **Step 1.6: Commit.**
 
   ```
-  git add migrations/000002_create_roles_users.up.sql migrations/000002_create_roles_users.down.sql
-  git commit -m "feat(migration): add roles, users, user_roles schema with audit cols and triggers"
+  git add migrations/000002_create_roles_users.up.sql migrations/000002_create_roles_users.down.sql \
+          migrations/000003_create_employees_dependents.up.sql migrations/000003_create_employees_dependents.down.sql
+  git commit -m "feat(migration): add roles/users/user_roles and employees/dependents schema"
   ```
 
 ---
 
-### Task 2: Models `role.go` + `user.go`
+### Task 2: Models `role.go` + `user.go` + `employee.go` + `dependent.go`
 
 **Files:**
 - Create: `internal/models/role.go`
 - Create: `internal/models/user.go`
+- Create: `internal/models/employee.go`
+- Create: `internal/models/dependent.go`
 
 - [ ] **Step 2.1: Write `internal/models/role.go`.**
 
@@ -215,7 +339,38 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   func (Role) TableName() string { return "roles" }
   ```
 
-- [ ] **Step 2.2: Write `internal/models/user.go`.**
+- [ ] **Step 2.2: Write `internal/models/user.go` (AUTH ONLY — no full_name, no department_id, no position_id).**
+
+  ```go
+  package models
+
+  import (
+      "time"
+  )
+
+  // User maps to the users table. Auth-only — HR / profile fields live on
+  // Employee (one-to-one via user_id).
+  type User struct {
+      BaseModel
+      Email           string     `gorm:"type:citext;not null;uniqueIndex" json:"email"`
+      PasswordHash    string     `gorm:"type:text;not null" json:"-"`
+      IsActive        bool       `gorm:"not null;default:true" json:"is_active"`
+      EmailChangedAt  *time.Time `json:"email_changed_at,omitempty"`
+      PasswordResetAt *time.Time `json:"password_reset_at,omitempty"`
+
+      // Many-to-many via user_roles join table.
+      Roles []Role `gorm:"many2many:user_roles;joinForeignKey:user_id;joinReferences:role_id" json:"roles,omitempty"`
+
+      // One-to-one with Employee — preloaded by handlers that need the HR
+      // profile in the response shape (e.g., login). Pointer so an
+      // un-preloaded User does not carry a zero-valued empty Employee.
+      Employee *Employee `gorm:"foreignKey:UserID" json:"employee,omitempty"`
+  }
+
+  func (User) TableName() string { return "users" }
+  ```
+
+- [ ] **Step 2.3: Write `internal/models/employee.go`.**
 
   ```go
   package models
@@ -226,26 +381,89 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       "github.com/google/uuid"
   )
 
-  // User maps to the users table.
-  type User struct {
+  // Employee maps to the employees table. 1-1 with User via UserID.
+  type Employee struct {
       BaseModel
-      Email           string     `gorm:"type:citext;not null;uniqueIndex" json:"email"`
-      PasswordHash    string     `gorm:"type:text;not null;default:''" json:"-"`
-      FullName        string     `gorm:"type:text;not null;default:''" json:"full_name"`
-      DepartmentID    *uuid.UUID `gorm:"type:uuid" json:"department_id,omitempty"`
-      PositionID      *uuid.UUID `gorm:"type:uuid" json:"position_id,omitempty"`
-      IsActive        bool       `gorm:"not null;default:true" json:"is_active"`
-      EmailChangedAt  *time.Time `json:"email_changed_at,omitempty"`
-      PasswordResetAt *time.Time `json:"password_reset_at,omitempty"`
+      UserID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
 
-      // Many-to-many via user_roles join table.
-      Roles []Role `gorm:"many2many:user_roles;joinForeignKey:user_id;joinReferences:role_id" json:"roles,omitempty"`
+      // Personal info
+      FullName         string     `gorm:"type:text;not null" json:"full_name"`
+      Phone            *string    `gorm:"type:text" json:"phone,omitempty"`
+      PersonalEmail    *string    `gorm:"type:citext" json:"personal_email,omitempty"`
+      Gender           *string    `gorm:"type:text" json:"gender,omitempty"`
+      PermanentAddress *string    `gorm:"type:text" json:"permanent_address,omitempty"`
+      CurrentAddress   *string    `gorm:"type:text" json:"current_address,omitempty"`
+      DOB              *time.Time `gorm:"type:date" json:"dob,omitempty"`
+      Nationality      *string    `gorm:"type:text" json:"nationality,omitempty"`
+      IDNumber         *string    `gorm:"type:text" json:"id_number,omitempty"`
+      IDIssueDate      *time.Time `gorm:"type:date" json:"id_issue_date,omitempty"`
+      IDFrontImage     *string    `gorm:"type:text" json:"id_front_image,omitempty"`
+      IDBackImage      *string    `gorm:"type:text" json:"id_back_image,omitempty"`
+      AvatarURL        *string    `gorm:"type:text" json:"avatar_url,omitempty"`
+      Education        *string    `gorm:"type:text" json:"education,omitempty"`
+      MaritalStatus    *string    `gorm:"type:text" json:"marital_status,omitempty"`
+
+      // Emergency contact
+      EmergencyContactName     *string `gorm:"type:text" json:"emergency_contact_name,omitempty"`
+      EmergencyContactRelation *string `gorm:"type:text" json:"emergency_contact_relation,omitempty"`
+      EmergencyContactPhone    *string `gorm:"type:text" json:"emergency_contact_phone,omitempty"`
+
+      // Work info — department_id / position_id have NO FK constraint until
+      // Phase 3 introduces departments/positions tables.
+      DepartmentID     *uuid.UUID `gorm:"type:uuid" json:"department_id,omitempty"`
+      PositionID       *uuid.UUID `gorm:"type:uuid" json:"position_id,omitempty"`
+      ManagerID        *uuid.UUID `gorm:"type:uuid" json:"manager_id,omitempty"`
+      JoinDate         *time.Time `gorm:"type:date" json:"join_date,omitempty"`
+      ContractType     string     `gorm:"type:text;not null;default:'official'" json:"contract_type"`
+      ContractSignDate *time.Time `gorm:"type:date" json:"contract_sign_date,omitempty"`
+      ContractEndDate  *time.Time `gorm:"type:date" json:"contract_end_date,omitempty"`
+      ContractRenewal  int        `gorm:"not null;default:1" json:"contract_renewal"`
+
+      // Salary & insurance
+      BasicSalary     float64 `gorm:"type:numeric(18,2);not null;default:0" json:"basic_salary"`
+      InsuranceSalary float64 `gorm:"type:numeric(18,2);not null;default:0" json:"insurance_salary"`
+
+      // Banking
+      BankAccount    *string `gorm:"type:text" json:"bank_account,omitempty"`
+      BankName       *string `gorm:"type:text" json:"bank_name,omitempty"`
+      BankHolderName *string `gorm:"type:text" json:"bank_holder_name,omitempty"`
+      PaymentMethod  string  `gorm:"type:text;not null;default:'bank_transfer'" json:"payment_method"`
+
+      // Relations
+      User         *User        `gorm:"foreignKey:UserID" json:"user,omitempty"`
+      Manager      *Employee    `gorm:"foreignKey:ManagerID" json:"manager,omitempty"`
+      Subordinates []Employee   `gorm:"foreignKey:ManagerID" json:"subordinates,omitempty"`
+      Dependents   []Dependent  `gorm:"foreignKey:EmployeeID" json:"dependents,omitempty"`
   }
 
-  func (User) TableName() string { return "users" }
+  func (Employee) TableName() string { return "employees" }
   ```
 
-- [ ] **Step 2.3: Verify build.**
+- [ ] **Step 2.4: Write `internal/models/dependent.go`.**
+
+  ```go
+  package models
+
+  import (
+      "time"
+
+      "github.com/google/uuid"
+  )
+
+  // Dependent maps to the dependents table — people supported by an employee.
+  type Dependent struct {
+      BaseModel
+      EmployeeID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"employee_id"`
+      FullName     string     `gorm:"type:text;not null" json:"full_name"`
+      DOB          *time.Time `gorm:"type:date" json:"dob,omitempty"`
+      Gender       *string    `gorm:"type:text" json:"gender,omitempty"`        // male / female / other
+      Relationship string     `gorm:"type:text;not null" json:"relationship"`   // child / parent / spouse / other
+  }
+
+  func (Dependent) TableName() string { return "dependents" }
+  ```
+
+- [ ] **Step 2.5: Verify build.**
 
   ```
   go build ./...
@@ -253,11 +471,11 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
 
   Expected: exit 0, no output.
 
-- [ ] **Step 2.4: Commit.**
+- [ ] **Step 2.6: Commit.**
 
   ```
-  git add internal/models/role.go internal/models/user.go
-  git commit -m "feat(models): add Role and User GORM models with JSONB permissions"
+  git add internal/models/role.go internal/models/user.go internal/models/employee.go internal/models/dependent.go
+  git commit -m "feat(models): add Role, User (auth-only), Employee, Dependent GORM models"
   ```
 
 ---
@@ -652,6 +870,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   # Seed
   SUPER_ADMIN_EMAIL=admin@exnodes.vn
   SUPER_ADMIN_PASSWORD=ChangeMe!2026
+  SUPER_ADMIN_NAME=Super Admin
   ```
 
 - [ ] **Step 5.2: Write the test FIRST.**
@@ -926,8 +1145,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   type UserRepository interface {
       FindByID(ctx context.Context, id uuid.UUID) (*models.User, error)
       FindByIDWithRoles(ctx context.Context, id uuid.UUID) (*models.User, error)
+      FindByIDWithRolesAndEmployee(ctx context.Context, id uuid.UUID) (*models.User, error)
       FindByEmail(ctx context.Context, email string) (*models.User, error)
       FindByEmailWithRoles(ctx context.Context, email string) (*models.User, error)
+      FindByEmailWithRolesAndEmployee(ctx context.Context, email string) (*models.User, error)
       Create(ctx context.Context, user *models.User) error
       Update(ctx context.Context, user *models.User) error
       SoftDelete(ctx context.Context, id uuid.UUID) error
@@ -976,6 +1197,32 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       err := r.db.WithContext(ctx).
           Scopes(notDeleted).
           Preload("Roles", notDeleted).
+          First(&u, "email = ?", email).Error
+      if err != nil {
+          return nil, err
+      }
+      return &u, nil
+  }
+
+  func (r *userRepository) FindByIDWithRolesAndEmployee(ctx context.Context, id uuid.UUID) (*models.User, error) {
+      var u models.User
+      err := r.db.WithContext(ctx).
+          Scopes(notDeleted).
+          Preload("Roles", notDeleted).
+          Preload("Employee", notDeleted).
+          First(&u, "id = ?", id).Error
+      if err != nil {
+          return nil, err
+      }
+      return &u, nil
+  }
+
+  func (r *userRepository) FindByEmailWithRolesAndEmployee(ctx context.Context, email string) (*models.User, error) {
+      var u models.User
+      err := r.db.WithContext(ctx).
+          Scopes(notDeleted).
+          Preload("Roles", notDeleted).
+          Preload("Employee", notDeleted).
           First(&u, "email = ?", email).Error
       if err != nil {
           return nil, err
@@ -1045,6 +1292,189 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
 
 ---
 
+### Task 7b: Employee + Dependent repositories
+
+**Files:**
+- Create: `internal/repositories/employee_repo.go`
+- Create: `internal/repositories/dependent_repo.go`
+
+- [ ] **Step 7b.1: Implement `internal/repositories/employee_repo.go`.**
+
+  ```go
+  package repositories
+
+  import (
+      "context"
+      "errors"
+      "time"
+
+      "github.com/google/uuid"
+      "gorm.io/gorm"
+
+      "github.com/exnodes/hrm-api/internal/models"
+  )
+
+  // EmployeeRepository defines data access for the HR profile of a user.
+  type EmployeeRepository interface {
+      Create(ctx context.Context, e *models.Employee) error
+      Update(ctx context.Context, e *models.Employee) error
+      SoftDelete(ctx context.Context, id uuid.UUID) error
+      FindByID(ctx context.Context, id uuid.UUID) (*models.Employee, error)
+      FindByUserID(ctx context.Context, userID uuid.UUID) (*models.Employee, error)
+      FindByIDWithUser(ctx context.Context, id uuid.UUID) (*models.Employee, error)
+  }
+
+  type employeeRepository struct{ db *gorm.DB }
+
+  // NewEmployeeRepository constructs a Postgres-backed EmployeeRepository.
+  func NewEmployeeRepository(db *gorm.DB) EmployeeRepository {
+      return &employeeRepository{db: db}
+  }
+
+  func (r *employeeRepository) Create(ctx context.Context, e *models.Employee) error {
+      return r.db.WithContext(ctx).Create(e).Error
+  }
+
+  func (r *employeeRepository) Update(ctx context.Context, e *models.Employee) error {
+      return r.db.WithContext(ctx).Save(e).Error
+  }
+
+  func (r *employeeRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+      now := time.Now().UTC()
+      res := r.db.WithContext(ctx).Model(&models.Employee{}).
+          Where("id = ? AND is_deleted = false", id).
+          Updates(map[string]interface{}{"is_deleted": true, "deleted_at": now})
+      if res.Error != nil {
+          return res.Error
+      }
+      if res.RowsAffected == 0 {
+          return errors.New("employee not found or already deleted")
+      }
+      return nil
+  }
+
+  func (r *employeeRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Employee, error) {
+      var e models.Employee
+      err := r.db.WithContext(ctx).Scopes(notDeleted).First(&e, "id = ?", id).Error
+      if err != nil {
+          return nil, err
+      }
+      return &e, nil
+  }
+
+  func (r *employeeRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (*models.Employee, error) {
+      var e models.Employee
+      err := r.db.WithContext(ctx).Scopes(notDeleted).First(&e, "user_id = ?", userID).Error
+      if err != nil {
+          return nil, err
+      }
+      return &e, nil
+  }
+
+  func (r *employeeRepository) FindByIDWithUser(ctx context.Context, id uuid.UUID) (*models.Employee, error) {
+      var e models.Employee
+      err := r.db.WithContext(ctx).
+          Scopes(notDeleted).
+          Preload("User", notDeleted).
+          First(&e, "id = ?", id).Error
+      if err != nil {
+          return nil, err
+      }
+      return &e, nil
+  }
+  ```
+
+- [ ] **Step 7b.2: Implement `internal/repositories/dependent_repo.go`.**
+
+  ```go
+  package repositories
+
+  import (
+      "context"
+      "errors"
+      "time"
+
+      "github.com/google/uuid"
+      "gorm.io/gorm"
+
+      "github.com/exnodes/hrm-api/internal/models"
+  )
+
+  // DependentRepository defines data access for the dependents of an employee.
+  type DependentRepository interface {
+      Create(ctx context.Context, d *models.Dependent) error
+      Update(ctx context.Context, d *models.Dependent) error
+      SoftDelete(ctx context.Context, id uuid.UUID) error
+      FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error)
+      ListByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Dependent, error)
+  }
+
+  type dependentRepository struct{ db *gorm.DB }
+
+  // NewDependentRepository constructs a Postgres-backed DependentRepository.
+  func NewDependentRepository(db *gorm.DB) DependentRepository {
+      return &dependentRepository{db: db}
+  }
+
+  func (r *dependentRepository) Create(ctx context.Context, d *models.Dependent) error {
+      return r.db.WithContext(ctx).Create(d).Error
+  }
+
+  func (r *dependentRepository) Update(ctx context.Context, d *models.Dependent) error {
+      return r.db.WithContext(ctx).Save(d).Error
+  }
+
+  func (r *dependentRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+      now := time.Now().UTC()
+      res := r.db.WithContext(ctx).Model(&models.Dependent{}).
+          Where("id = ? AND is_deleted = false", id).
+          Updates(map[string]interface{}{"is_deleted": true, "deleted_at": now})
+      if res.Error != nil {
+          return res.Error
+      }
+      if res.RowsAffected == 0 {
+          return errors.New("dependent not found or already deleted")
+      }
+      return nil
+  }
+
+  func (r *dependentRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error) {
+      var d models.Dependent
+      err := r.db.WithContext(ctx).Scopes(notDeleted).First(&d, "id = ?", id).Error
+      if err != nil {
+          return nil, err
+      }
+      return &d, nil
+  }
+
+  func (r *dependentRepository) ListByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Dependent, error) {
+      var out []models.Dependent
+      err := r.db.WithContext(ctx).
+          Scopes(notDeleted).
+          Where("employee_id = ?", employeeID).
+          Order("created_at ASC").
+          Find(&out).Error
+      return out, err
+  }
+  ```
+
+- [ ] **Step 7b.3: Build.**
+
+  ```
+  go build ./...
+  ```
+
+  Expected: exit 0.
+
+- [ ] **Step 7b.4: Commit.**
+
+  ```
+  git add internal/repositories/employee_repo.go internal/repositories/dependent_repo.go
+  git commit -m "feat(repo): add employee and dependent repositories with NotDeleted scope"
+  ```
+
+---
+
 ### Task 8: Service test helper (real Postgres test DB)
 
 **Files:**
@@ -1085,9 +1515,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   )
 
   var (
-      testDB       *gorm.DB
-      testUserRepo repositories.UserRepository
-      testRoleRepo repositories.RoleRepository
+      testDB           *gorm.DB
+      testUserRepo     repositories.UserRepository
+      testRoleRepo     repositories.RoleRepository
+      testEmployeeRepo repositories.EmployeeRepository
   )
 
   // skipIfNoDB skips the test when TEST_DATABASE_URL is not set.
@@ -1146,6 +1577,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       testDB = gdb
       testUserRepo = repositories.NewUserRepository(gdb)
       testRoleRepo = repositories.NewRoleRepository(gdb)
+      testEmployeeRepo = repositories.NewEmployeeRepository(gdb)
 
       os.Exit(m.Run())
   }
@@ -1156,7 +1588,8 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       if testDB == nil {
           return
       }
-      if err := testDB.Exec(`TRUNCATE TABLE user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+      // Order matters because of FK constraints; CASCADE covers the rest.
+      if err := testDB.Exec(`TRUNCATE TABLE dependents, employees, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
           t.Fatalf("truncate: %v", err)
       }
   }
@@ -1180,7 +1613,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       return r
   }
 
-  // makeUser inserts a user, optionally assigning roles, and returns it.
+  // makeUser inserts an auth-only user, optionally assigning roles, and returns it.
   func makeUser(t *testing.T, email, password string, roles ...*models.Role) *models.User {
       t.Helper()
       hash, err := utils.HashPassword(password)
@@ -1190,7 +1623,6 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       u := &models.User{
           Email:        email,
           PasswordHash: hash,
-          FullName:     email,
           IsActive:     true,
       }
       if err := testUserRepo.Create(context.Background(), u); err != nil {
@@ -1206,6 +1638,26 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           }
       }
       return u
+  }
+
+  // makeEmployee inserts an Employee row linked to the given user, with
+  // sensible defaults. fullName falls back to the user's email when empty.
+  func makeEmployee(t *testing.T, forUser *models.User, fullName string) *models.Employee {
+      t.Helper()
+      if fullName == "" {
+          fullName = forUser.Email
+      }
+      e := &models.Employee{
+          UserID:          forUser.ID,
+          FullName:        fullName,
+          ContractType:    "official",
+          ContractRenewal: 1,
+          PaymentMethod:   "bank_transfer",
+      }
+      if err := testEmployeeRepo.Create(context.Background(), e); err != nil {
+          t.Fatalf("create employee: %v", err)
+      }
+      return e
   }
   ```
 
@@ -1267,17 +1719,24 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       skipIfNoDB(t)
       truncateAll(t)
       role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
-      makeUser(t, "alice@test.com", "Secret123!", role)
+      u := makeUser(t, "alice@test.com", "Secret123!", role)
+      makeEmployee(t, u, "Alice Tester")
 
       svc := newAuthSvc()
-      tokens, err := svc.Login(context.Background(), "alice@test.com", "Secret123!")
+      result, err := svc.Login(context.Background(), "alice@test.com", "Secret123!")
       if err != nil {
           t.Fatalf("login err: %v", err)
       }
-      if tokens.AccessToken == "" || tokens.RefreshToken == "" {
+      if result.Tokens.AccessToken == "" || result.Tokens.RefreshToken == "" {
           t.Fatal("expected non-empty tokens")
       }
-      claims, err := utils.VerifyToken(tokens.AccessToken, jwtSecret)
+      if result.User == nil || result.User.Employee == nil {
+          t.Fatal("expected user with preloaded employee")
+      }
+      if result.User.Employee.FullName != "Alice Tester" {
+          t.Errorf("employee.full_name: got %q", result.User.Employee.FullName)
+      }
+      claims, err := utils.VerifyToken(result.Tokens.AccessToken, jwtSecret)
       if err != nil {
           t.Fatalf("verify: %v", err)
       }
@@ -1344,14 +1803,15 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       skipIfNoDB(t)
       truncateAll(t)
       role := makeRole(t, "Super Admin", []permissions.Permission{permissions.PermAll}, true)
-      makeUser(t, "boss@test.com", "Secret123!", role)
+      u := makeUser(t, "boss@test.com", "Secret123!", role)
+      makeEmployee(t, u, "The Boss")
 
       svc := newAuthSvc()
-      tokens, err := svc.Login(context.Background(), "boss@test.com", "Secret123!")
+      result, err := svc.Login(context.Background(), "boss@test.com", "Secret123!")
       if err != nil {
           t.Fatalf("login err: %v", err)
       }
-      if tokens.AccessToken == "" {
+      if result.Tokens.AccessToken == "" {
           t.Fatal("expected access token")
       }
   }
@@ -1367,11 +1827,11 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       if err != nil {
           t.Fatalf("sign refresh: %v", err)
       }
-      tokens, err := svc.Refresh(context.Background(), refresh)
+      result, err := svc.Refresh(context.Background(), refresh)
       if err != nil {
           t.Fatalf("refresh err: %v", err)
       }
-      if tokens.AccessToken == "" || tokens.RefreshToken == "" {
+      if result.Tokens.AccessToken == "" || result.Tokens.RefreshToken == "" {
           t.Fatal("expected token pair")
       }
   }
@@ -1465,6 +1925,14 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       TokenType    string // always "Bearer"
   }
 
+  // LoginResult bundles the token pair with the authenticated user (with
+  // roles and employee profile preloaded) so handlers can render the full
+  // login response shape without a second DB round-trip.
+  type LoginResult struct {
+      Tokens TokenPair
+      User   *models.User // includes Roles and Employee
+  }
+
   // AuthService handles login, refresh, and permission resolution.
   type AuthService struct {
       users repositories.UserRepository
@@ -1477,9 +1945,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       return &AuthService{users: users, roles: roles, cfg: cfg}
   }
 
-  // Login authenticates an email/password pair and returns a token pair.
-  func (s *AuthService) Login(ctx context.Context, email, password string) (*TokenPair, error) {
-      user, err := s.users.FindByEmailWithRoles(ctx, email)
+  // Login authenticates an email/password pair and returns a token pair plus
+  // the authenticated user with Roles and Employee preloaded.
+  func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResult, error) {
+      user, err := s.users.FindByEmailWithRolesAndEmployee(ctx, email)
       if err != nil {
           if errors.Is(err, gorm.ErrRecordNotFound) {
               return nil, apperr.ErrUnauthorized("Invalid email or password")
@@ -1504,11 +1973,16 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           return nil, apperr.ErrForbidden("You do not have permission to access this system.")
       }
 
-      return s.issueTokenPair(user.ID)
+      tokens, err := s.issueTokenPair(user.ID)
+      if err != nil {
+          return nil, err
+      }
+      return &LoginResult{Tokens: *tokens, User: user}, nil
   }
 
-  // Refresh exchanges a refresh token for a new token pair.
-  func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenPair, error) {
+  // Refresh exchanges a refresh token for a new token pair (and returns the
+  // refreshed User with Roles + Employee preloaded for the response shape).
+  func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginResult, error) {
       claims, err := utils.VerifyToken(refreshToken, s.cfg.JWTSecret)
       if err != nil {
           return nil, apperr.ErrUnauthorized("Invalid or expired refresh token")
@@ -1520,14 +1994,18 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       if err != nil {
           return nil, apperr.ErrUnauthorized("Invalid token subject")
       }
-      user, err := s.users.FindByID(ctx, uid)
+      user, err := s.users.FindByIDWithRolesAndEmployee(ctx, uid)
       if err != nil {
           return nil, apperr.ErrUnauthorized("User not found or inactive")
       }
       if !user.IsActive {
           return nil, apperr.ErrUnauthorized("User not found or inactive")
       }
-      return s.issueTokenPair(user.ID)
+      tokens, err := s.issueTokenPair(user.ID)
+      if err != nil {
+          return nil, err
+      }
+      return &LoginResult{Tokens: *tokens, User: user}, nil
   }
 
   // Logout is stateless in Phase 1 — the client discards its tokens. Future
@@ -1613,9 +2091,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   )
 
   func newSeedSvc() *services.SeedService {
-      return services.NewSeedService(testDB, testUserRepo, testRoleRepo, services.SeedConfig{
+      return services.NewSeedService(testDB, testUserRepo, testRoleRepo, testEmployeeRepo, services.SeedConfig{
           SuperAdminEmail:    "admin@test.com",
           SuperAdminPassword: "ChangeMe!2026",
+          SuperAdminName:     "Super Admin",
       })
   }
 
@@ -1655,7 +2134,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       }
 
       // Super admin user must exist and be linked.
-      u, err := testUserRepo.FindByEmailWithRoles(context.Background(), "admin@test.com")
+      u, err := testUserRepo.FindByEmailWithRolesAndEmployee(context.Background(), "admin@test.com")
       if err != nil {
           t.Fatalf("admin user: %v", err)
       }
@@ -1667,6 +2146,15 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       }
       if !foundSA {
           t.Fatal("admin user must be linked to Super Admin role")
+      }
+      if u.Employee == nil {
+          t.Fatal("admin user must have a matching employee row")
+      }
+      if u.Employee.FullName != "Super Admin" {
+          t.Errorf("employee.full_name: want %q, got %q", "Super Admin", u.Employee.FullName)
+      }
+      if u.Employee.ContractType != "official" {
+          t.Errorf("employee.contract_type: want %q, got %q", "official", u.Employee.ContractType)
       }
   }
 
@@ -1691,6 +2179,11 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       testDB.Raw("SELECT COUNT(*) FROM users WHERE is_deleted = false").Scan(&userCount)
       if userCount != 1 {
           t.Errorf("expected 1 user after double-seed, got %d", userCount)
+      }
+      var empCount int64
+      testDB.Raw("SELECT COUNT(*) FROM employees WHERE is_deleted = false").Scan(&empCount)
+      if empCount != 1 {
+          t.Errorf("expected 1 employee after double-seed, got %d", empCount)
       }
   }
 
@@ -1720,6 +2213,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       "context"
       "errors"
       "log"
+      "time"
 
       "github.com/google/uuid"
       "gorm.io/gorm"
@@ -1734,21 +2228,29 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   type SeedConfig struct {
       SuperAdminEmail    string
       SuperAdminPassword string
+      SuperAdminName     string // default "Super Admin" if blank
   }
 
-  // SeedService creates the 5 system roles and 1 super admin user on boot.
-  // Safe to run repeatedly — operations are merge/upsert and never overwrite
-  // manually-edited records.
+  // SeedService creates the 5 system roles, 1 super admin user, and the
+  // matching employee row on boot. Safe to run repeatedly — operations are
+  // merge/upsert and never overwrite manually-edited records.
   type SeedService struct {
-      db    *gorm.DB
-      users repositories.UserRepository
-      roles repositories.RoleRepository
-      cfg   SeedConfig
+      db        *gorm.DB
+      users     repositories.UserRepository
+      roles     repositories.RoleRepository
+      employees repositories.EmployeeRepository
+      cfg       SeedConfig
   }
 
   // NewSeedService constructs a SeedService.
-  func NewSeedService(db *gorm.DB, users repositories.UserRepository, roles repositories.RoleRepository, cfg SeedConfig) *SeedService {
-      return &SeedService{db: db, users: users, roles: roles, cfg: cfg}
+  func NewSeedService(
+      db *gorm.DB,
+      users repositories.UserRepository,
+      roles repositories.RoleRepository,
+      employees repositories.EmployeeRepository,
+      cfg SeedConfig,
+  ) *SeedService {
+      return &SeedService{db: db, users: users, roles: roles, employees: employees, cfg: cfg}
   }
 
   type roleSeed struct {
@@ -1894,12 +2396,21 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           return err
       }
 
-      existing, err := s.users.FindByEmailWithRoles(ctx, s.cfg.SuperAdminEmail)
+      adminName := s.cfg.SuperAdminName
+      if adminName == "" {
+          adminName = "Super Admin"
+      }
+
+      existing, err := s.users.FindByEmailWithRolesAndEmployee(ctx, s.cfg.SuperAdminEmail)
       if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
           return err
       }
+
+      var userID uuid.UUID
       if existing != nil {
-          // Ensure linkage; never touch password.
+          userID = existing.ID
+
+          // Ensure role linkage; never touch password.
           ids := []uuid.UUID{}
           hasSA := false
           for _, r := range existing.Roles {
@@ -1915,26 +2426,48 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
               }
               log.Printf("seed: linked super admin role to existing user %q", existing.Email)
           }
-          return nil
+      } else {
+          hash, err := utils.HashPassword(s.cfg.SuperAdminPassword)
+          if err != nil {
+              return err
+          }
+          u := &models.User{
+              Email:        s.cfg.SuperAdminEmail,
+              PasswordHash: hash,
+              IsActive:     true,
+          }
+          if err := s.users.Create(ctx, u); err != nil {
+              return err
+          }
+          if err := s.users.ReplaceRoles(ctx, u.ID, []uuid.UUID{saRole.ID}); err != nil {
+              return err
+          }
+          log.Printf("seed: created super admin user %q", u.Email)
+          userID = u.ID
       }
 
-      hash, err := utils.HashPassword(s.cfg.SuperAdminPassword)
-      if err != nil {
+      // Ensure the matching employee row exists (idempotent — never overwrite
+      // a manually-edited employee record).
+      _, err = s.employees.FindByUserID(ctx, userID)
+      if err == nil {
+          return nil
+      }
+      if !errors.Is(err, gorm.ErrRecordNotFound) {
           return err
       }
-      u := &models.User{
-          Email:        s.cfg.SuperAdminEmail,
-          PasswordHash: hash,
-          FullName:     "Super Admin",
-          IsActive:     true,
+      today := time.Now().UTC()
+      emp := &models.Employee{
+          UserID:          userID,
+          FullName:        adminName,
+          ContractType:    "official",
+          ContractRenewal: 1,
+          PaymentMethod:   "bank_transfer",
+          JoinDate:        &today,
       }
-      if err := s.users.Create(ctx, u); err != nil {
+      if err := s.employees.Create(ctx, emp); err != nil {
           return err
       }
-      if err := s.users.ReplaceRoles(ctx, u.ID, []uuid.UUID{saRole.ID}); err != nil {
-          return err
-      }
-      log.Printf("seed: created super admin user %q", u.Email)
+      log.Printf("seed: created super admin employee profile for %q", s.cfg.SuperAdminEmail)
       return nil
   }
   ```
@@ -2201,6 +2734,8 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   ```go
   package dto
 
+  import "github.com/google/uuid"
+
   // LoginRequest is the body for POST /api/v1/auth/login.
   type LoginRequest struct {
       Email    string `json:"email" binding:"required,email" example:"admin@exnodes.vn"`
@@ -2212,11 +2747,42 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       RefreshToken string `json:"refresh_token" binding:"required" example:"eyJhbGciOi..."`
   }
 
+  // EmployeeSummary is the slice of Employee fields embedded in auth responses.
+  // The full Employee resource lives under /api/v1/employees.
+  type EmployeeSummary struct {
+      ID           uuid.UUID  `json:"id"`
+      FullName     string     `json:"full_name"`
+      AvatarURL    *string    `json:"avatar_url,omitempty"`
+      DepartmentID *uuid.UUID `json:"department_id,omitempty"`
+      PositionID   *uuid.UUID `json:"position_id,omitempty"`
+      ManagerID    *uuid.UUID `json:"manager_id,omitempty"`
+  }
+
+  // RoleSummary is the slim role projection used in auth responses.
+  type RoleSummary struct {
+      ID          uuid.UUID `json:"id"`
+      Name        string    `json:"name"`
+      IsSystem    bool      `json:"is_system"`
+      Permissions []string  `json:"permissions"`
+  }
+
+  // UserSummary is the user shape returned by the login/refresh endpoints. It
+  // embeds the HR profile so the frontend never has to fetch full_name from
+  // /users separately.
+  type UserSummary struct {
+      ID       uuid.UUID        `json:"id"`
+      Email    string           `json:"email"`
+      IsActive bool             `json:"is_active"`
+      Employee *EmployeeSummary `json:"employee,omitempty"`
+      Roles    []RoleSummary    `json:"roles"`
+  }
+
   // LoginResponse is the body of a successful login or refresh.
   type LoginResponse struct {
-      AccessToken  string `json:"access_token"`
-      RefreshToken string `json:"refresh_token"`
-      TokenType    string `json:"token_type" example:"Bearer"`
+      AccessToken  string      `json:"access_token"`
+      RefreshToken string      `json:"refresh_token"`
+      TokenType    string      `json:"token_type" example:"Bearer"`
+      User         UserSummary `json:"user"`
   }
 
   // LogoutResponse is the body of a logout call (currently empty acknowledgement).
@@ -2252,6 +2818,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       apperr "github.com/exnodes/hrm-api/internal/errors"
       "github.com/exnodes/hrm-api/internal/dto"
       "github.com/exnodes/hrm-api/internal/middleware"
+      "github.com/exnodes/hrm-api/internal/models"
       "github.com/exnodes/hrm-api/internal/services"
   )
 
@@ -2263,6 +2830,42 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   // NewAuthHandler constructs an AuthHandler.
   func NewAuthHandler(auth *services.AuthService) *AuthHandler {
       return &AuthHandler{auth: auth}
+  }
+
+  // toUserSummary projects an auth-loaded User (with Roles + Employee preloaded)
+  // into the auth response shape.
+  func toUserSummary(u *models.User) dto.UserSummary {
+      var emp *dto.EmployeeSummary
+      if u.Employee != nil {
+          emp = &dto.EmployeeSummary{
+              ID:           u.Employee.ID,
+              FullName:     u.Employee.FullName,
+              AvatarURL:    u.Employee.AvatarURL,
+              DepartmentID: u.Employee.DepartmentID,
+              PositionID:   u.Employee.PositionID,
+              ManagerID:    u.Employee.ManagerID,
+          }
+      }
+      roles := make([]dto.RoleSummary, 0, len(u.Roles))
+      for _, r := range u.Roles {
+          perms := make([]string, 0, len(r.Permissions))
+          for _, p := range r.Permissions {
+              perms = append(perms, p)
+          }
+          roles = append(roles, dto.RoleSummary{
+              ID:          r.ID,
+              Name:        r.Name,
+              IsSystem:    r.IsSystem,
+              Permissions: perms,
+          })
+      }
+      return dto.UserSummary{
+          ID:       u.ID,
+          Email:    u.Email,
+          IsActive: u.IsActive,
+          Employee: emp,
+          Roles:    roles,
+      }
   }
 
   // Login godoc
@@ -2283,7 +2886,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           _ = c.Error(apperr.ErrBadRequest(err.Error()))
           return
       }
-      tokens, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+      result, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
       if err != nil {
           _ = c.Error(err)
           return
@@ -2292,9 +2895,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           Success: true,
           Message: "Login successful",
           Data: dto.LoginResponse{
-              AccessToken:  tokens.AccessToken,
-              RefreshToken: tokens.RefreshToken,
+              AccessToken:  result.Tokens.AccessToken,
+              RefreshToken: result.Tokens.RefreshToken,
               TokenType:    "Bearer",
+              User:         toUserSummary(result.User),
           },
       })
   }
@@ -2315,7 +2919,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           _ = c.Error(apperr.ErrBadRequest(err.Error()))
           return
       }
-      tokens, err := h.auth.Refresh(c.Request.Context(), req.RefreshToken)
+      result, err := h.auth.Refresh(c.Request.Context(), req.RefreshToken)
       if err != nil {
           _ = c.Error(err)
           return
@@ -2324,9 +2928,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
           Success: true,
           Message: "Token refreshed",
           Data: dto.LoginResponse{
-              AccessToken:  tokens.AccessToken,
-              RefreshToken: tokens.RefreshToken,
+              AccessToken:  result.Tokens.AccessToken,
+              RefreshToken: result.Tokens.RefreshToken,
               TokenType:    "Bearer",
+              User:         toUserSummary(result.User),
           },
       })
   }
@@ -2440,8 +3045,9 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   JWTRefreshTTLDays      int
   SuperAdminEmail        string
   SuperAdminPassword     string
+  SuperAdminName         string
   ```
-  Loaded via `os.Getenv` with the env keys `JWT_SECRET_KEY`, `JWT_ACCESS_TTL_MINUTES`, `JWT_REFRESH_TTL_DAYS`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`. Defaults: access 60 min, refresh 14 days. If `JWT_SECRET_KEY` is empty the app must `log.Fatal` on boot.
+  Loaded via `os.Getenv` with the env keys `JWT_SECRET_KEY`, `JWT_ACCESS_TTL_MINUTES`, `JWT_REFRESH_TTL_DAYS`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, `SUPER_ADMIN_NAME`. Defaults: access 60 min, refresh 14 days, `SuperAdminName` defaults to `"Super Admin"` when blank. If `JWT_SECRET_KEY` is empty the app must `log.Fatal` on boot.
 
   Add these if missing (do not break existing keys).
 
@@ -2453,6 +3059,9 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   // ---- repositories ----
   userRepo := repositories.NewUserRepository(db)
   roleRepo := repositories.NewRoleRepository(db)
+  employeeRepo := repositories.NewEmployeeRepository(db)
+  dependentRepo := repositories.NewDependentRepository(db)
+  _ = dependentRepo // wired in later phases
 
   // ---- services ----
   authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -2460,9 +3069,10 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
       AccessTTL:  time.Duration(cfg.JWTAccessTTLMinutes) * time.Minute,
       RefreshTTL: time.Duration(cfg.JWTRefreshTTLDays) * 24 * time.Hour,
   })
-  seedSvc := services.NewSeedService(db, userRepo, roleRepo, services.SeedConfig{
+  seedSvc := services.NewSeedService(db, userRepo, roleRepo, employeeRepo, services.SeedConfig{
       SuperAdminEmail:    cfg.SuperAdminEmail,
       SuperAdminPassword: cfg.SuperAdminPassword,
+      SuperAdminName:     cfg.SuperAdminName,
   })
 
   // ---- run idempotent seed on boot ----
@@ -2547,9 +3157,14 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
   make migrate-down || true
   make migrate-up
   make migrate-version
+  psql $DATABASE_URL -c '\dt'
   ```
 
-  Expected: `migrate-version` prints `2` (or current latest).
+  Expected: `migrate-version` prints `3` (000001 init, 000002 roles/users, 000003 employees/dependents). `\dt` shows `roles`, `users`, `user_roles`, `employees`, `dependents`. Spot-check:
+  ```
+  psql $DATABASE_URL -c '\d employees' | head -50
+  ```
+  Expected columns include `full_name`, `department_id`, `position_id`, `manager_id` (FK to employees), `basic_salary numeric(18,2)`, `contract_type`, plus 4 audit cols.
 
 - [ ] **Step 17.2: Run the server in the background.**
 
@@ -2580,12 +3195,24 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
     "data": {
       "access_token": "eyJhbGciOi...",
       "refresh_token": "eyJhbGciOi...",
-      "token_type": "Bearer"
+      "token_type": "Bearer",
+      "user": {
+        "id": "<uuid>",
+        "email": "admin@exnodes.vn",
+        "is_active": true,
+        "employee": {
+          "id": "<uuid>",
+          "full_name": "Super Admin"
+        },
+        "roles": [
+          { "id": "<uuid>", "name": "Super Admin", "is_system": true, "permissions": ["*"] }
+        ]
+      }
     }
   }
   ```
 
-  Capture `access_token` as `ACCESS` and `refresh_token` as `REFRESH` env vars.
+  Capture `access_token` as `ACCESS` and `refresh_token` as `REFRESH` env vars. Confirm `data.user.employee.full_name == "Super Admin"` (or whatever `SUPER_ADMIN_NAME` was set to).
 
 - [ ] **Step 17.4: Hit a protected endpoint with the token.**
 
@@ -2702,17 +3329,19 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
 
 All items below must be true before declaring the phase complete.
 
-- [ ] `migrations/000002_create_roles_users.up.sql` + `.down.sql` exist, applied cleanly, and rollback restores a working DB.
-- [ ] `internal/models/role.go` and `internal/models/user.go` compile and embed `BaseModel`.
+- [ ] `migrations/000002_create_roles_users.up.sql` + `.down.sql` AND `migrations/000003_create_employees_dependents.up.sql` + `.down.sql` exist, applied cleanly, and rollback restores a working DB.
+- [ ] After `make migrate-up`, the DB contains tables `roles`, `users` (auth-only — no `full_name` / `department_id` / `position_id` column), `user_roles`, `employees` (full HR schema), `dependents`. All have 4 audit cols, `is_deleted` index, and a `set_updated_at` trigger. `employees.user_id` is UNIQUE; `employees.manager_id` is a self-ref FK; `dependents.employee_id` cascades on delete. `employees.department_id` and `employees.position_id` are nullable UUIDs with NO FK constraint (constraints added in Phase 3).
+- [ ] `internal/models/role.go`, `internal/models/user.go` (auth-only), `internal/models/employee.go`, `internal/models/dependent.go` compile and embed `BaseModel`.
+- [ ] `internal/models/user.go` does NOT declare a `FullName`, `DepartmentID`, or `PositionID` field — those live on `Employee`.
 - [ ] `internal/permissions/registry.go` defines all 35 permissions from the Python source (1 auth + 6 users + 4 roles + 4 departments + 4 positions + 4 skills + 7 leave_requests + 1 leave_quota + 2 attendance + 1 organization_settings + 1 announcements) plus `PermAll` and the 11-group `PermissionGroups` catalog. Tests pass.
 - [ ] `pkg/utils/password.go` and `pkg/utils/jwt.go` compile, tests pass (`go test ./pkg/utils/...`).
-- [ ] `internal/repositories/role_repo.go` + `user_repo.go` compile.
-- [ ] `internal/services/auth_service.go` implements `Login`, `Refresh`, `Logout`, `ResolveUserPermissions`. Tests pass (or skip if no DB).
-- [ ] `internal/services/seed_service.go` is idempotent. Running twice does not duplicate rows. Tests pass.
+- [ ] `internal/repositories/role_repo.go`, `user_repo.go`, `employee_repo.go`, `dependent_repo.go` compile.
+- [ ] `internal/services/auth_service.go` implements `Login`, `Refresh`, `Logout`, `ResolveUserPermissions`. `Login` and `Refresh` return `*LoginResult` (Tokens + User-with-Employee-preloaded). Tests pass (or skip if no DB).
+- [ ] `internal/services/seed_service.go` is idempotent. Running twice does not duplicate rows. After seed, the DB contains exactly 5 roles, 1 user, AND 1 employee row whose `full_name` matches `SUPER_ADMIN_NAME` (default "Super Admin") and whose `user_id` equals the super admin user's ID. Tests pass.
 - [ ] `internal/middleware/auth.go` validates Bearer tokens, loads user, checks `is_active` + `is_deleted` + session-invalidation timestamps.
 - [ ] `internal/middleware/permissions.go` enforces `RequirePerms` with wildcard bypass and `{required, missing}` details on 403.
-- [ ] `internal/dto/auth.go` defines `LoginRequest`, `LoginResponse`, `RefreshRequest`, `LogoutResponse`.
-- [ ] `internal/handlers/auth_handler.go` exposes login, refresh, logout — all with full Swagger annotations including `@Security BearerAuth` on logout.
+- [ ] `internal/dto/auth.go` defines `LoginRequest`, `LoginResponse` (with embedded `user.employee` summary), `RefreshRequest`, `LogoutResponse`, `UserSummary`, `EmployeeSummary`, `RoleSummary`.
+- [ ] `internal/handlers/auth_handler.go` exposes login, refresh, logout — all with full Swagger annotations including `@Security BearerAuth` on logout. Login/refresh responses include `data.user.employee.full_name` populated from the seeded Employee row.
 - [ ] `internal/handlers/role_handler.go` exposes `GET /api/v1/roles/permissions` — also annotated.
 - [ ] `cmd/server/main.go` wires repos, services, middleware, routes, and runs the seed on boot.
 - [ ] Swagger UI lists all 4 new endpoints.

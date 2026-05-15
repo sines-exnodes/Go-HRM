@@ -17,7 +17,7 @@
 - Create: `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/.gitignore`
 - Create: `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/.gitkeep`
 
-- [ ] **Step 1: Verify the working directory is the empty project root**
+- [x] **Step 1: Verify the working directory is the empty project root**
 
 Run:
 ```bash
@@ -25,7 +25,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && ls -A
 ```
 Expected output contains `ba-requirements` and `docs` and nothing else (no `go.mod` yet).
 
-- [ ] **Step 2: Initialise the Go module**
+- [x] **Step 2: Initialise the Go module**
 
 Run:
 ```bash
@@ -43,14 +43,14 @@ module github.com/exnodes/hrm-api
 
 ```
 
-- [ ] **Step 3: Write `.gitignore`**
+- [x] **Step 3: Write `.gitignore`**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/.gitignore` with exactly this content:
 ```gitignore
 # Binaries
 /bin/
 /tmp/
-server
+/server
 *.exe
 *.test
 *.out
@@ -75,7 +75,7 @@ coverage.html
 /docs/swagger/swagger.json.bak
 ```
 
-- [ ] **Step 4: Initialise the git repository (if not already) and stage**
+- [x] **Step 4: Initialise the git repository (if not already) and stage**
 
 Run:
 ```bash
@@ -83,7 +83,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && git rev-parse
 ```
 Expected: either `true` or `Initialized empty Git repository in ...`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 ```bash
@@ -115,7 +115,7 @@ Expected: `1 file changed` or `2 files changed` summary; no errors.
 - Create: `docs/swagger/.gitkeep`
 - Create: `docs/superpowers/verification/.gitkeep`
 
-- [ ] **Step 1: Create all directories at once**
+- [x] **Step 1: Create all directories at once**
 
 Run:
 ```bash
@@ -131,7 +131,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: no output.
 
-- [ ] **Step 2: Drop a `.gitkeep` in every leaf directory**
+- [x] **Step 2: Drop a `.gitkeep` in every leaf directory**
 
 Run:
 ```bash
@@ -149,7 +149,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: no output.
 
-- [ ] **Step 3: Verify the tree**
+- [x] **Step 3: Verify the tree**
 
 Run:
 ```bash
@@ -185,7 +185,7 @@ Expected (order may vary):
 ./scripts
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -203,7 +203,7 @@ Expected: 16 files added.
 - Modify: `go.mod`
 - Modify: `go.sum` (auto-generated)
 
-- [ ] **Step 1: Add Gin, GORM, Postgres driver**
+- [x] **Step 1: Add Gin, GORM, Postgres driver**
 
 Run:
 ```bash
@@ -214,7 +214,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: each command prints `go: added github.com/...@v...`.
 
-- [ ] **Step 2: Add config, UUID, and migrate library**
+- [x] **Step 2: Add config, UUID, and migrate library**
 
 Run:
 ```bash
@@ -225,7 +225,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: each `go get` prints an `added` line.
 
-- [ ] **Step 3: Add Swagger libraries**
+- [x] **Step 3: Add Swagger libraries**
 
 Run:
 ```bash
@@ -236,7 +236,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: each `go get` prints an `added` line.
 
-- [ ] **Step 4: Install the `swag` CLI and the `migrate` CLI**
+- [x] **Step 4: Install the `swag` CLI and the `migrate` CLI**
 
 Run:
 ```bash
@@ -251,7 +251,7 @@ Verify:
 ```
 Expected: `swag version v1.16.4` and `4.18.1` (or similar).
 
-- [ ] **Step 5: Tidy the module**
+- [x] **Step 5: Tidy the module**
 
 Run:
 ```bash
@@ -259,7 +259,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go mod tidy
 ```
 Expected: silent success (no error); `go.sum` is created.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 ```bash
@@ -277,7 +277,7 @@ Expected: 2 files changed.
 - Create: `.env.example`
 - Create: `Makefile`
 
-- [ ] **Step 1: Create `.env.example`**
+- [x] **Step 1: Create `.env.example`**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/.env.example` with exactly this content:
 ```dotenv
@@ -317,7 +317,7 @@ SUPABASE_S3_ACCESS_KEY=
 SUPABASE_S3_SECRET_KEY=
 ```
 
-- [ ] **Step 2: Create the Makefile**
+- [x] **Step 2: Create the Makefile**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/Makefile` with exactly this content:
 ```makefile
@@ -397,7 +397,7 @@ migrate-force:
 	$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DATABASE_URL)" force $(version)
 ```
 
-- [ ] **Step 3: Sanity-check the Makefile syntax**
+- [x] **Step 3: Sanity-check the Makefile syntax**
 
 Run:
 ```bash
@@ -405,7 +405,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && make help
 ```
 Expected: the help block prints. No `*** missing separator` errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -422,7 +422,7 @@ Expected: 2 files changed.
 **Files:**
 - Create: `internal/config/config.go`
 
-- [ ] **Step 1: Write the config loader**
+- [x] **Step 1: Write the config loader**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/config/config.go` with exactly:
 ```go
@@ -555,7 +555,7 @@ func getEnvBool(key string, fallback bool) bool {
 }
 ```
 
-- [ ] **Step 2: Compile-check**
+- [x] **Step 2: Compile-check**
 
 Run:
 ```bash
@@ -563,7 +563,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./in
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Run:
 ```bash
@@ -581,7 +581,7 @@ Expected: 1 add, 1 delete.
 **Files:**
 - Create: `internal/config/db.go`
 
-- [ ] **Step 1: Write the DB helper**
+- [x] **Step 1: Write the DB helper**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/config/db.go` with exactly:
 ```go
@@ -727,7 +727,7 @@ func latestMigrationVersionOnDisk(migrationsDir string) (int64, error) {
 }
 ```
 
-- [ ] **Step 2: Compile-check**
+- [x] **Step 2: Compile-check**
 
 Run:
 ```bash
@@ -735,7 +735,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./in
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Run:
 ```bash
@@ -752,7 +752,7 @@ Expected: 1 file changed.
 **Files:**
 - Create: `internal/errors/errors.go`
 
-- [ ] **Step 1: Write the error type**
+- [x] **Step 1: Write the error type**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/errors/errors.go` with exactly:
 ```go
@@ -868,7 +868,7 @@ func ErrInternal(msg string) *AppError {
 }
 ```
 
-- [ ] **Step 2: Compile-check**
+- [x] **Step 2: Compile-check**
 
 Run:
 ```bash
@@ -876,7 +876,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./in
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Run:
 ```bash
@@ -894,7 +894,7 @@ Expected: 1 add, 1 delete.
 **Files:**
 - Create: `internal/middleware/error.go`
 
-- [ ] **Step 1: Write the error middleware**
+- [x] **Step 1: Write the error middleware**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/middleware/error.go` with exactly:
 ```go
@@ -958,7 +958,7 @@ func ErrorHandler() gin.HandlerFunc {
 }
 ```
 
-- [ ] **Step 2: Compile-check**
+- [x] **Step 2: Compile-check**
 
 Run:
 ```bash
@@ -966,7 +966,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./in
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Run:
 ```bash
@@ -984,7 +984,7 @@ Expected: 1 file changed.
 - Create: `internal/middleware/cors.go`
 - Create: `internal/middleware/recovery.go`
 
-- [ ] **Step 1: Write the CORS middleware**
+- [x] **Step 1: Write the CORS middleware**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/middleware/cors.go` with exactly:
 ```go
@@ -1016,7 +1016,7 @@ func CORS() gin.HandlerFunc {
 }
 ```
 
-- [ ] **Step 2: Write the recovery middleware**
+- [x] **Step 2: Write the recovery middleware**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/middleware/recovery.go` with exactly:
 ```go
@@ -1052,7 +1052,7 @@ func Recovery() gin.HandlerFunc {
 }
 ```
 
-- [ ] **Step 3: Compile-check**
+- [x] **Step 3: Compile-check**
 
 Run:
 ```bash
@@ -1060,7 +1060,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./in
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -1079,7 +1079,7 @@ Expected: 2 adds, 1 delete.
 - Create: `internal/dto/response.go`
 - Create: `internal/models/base.go`
 
-- [ ] **Step 1: Write the response envelopes**
+- [x] **Step 1: Write the response envelopes**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/dto/response.go` with exactly:
 ```go
@@ -1142,7 +1142,7 @@ func NewPaginatedResponse[T any](items []T, total int64, page, pageSize int) Res
 }
 ```
 
-- [ ] **Step 2: Write `BaseModel`**
+- [x] **Step 2: Write `BaseModel`**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/models/base.go` with exactly:
 ```go
@@ -1177,7 +1177,7 @@ func NotDeleted(db *gorm.DB) *gorm.DB {
 }
 ```
 
-- [ ] **Step 3: Compile-check**
+- [x] **Step 3: Compile-check**
 
 Run:
 ```bash
@@ -1186,7 +1186,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -1205,7 +1205,7 @@ Expected: 2 adds, 2 deletes.
 - Create: `migrations/000001_init_extensions.up.sql`
 - Create: `migrations/000001_init_extensions.down.sql`
 
-- [ ] **Step 1: Write the up migration**
+- [x] **Step 1: Write the up migration**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/migrations/000001_init_extensions.up.sql` with exactly:
 ```sql
@@ -1230,7 +1230,7 @@ END;
 $$ LANGUAGE plpgsql;
 ```
 
-- [ ] **Step 2: Write the down migration**
+- [x] **Step 2: Write the down migration**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/migrations/000001_init_extensions.down.sql` with exactly:
 ```sql
@@ -1244,7 +1244,7 @@ DROP EXTENSION IF EXISTS pgcrypto;
 DROP EXTENSION IF EXISTS "uuid-ossp";
 ```
 
-- [ ] **Step 3: Verify both files exist and are well-formed SQL**
+- [x] **Step 3: Verify both files exist and are well-formed SQL**
 
 Run:
 ```bash
@@ -1254,7 +1254,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: two files listed (one `.up.sql`, one `.down.sql`); `grep` prints `3`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -1273,7 +1273,7 @@ Expected: 2 adds, 1 delete.
 - Create: `internal/handlers/health_handler.go`
 - Create: `internal/handlers/router.go`
 
-- [ ] **Step 1: Write the health handler**
+- [x] **Step 1: Write the health handler**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/handlers/health_handler.go` with exactly:
 ```go
@@ -1316,7 +1316,7 @@ func (h *HealthHandler) Health(c *gin.Context) {
 }
 ```
 
-- [ ] **Step 2: Write the route registrar**
+- [x] **Step 2: Write the route registrar**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/internal/handlers/router.go` with exactly:
 ```go
@@ -1359,7 +1359,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, swaggerEnabled bool) {
 }
 ```
 
-- [ ] **Step 3: Compile-check**
+- [x] **Step 3: Compile-check**
 
 Run:
 ```bash
@@ -1367,7 +1367,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./in
 ```
 Expected: a single error of the form `package github.com/exnodes/hrm-api/docs/swagger` is **not** expected here because `router.go` does NOT yet import the generated docs. The build should succeed cleanly (no output, exit code 0).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -1385,7 +1385,7 @@ Expected: 2 adds, 1 delete.
 **Files:**
 - Create: `cmd/server/main.go`
 
-- [ ] **Step 1: Write the entry point**
+- [x] **Step 1: Write the entry point**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/cmd/server/main.go` with exactly:
 ```go
@@ -1452,7 +1452,7 @@ func main() {
 }
 ```
 
-- [ ] **Step 2: Create a stub `docs/swagger` package so main.go builds before `swag init`**
+- [x] **Step 2: Create a stub `docs/swagger` package so main.go builds before `swag init`**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/docs/swagger/docs.go` with exactly:
 ```go
@@ -1462,7 +1462,7 @@ Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/docs/swagge
 package docs
 ```
 
-- [ ] **Step 3: Compile-check**
+- [x] **Step 3: Compile-check**
 
 Run:
 ```bash
@@ -1470,7 +1470,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./..
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -1488,7 +1488,7 @@ Expected: 2 adds, 2 deletes.
 **Files:**
 - Create / regenerate: `docs/swagger/docs.go`, `docs/swagger/swagger.json`, `docs/swagger/swagger.yaml`
 
-- [ ] **Step 1: Generate the Swagger docs**
+- [x] **Step 1: Generate the Swagger docs**
 
 Run:
 ```bash
@@ -1505,7 +1505,7 @@ swagger.json
 swagger.yaml
 ```
 
-- [ ] **Step 2: Verify generated `docs.go` registers `/health`**
+- [x] **Step 2: Verify generated `docs.go` registers `/health`**
 
 Run:
 ```bash
@@ -1513,7 +1513,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && grep -c '"/he
 ```
 Expected: a non-zero count (typically `1`).
 
-- [ ] **Step 3: Compile-check the full module**
+- [x] **Step 3: Compile-check the full module**
 
 Run:
 ```bash
@@ -1521,7 +1521,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && go build ./..
 ```
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 ```bash
@@ -1539,7 +1539,7 @@ Expected: 3 files changed (1 modified, 2 new).
 - Create: `README.md`
 - Create: `docs/superpowers/verification/phase-00.md`
 
-- [ ] **Step 1: Write the README**
+- [x] **Step 1: Write the README**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/README.md` with exactly:
 ````markdown
@@ -1676,7 +1676,7 @@ docs/
   to start if behind or dirty.
 ````
 
-- [ ] **Step 2: Run end-to-end verification — migrate-up and capture the output**
+- [x] **Step 2: Run end-to-end verification — migrate-up and capture the output**
 
 Run:
 ```bash
@@ -1688,7 +1688,7 @@ Expected: log ends with no error; `schema_migrations` is created in Postgres.
 
 If Postgres credentials in `.env` are not yet valid, fix `.env` and re-run. Do NOT skip this step.
 
-- [ ] **Step 3: Boot the server in the background**
+- [x] **Step 3: Boot the server in the background**
 
 Run:
 ```bash
@@ -1699,7 +1699,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: the grep prints the listening log line.
 
-- [ ] **Step 4: Curl `/health` and capture the response**
+- [x] **Step 4: Curl `/health` and capture the response**
 
 Run:
 ```bash
@@ -1711,7 +1711,7 @@ Expected: HTTP code `200`, body:
 {"success":true,"data":{"status":"ok","service":"exnodes-hrm-api"}}
 ```
 
-- [ ] **Step 5: Verify Swagger UI**
+- [x] **Step 5: Verify Swagger UI**
 
 Run:
 ```bash
@@ -1720,7 +1720,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/swagger/index.htm
 ```
 Expected: first command prints `200`; second prints a non-zero count.
 
-- [ ] **Step 6: Stop the server**
+- [x] **Step 6: Stop the server**
 
 Run:
 ```bash
@@ -1730,7 +1730,7 @@ ss -tlnp 2>/dev/null | grep ':8080 ' && echo 'STILL RUNNING' || echo 'STOPPED'
 ```
 Expected last line: `STOPPED` (on macOS, fall back to `lsof -i :8080` — no output means stopped).
 
-- [ ] **Step 7: Write the verification log**
+- [x] **Step 7: Write the verification log**
 
 Create `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/docs/superpowers/verification/phase-00.md` with this content, **substituting** the four `<...>` placeholders with the literal output captured in steps 2–5 (do not leave the placeholders in the committed file):
 ```markdown
@@ -1796,7 +1796,7 @@ All Phase 0 acceptance criteria met:
 - [x] README quickstart written
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Run:
 ```bash
@@ -1807,7 +1807,7 @@ cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2 && \
 ```
 Expected: 2 adds, 1 delete.
 
-- [ ] **Step 9: Final tree sanity check**
+- [x] **Step 9: Final tree sanity check**
 
 Run:
 ```bash
@@ -1825,13 +1825,13 @@ Expected: 15 commits since module init, ending with `BUILD OK`.
 
 All boxes below must be checked before Phase 0 is considered complete:
 
-- [ ] `go build ./...` returns exit 0 with no warnings
-- [ ] `make migrate-up` against an empty Postgres database succeeds
-- [ ] `make migrate-version` prints `1`
-- [ ] `make run` logs `exnodes-hrm-api listening on :8080`
-- [ ] `curl http://localhost:8080/health` returns HTTP 200 with body `{"success":true,"data":{"status":"ok","service":"exnodes-hrm-api"}}`
-- [ ] `http://localhost:8080/swagger/index.html` renders and lists `GET /health` under the `system` tag
-- [ ] `docs/superpowers/verification/phase-00.md` exists and is committed, with all placeholder `<...>` blocks replaced by real captured output
-- [ ] Every task in this plan ended with a commit; `git log --oneline` shows ≥ 15 commits since `go mod init`
+- [x] `go build ./...` returns exit 0 with no warnings
+- [x] `make migrate-up` against an empty Postgres database succeeds
+- [x] `make migrate-version` prints `1`
+- [x] `make run` logs `exnodes-hrm-api listening on :8080`
+- [x] `curl http://localhost:8080/health` returns HTTP 200 with body `{"success":true,"data":{"status":"ok","service":"exnodes-hrm-api"}}`
+- [x] `http://localhost:8080/swagger/index.html` renders and lists `GET /health` under the `system` tag
+- [x] `docs/superpowers/verification/phase-00.md` exists and is committed, with all placeholder `<...>` blocks replaced by real captured output
+- [x] Every task in this plan ended with a commit; `git log --oneline` shows ≥ 15 commits since `go mod init`
 
 Once all boxes are checked, Phase 1 (Auth + RBAC core) may begin.
