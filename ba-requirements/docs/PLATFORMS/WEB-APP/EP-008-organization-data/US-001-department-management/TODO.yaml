@@ -1,0 +1,202 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-008
+story_id: US-001
+story_name: "Department Management"
+version: "1.0"
+last_updated: "2026-03-03"
+completion_percentage: 42
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: Department Management
+
+**Epic:** EP-008 (Organization Data)
+**Story:** US-001-department-management
+**Last Updated:** 2026-03-03
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 5 |
+| In Progress | 0 |
+| Pending | 7 |
+| **Total** | **12** |
+
+**Completion:** 42%
+
+---
+
+## Tasks
+
+tasks:
+
+  # Analysis Tasks
+  - id: "TK-001-01"
+    title: "Business analysis and requirements gathering"
+    description: "Analyze department management scope, stakeholders, and business rules"
+    status: "completed"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: []
+    notes: "Completed during EP-008 EPIC creation and Figma extraction"
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-02"
+    title: "Create ANALYSIS.md"
+    description: "Document business context, scope, requirements analysis, and design context"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "Includes Design Context [ADD-ON] from Figma extraction (node 3059:1722)"
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-03"
+    title: "Create REQUIREMENTS.md"
+    description: "Document user stories, use cases, functional requirements, business rules"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "4 user stories, 10 functional requirements, 5 business rules"
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-04"
+    title: "Create FLOWCHART.md"
+    description: "Document department management process flows as Mermaid diagrams"
+    status: "completed"
+    category: "documentation"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "Covers List, Create, Edit, Deactivate flows + state diagram"
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-05"
+    title: "Resolve open questions with Product Owner"
+    description: "Clarify gear icon actions, inactive dept visibility, max hierarchy depth, employee count scope, form style (modal vs page), export format"
+    status: "pending"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-02", "TK-001-03"]
+    notes: "6 open questions logged in REQUIREMENTS.md and ANALYSIS.md"
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-06"
+    title: "Request Create/Edit form design from Design Team"
+    description: "The Figma design only shows the list view. Create and Edit form designs are needed for detail requirements"
+    status: "completed"
+    category: "design"
+    priority: "high"
+    assigned_to: "Design Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-001-05"]
+    notes: "Completed — Create (3059:1793) and Edit (3060:22578) forms extracted from Figma. Both are full-page, single-field (department name only). Flat structure confirmed by Product Owner."
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-07"
+    title: "Write detail requirement: Department List (DR-US-001-01)"
+    description: "Step-by-step detail requirement for viewing, searching, and exporting the department list"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-05"]
+    notes: "Parent: FR-US-001-01 to FR-US-001-04"
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-08"
+    title: "Write detail requirement: Create Department (DR-US-001-02)"
+    description: "Step-by-step detail requirement for creating a new department"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-05", "TK-001-06"]
+    notes: "Create form design extracted from Figma (node 3059:1793). Blocker cleared."
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-09"
+    title: "Write detail requirement: Edit & Deactivate Department (DR-US-001-03)"
+    description: "Step-by-step detail requirement for editing and deactivating departments"
+    status: "pending"
+    category: "documentation"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-08"]
+    notes: "Edit form design extracted from Figma (node 3060:22578). Blocker cleared."
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-10"
+    title: "Stakeholder review of requirements"
+    description: "Present REQUIREMENTS.md to Product Owner and stakeholders for sign-off"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-05", "TK-001-07"]
+    notes: null
+    updated_at: "2026-03-03T00:00:00Z"
+
+  - id: "TK-001-11"
+    title: "Define UAT scenarios and test plan"
+    description: "Create user acceptance testing scenarios covering all user stories"
+    status: "pending"
+    category: "testing"
+    priority: "medium"
+    assigned_to: "QA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-10"]
+    notes: null
+    updated_at: "2026-03-03T00:00:00Z"
+
+  # Design Tasks
+  - id: "TK-001-D01"
+    title: "Figma design extraction - Department List"
+    description: "Extract design context from Figma Department List screen"
+    status: "completed"
+    category: "design"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: []
+    notes: "Extracted node 3059:1722. 7 gaps identified. Create/Edit form missing."
+    updated_at: "2026-03-03T00:00:00Z"

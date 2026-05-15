@@ -1,0 +1,200 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-001
+story_id: US-005
+story_name: "User Management"
+version: "1.0"
+last_updated: "2026-03-24"
+completion_percentage: 8
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: User Management
+
+**Epic:** EP-001 (Foundation)
+**Story:** US-005-user-management
+**Last Updated:** 2026-03-24
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 1 |
+| In Progress | 1 |
+| Pending | 10 |
+| **Total** | **12** |
+
+**Completion:** 8%
+
+---
+
+## Tasks
+
+tasks:
+
+  - id: "TK-005-01"
+    title: "Figma extraction — User List"
+    description: "Extract design context from Figma User List screen"
+    status: "completed"
+    category: "design"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: []
+    notes: "Extracted node 3048:6011. 9 gaps identified. Create/Edit User screens pending."
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-02"
+    title: "Write detail requirement: User List (DR-001-005-01)"
+    description: "Step-by-step detail requirement for viewing, searching, filtering, and exporting the user list"
+    status: "in_progress"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-005-01"]
+    notes: "Complex screen — 9 columns, 4 filter chips, multi-field search, export"
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-03"
+    title: "Resolve open questions with Product Owner"
+    description: "Status values, filter behavior, gear actions, search scope, export format"
+    status: "pending"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-005-02"]
+    notes: "9 gaps identified in Figma extraction"
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-04"
+    title: "Request Create/Edit User screens from Design Team"
+    description: "Figma screens needed for Create User and Edit User forms"
+    status: "pending"
+    category: "design"
+    priority: "high"
+    assigned_to: "Design Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-005-02"]
+    notes: null
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-05"
+    title: "Write detail requirement: Create User (DR-001-005-02)"
+    description: "Detail requirement for creating a new user account"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-005-03", "TK-005-04"]
+    notes: "Depends on Create User Figma screen and resolved open questions"
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-06"
+    title: "Write detail requirement: Edit User (DR-001-005-03)"
+    description: "Detail requirement for editing an existing user"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-005-05"]
+    notes: null
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-07"
+    title: "Write detail requirement: Deactivate/Activate User (DR-001-005-04)"
+    description: "Detail requirement for deactivating and reactivating user accounts"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-005-03"]
+    notes: null
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-08"
+    title: "Create ANALYSIS.md"
+    description: "Full business analysis with design context"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-005-01"]
+    notes: "Stub created with Design Context ADD-ON. Needs full elaboration."
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-09"
+    title: "Create FLOWCHART.md"
+    description: "Process flowcharts for user management workflows"
+    status: "pending"
+    category: "documentation"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-005-03"]
+    notes: "Stub created"
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-10"
+    title: "Elaborate REQUIREMENTS.md"
+    description: "Full requirements with acceptance criteria, NFRs, data requirements"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-005-03"]
+    notes: "Stub created with UI Specifications ADD-ON"
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-11"
+    title: "Stakeholder review and sign-off"
+    description: "Present requirements and DRs for approval"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-005-05", "TK-005-06", "TK-005-07"]
+    notes: null
+    updated_at: "2026-03-24T00:00:00Z"
+
+  - id: "TK-005-12"
+    title: "Define UAT scenarios and test plan"
+    description: "User acceptance testing scenarios"
+    status: "pending"
+    category: "testing"
+    priority: "medium"
+    assigned_to: "QA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-005-11"]
+    notes: null
+    updated_at: "2026-03-24T00:00:00Z"

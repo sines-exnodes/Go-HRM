@@ -1,0 +1,201 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-001
+story_id: US-004
+story_name: "Role & Permission Management"
+version: "1.0"
+last_updated: "2026-03-19"
+completion_percentage: 17
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: Role & Permission Management
+
+**Epic:** EP-001 (Foundation)
+**Story:** US-004-role-permission-management
+**Last Updated:** 2026-03-19
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 2 |
+| In Progress | 0 |
+| Pending | 10 |
+| **Total** | **12** |
+
+**Completion:** 17%
+
+---
+
+## Tasks
+
+tasks:
+
+  # Analysis & Documentation Tasks
+  - id: "TK-004-01"
+    title: "Figma extraction — Role List screen"
+    description: "Extract design context from Figma Role List frame (node 3081:1680)"
+    status: "completed"
+    category: "design"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: []
+    notes: "Extracted 2026-03-19. Design Context [ADD-ON] added to ANALYSIS.md. 9 gaps identified."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-02"
+    title: "Create ANALYSIS.md with Design Context"
+    description: "Document business context, scope, requirements analysis, and Figma design context"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-004-01"]
+    notes: "Includes Design Context [ADD-ON] from Role List extraction. 6 open questions logged."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-03"
+    title: "Resolve open questions with Product Owner"
+    description: "Clarify: permission display format, Export button inclusion, self-lock prevention, user count column, gear icon actions"
+    status: "pending"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-004-02"]
+    notes: "6 open questions logged in ANALYSIS.md Section 10"
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-04"
+    title: "Request Create/Edit Role screen designs from Design Team"
+    description: "Figma screens needed: Create Role (with permission matrix), Edit Role. Critical for full requirements."
+    status: "pending"
+    category: "design"
+    priority: "high"
+    assigned_to: "Design Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-004-03"]
+    notes: "When received, extract via /figma-extract US-004-role-permission-management and update ANALYSIS.md"
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-05"
+    title: "Elaborate full REQUIREMENTS.md"
+    description: "Complete requirements with acceptance criteria, NFRs, data requirements, and interface requirements"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-004-03", "TK-004-04"]
+    notes: "Current REQUIREMENTS.md is a stub (v0.1). Full elaboration blocked by open questions and missing designs."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-06"
+    title: "Elaborate full FLOWCHART.md"
+    description: "Complete flowcharts including Create Role, Edit Role with permission matrix, and all decision points"
+    status: "pending"
+    category: "documentation"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-004-05"]
+    notes: "Current FLOWCHART.md is a stub (v0.1). Needs Create/Edit role designs to complete."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-07"
+    title: "Write detail requirement: Role List (DR-001-004-01)"
+    description: "Step-by-step detail requirement for viewing, searching, and paginating the role list"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-004-05"]
+    notes: "Parent: FR-US-004-01. Figma reference available (node 3081:1680)."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-08"
+    title: "Write detail requirement: Create Role (DR-001-004-02)"
+    description: "Step-by-step detail requirement for creating a new role with permission assignment"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-004-05", "TK-004-04"]
+    notes: "Parent: FR-US-004-04. Blocked by missing Create Role Figma screen."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-09"
+    title: "Write detail requirement: Edit Role (DR-001-004-03)"
+    description: "Step-by-step detail requirement for editing role name and permissions"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-004-08"]
+    notes: "Parent: FR-US-004-05. Blocked by missing Edit Role Figma screen."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-10"
+    title: "Write detail requirement: Delete Role (DR-001-004-04)"
+    description: "Step-by-step detail requirement for deleting a role with confirmation and blocking dialogs"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-004-07"]
+    notes: "Parent: FR-US-004-06. Delete pattern same as Department/Position — can proceed without separate Figma screen."
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-11"
+    title: "Stakeholder review and sign-off on requirements"
+    description: "Present REQUIREMENTS.md and detail requirements to Product Owner and stakeholders for sign-off"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-004-07", "TK-004-08", "TK-004-09", "TK-004-10"]
+    notes: null
+    updated_at: "2026-03-19T00:00:00Z"
+
+  - id: "TK-004-12"
+    title: "Define UAT scenarios and test plan"
+    description: "Create user acceptance testing scenarios covering all user stories and acceptance criteria"
+    status: "pending"
+    category: "testing"
+    priority: "medium"
+    assigned_to: "QA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-004-11"]
+    notes: null
+    updated_at: "2026-03-19T00:00:00Z"

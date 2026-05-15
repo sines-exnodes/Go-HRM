@@ -1,0 +1,201 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-008
+story_id: US-002
+story_name: "Position Management"
+version: "1.0"
+last_updated: "2026-03-05"
+completion_percentage: 50
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: Position Management
+
+**Epic:** EP-008 (Organization Data)
+**Story:** US-002-position-management
+**Last Updated:** 2026-03-05
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 8 |
+| In Progress | 0 |
+| Pending | 4 |
+| **Total** | **12** |
+
+**Completion:** 67%
+
+---
+
+## Tasks
+
+tasks:
+
+  # Analysis & Documentation Tasks
+  - id: "TK-002-01"
+    title: "Business analysis and requirements gathering"
+    description: "Analyze position management scope, stakeholders, and business rules based on EP-008 EPIC and alignment with US-001 pattern"
+    status: "completed"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: []
+    notes: "Scope confirmed: single-field form, hard delete, no department association in V1, identical pattern to US-001 department management"
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-02"
+    title: "Create REQUIREMENTS.md"
+    description: "Document user stories, use cases, functional requirements, business rules, and acceptance criteria"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-002-01"]
+    notes: "4 user stories (US-002-01 through US-002-04), 9 functional requirements (FR-US-002-01 through FR-US-002-09), 4 business rules, 6 NFRs"
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-03"
+    title: "Create ANALYSIS.md"
+    description: "Document business context, scope definition, requirements analysis, data flow, and implementation approach"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-01"]
+    notes: "Stub complete — all 13 required sections present. No Figma data yet (pending design delivery)"
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-04"
+    title: "Create FLOWCHART.md"
+    description: "Document position management process flows as Mermaid diagrams"
+    status: "completed"
+    category: "documentation"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-002-01"]
+    notes: "Covers Position List, Create, Edit, Delete flows + state diagram. All 11 sections present."
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-05"
+    title: "Write detail requirement: Position List (DR-008-002-01)"
+    description: "Step-by-step detail requirement for viewing, searching, paginating, and exporting the position list"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-02"]
+    notes: "Parent: FR-US-002-01. Mirrors DR-008-001-01. Figma reference pending design delivery."
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-06"
+    title: "Write detail requirement: Create Position (DR-008-002-02)"
+    description: "Step-by-step detail requirement for creating a new position"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-05"]
+    notes: "Parent: FR-US-002-05. Single-field form. 17 ACs. Figma reference pending design delivery."
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-07"
+    title: "Write detail requirement: Edit Position (DR-008-002-03)"
+    description: "Step-by-step detail requirement for editing an existing position name"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-06"]
+    notes: "Parent: FR-US-002-06. Pre-filled form; uniqueness check excludes current position. 17 ACs."
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-08"
+    title: "Write detail requirement: Delete Position (DR-008-002-04)"
+    description: "Step-by-step detail requirement for deleting a position with confirmation and blocking dialogs"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-05"]
+    notes: "Parent: FR-US-002-07. Hard delete, two-dialog pattern. 18 ACs. Race condition protection documented."
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-09"
+    title: "Resolve open questions with Product Owner"
+    description: "Clarify export file format (CSV vs Excel). Confirm any additional open questions from DRs."
+    status: "pending"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-002-02", "TK-002-05", "TK-002-06", "TK-002-07", "TK-002-08"]
+    notes: "Main open question: export format. Log in REQUIREMENTS.md Section 10 and DR-008-002-01 Section 8."
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-10"
+    title: "Request Position screen designs from Design Team"
+    description: "Figma screens needed: Position List, Create A New Position, Edit A Position. Expected to mirror Department Management screens."
+    status: "pending"
+    category: "design"
+    priority: "high"
+    assigned_to: "Design Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-002-02"]
+    notes: "When received, extract via /figma-extract US-002-position-management and add Design Context [ADD-ON] to ANALYSIS.md"
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-11"
+    title: "Stakeholder review and sign-off on requirements"
+    description: "Present REQUIREMENTS.md and detail requirements to Product Owner and stakeholders for sign-off"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-002-09"]
+    notes: null
+    updated_at: "2026-03-05T00:00:00Z"
+
+  - id: "TK-002-12"
+    title: "Define UAT scenarios and test plan"
+    description: "Create user acceptance testing scenarios covering all user stories and acceptance criteria"
+    status: "pending"
+    category: "testing"
+    priority: "medium"
+    assigned_to: "QA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-11"]
+    notes: null
+    updated_at: "2026-03-05T00:00:00Z"

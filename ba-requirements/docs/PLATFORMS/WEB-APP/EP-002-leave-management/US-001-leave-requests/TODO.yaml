@@ -1,0 +1,148 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-002
+story_id: US-001
+story_name: "Leave Requests"
+version: "1.0"
+last_updated: "2026-03-27"
+completion_percentage: 10
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: Leave Requests
+
+**Epic:** EP-002 (Leave Management)
+**Story:** US-001-leave-requests
+**Last Updated:** 2026-03-27
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 1 |
+| In Progress | 1 |
+| Pending | 6 |
+| **Total** | **8** |
+
+**Completion:** 12%
+
+---
+
+## Tasks
+
+tasks:
+
+  - id: "TK-001-01"
+    title: "Business analysis and Figma extraction"
+    description: "Analyze leave requests scope and extract design context from Figma"
+    status: "completed"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: []
+    notes: "Figma extraction complete — Leave Requests List screen (node 3123:7904)"
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-02"
+    title: "Write DR-002-001-01 Leave Requests List"
+    description: "Detail requirement for the leave requests list view"
+    status: "in_progress"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "Parent: FR-US-001-01"
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-03"
+    title: "Write DR-002-001-02 Create Leave Request"
+    description: "Detail requirement for creating a new leave request"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Parent: FR-US-001-09. Needs Figma design extraction."
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-04"
+    title: "Write DR-002-001-03 Edit Leave Request"
+    description: "Detail requirement for editing a pending leave request"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-03"]
+    notes: "Parent: FR-US-001-10. Only pending requests editable."
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-05"
+    title: "Write DR-002-001-04 Approve/Reject Leave Request"
+    description: "Detail requirement for approving or rejecting a leave request"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Parent: FR-US-001-11. Manager/admin action."
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-06"
+    title: "Write DR-002-001-05 Cancel Leave Request"
+    description: "Detail requirement for cancelling a leave request"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Parent: FR-US-001-12"
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-07"
+    title: "Resolve open questions with Product Owner"
+    description: "Confirm status values, badge colors, gear icon actions, leave types"
+    status: "pending"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: null
+    updated_at: "2026-03-27T00:00:00Z"
+
+  - id: "TK-001-08"
+    title: "Stakeholder review and sign-off"
+    description: "Present requirements to Product Owner for approval"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-07"]
+    notes: null
+    updated_at: "2026-03-27T00:00:00Z"

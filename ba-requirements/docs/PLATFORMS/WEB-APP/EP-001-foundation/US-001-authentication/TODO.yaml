@@ -1,0 +1,155 @@
+# TODO Tracking for User Authentication
+# Story: US-001-authentication
+
+metadata:
+  document_type: TODO
+  platform: WEB-APP
+  epic_id: EP-001
+  story_id: US-001
+  story_name: "User Authentication"
+  status: in_progress
+  version: "1.0"
+  last_updated: "2026-02-26"
+  add_on_sections: []
+  approved_by: null
+  total_tasks: 8
+  completed_tasks: 2
+  in_progress_tasks: 1
+  blocked_tasks: 0
+  completion_percentage: 25
+  task_id_range:
+    start: 1
+    end: 99
+    next_available: 9
+  design_task_id_range:
+    start: 1
+    end: 99
+    next_available: 2
+  related_documents:
+    - path: "./ANALYSIS.md"
+      relationship: sibling
+    - path: "./REQUIREMENTS.md"
+      relationship: sibling
+    - path: "./FLOWCHART.md"
+      relationship: sibling
+  revision_history: []
+
+# Task ID Format: TK-001-NN (where 001 = US-001 story, NN = task sequence)
+# Design Task ID Format: TK-001-DNN (D prefix for design tasks)
+
+tasks:
+  - id: "TK-001-01"
+    title: "Define core requirements and business rules"
+    description: "Analyze and document all authentication requirements"
+    status: "completed"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 16
+    blocker: null
+    notes: "ANALYSIS.md created with Figma design context"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-02"
+    title: "Create REQUIREMENTS.md specification"
+    description: "Document functional and non-functional requirements with user stories and acceptance criteria"
+    status: "completed"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 16
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "REQUIREMENTS.md created with 13 functional requirements, 4 user stories"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-03"
+    title: "Create FLOWCHART.md business process diagrams"
+    description: "Document authentication workflows using Mermaid flowcharts"
+    status: "completed"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 12
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "FLOWCHART.md created with sign-in, password reset, session management flows"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-04"
+    title: "Resolve open questions with Product Owner"
+    description: "Get answers for session timeout, remember me duration, lockout policy, password policy"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "5 open questions documented in ANALYSIS.md and REQUIREMENTS.md"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-05"
+    title: "Stakeholder review and formal approval"
+    description: "Present BA documents to stakeholders for review and sign-off"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 8
+    blocker: null
+    dependencies: ["TK-001-01", "TK-001-02", "TK-001-03", "TK-001-04"]
+    notes: "Schedule review with HR leadership and product owner"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-06"
+    title: "Define UAT acceptance criteria"
+    description: "Document UAT scenarios and business acceptance criteria for authentication"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 8
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Based on acceptance criteria in REQUIREMENTS.md"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-07"
+    title: "Create end-user documentation"
+    description: "Write user guides for sign-in, password reset, and session management"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "Documentation Team"
+    estimated_hours: 12
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Focus on end-user instructions, not technical documentation"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  - id: "TK-001-08"
+    title: "Create training materials"
+    description: "Develop training materials for staff on the authentication process"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "Training Team"
+    estimated_hours: 12
+    blocker: null
+    dependencies: ["TK-001-07"]
+    notes: "Include guides for all configured user roles"
+    updated_at: "2026-02-26T00:00:00Z"
+
+  # Design Tasks
+  - id: "TK-001-D01"
+    title: "Extract Figma design context for Sign In"
+    description: "Use /figma-extract to populate Design Context [ADD-ON] in ANALYSIS.md"
+    status: "completed"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    category: "design_documentation"
+    notes: "Sign In screen extracted. Gaps identified: forgot password, error states, loading state"
+    updated_at: "2026-02-26T00:00:00Z"
+
+summary:
+  total_tasks: 9
+  pending: 5
+  in_progress: 0
+  completed: 4
+  blocked: 0
+  completion_percentage: 44
+  estimated_total_hours: 90

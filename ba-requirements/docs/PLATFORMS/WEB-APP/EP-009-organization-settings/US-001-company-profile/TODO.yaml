@@ -1,0 +1,105 @@
+# TODO Tracking for Company Profile
+# Story: US-001-company-profile
+
+metadata:
+  document_type: TODO
+  platform: WEB-APP
+  epic_id: EP-009
+  story_id: US-001
+  story_name: "Company Profile"
+  status: in_progress
+  version: "1.0"
+  last_updated: "2026-04-23"
+  add_on_sections: []
+  approved_by: null
+  total_tasks: 8
+  completed_tasks: 0
+  in_progress_tasks: 0
+  blocked_tasks: 0
+  completion_percentage: 0
+  task_id_range:
+    start: 1
+    end: 99
+    next_available: 9
+  design_task_id_range:
+    start: 1
+    end: 99
+    next_available: 2
+  related_documents:
+    - path: "./ANALYSIS.md"
+      relationship: sibling
+    - path: "./FLOWCHART.md"
+      relationship: sibling
+  revision_history: []
+
+# Task ID Format: TK-001-NN (where 001 = US-001 story number, NN = task sequence)
+# Design Task ID Format: TK-001-DNN (D prefix for design tasks)
+
+tasks:
+  - id: "TK-001-01"
+    title: "Define core requirements and business rules"
+    description: "Analyze and document all requirements for Company Profile settings"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 8
+    blocker: null
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+  - id: "TK-001-02"
+    title: "Create FLOWCHART.md business process diagrams"
+    description: "Document workflows using Mermaid flowcharts"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+  - id: "TK-001-04"
+    title: "Resolve open questions with Product Owner"
+    description: "Get answers for address field requirements and company name editability"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+  - id: "TK-001-05"
+    title: "Stakeholder review and formal approval"
+    description: "Present BA documents to stakeholders for review and sign-off"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-01", "TK-001-02", "TK-001-04"]
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+  # Design Tasks
+  - id: "TK-001-D01"
+    title: "Extract Figma design context"
+    description: "Use /ennam-ba:figma-extract to populate Design Context [ADD-ON] in ANALYSIS.md"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    category: "design_documentation"
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+summary:
+  total_tasks: 5
+  pending: 5
+  in_progress: 0
+  completed: 0
+  blocked: 0
+  completion_percentage: 0
+  estimated_total_hours: 20

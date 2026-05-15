@@ -1,0 +1,148 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-003
+story_id: US-001
+story_name: "Request Tickets"
+version: "1.0"
+last_updated: "2026-04-01"
+completion_percentage: 10
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: Request Tickets
+
+**Epic:** EP-003 (Request Ticket Management)
+**Story:** US-001-request-tickets
+**Last Updated:** 2026-04-01
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 1 |
+| In Progress | 1 |
+| Pending | 6 |
+| **Total** | **8** |
+
+**Completion:** 12%
+
+---
+
+## Tasks
+
+tasks:
+
+  - id: "TK-001-01"
+    title: "Business analysis and Figma extraction"
+    description: "Analyze request tickets scope and extract design context from Figma"
+    status: "completed"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: []
+    notes: "Figma extraction complete — Request Tickets List screen (node 3171:3062)"
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-02"
+    title: "Write DR-003-001-01 Request Tickets List"
+    description: "Detail requirement for the request tickets list view"
+    status: "in_progress"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-01"]
+    notes: "Parent: FR-US-001-01"
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-03"
+    title: "Write DR-003-001-02 Create Request Ticket"
+    description: "Detail requirement for creating a new request ticket"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Parent: FR-US-001-09. Needs Figma design extraction for create form."
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-04"
+    title: "Write DR-003-001-03 Edit Request Ticket"
+    description: "Detail requirement for editing a request ticket"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-03"]
+    notes: "Parent: FR-US-001-10. Status-dependent editability."
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-05"
+    title: "Write DR-003-001-04 Status Management"
+    description: "Detail requirement for status transitions on request tickets"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Parent: FR-US-001-11. Manager/admin action."
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-06"
+    title: "Write DR-003-001-05 Delete Request Ticket"
+    description: "Detail requirement for deleting a request ticket"
+    status: "pending"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: "Parent: FR-US-001-12. Soft delete pattern."
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-07"
+    title: "Resolve open questions with Product Owner"
+    description: "Confirm request types, status values, badge colors, gear icon actions"
+    status: "pending"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-001-02"]
+    notes: null
+    updated_at: "2026-04-01T00:00:00Z"
+
+  - id: "TK-001-08"
+    title: "Stakeholder review and sign-off"
+    description: "Present requirements to Product Owner for approval"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-001-07"]
+    notes: null
+    updated_at: "2026-04-01T00:00:00Z"

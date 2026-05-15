@@ -1,0 +1,92 @@
+# TODO Tracking for Attendance Settings
+# Story: US-002-attendance-settings
+
+metadata:
+  document_type: TODO
+  platform: WEB-APP
+  epic_id: EP-009
+  story_id: US-002
+  story_name: "Attendance Settings"
+  status: in_progress
+  version: "1.0"
+  last_updated: "2026-04-23"
+  add_on_sections: []
+  approved_by: null
+  total_tasks: 5
+  completed_tasks: 1
+  in_progress_tasks: 0
+  blocked_tasks: 0
+  completion_percentage: 20
+  task_id_range:
+    start: 1
+    end: 99
+    next_available: 6
+  design_task_id_range:
+    start: 1
+    end: 99
+    next_available: 2
+  related_documents:
+    - path: "./ANALYSIS.md"
+      relationship: sibling
+    - path: "./FLOWCHART.md"
+      relationship: sibling
+  revision_history: []
+
+# Task ID Format: TK-002-NN (where 002 = US-002 story number, NN = task sequence)
+
+tasks:
+  - id: "TK-002-01"
+    title: "Define core requirements and business rules"
+    description: "Document requirements for Attendance Settings"
+    status: "completed"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 8
+    blocker: null
+    notes: "Completed via DR-009-002-01"
+    updated_at: "2026-04-23T00:00:00Z"
+
+  - id: "TK-002-02"
+    title: "Create FLOWCHART.md business process diagrams"
+    description: "Document workflows using Mermaid flowcharts"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-002-01"]
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+  - id: "TK-002-05"
+    title: "Stakeholder review and formal approval"
+    description: "Present BA documents to stakeholders for review and sign-off"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-002-01", "TK-002-02"]
+    notes: ""
+    updated_at: "2026-04-23T00:00:00Z"
+
+  # Design Tasks
+  - id: "TK-002-D01"
+    title: "Extract Figma design context"
+    description: "Figma context already captured in DR-009-002-01"
+    status: "completed"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    category: "design_documentation"
+    notes: "Completed during DR creation"
+    updated_at: "2026-04-23T00:00:00Z"
+
+summary:
+  total_tasks: 4
+  pending: 2
+  in_progress: 0
+  completed: 2
+  blocked: 0
+  completion_percentage: 50
+  estimated_total_hours: 18
