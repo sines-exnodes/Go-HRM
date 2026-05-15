@@ -17,13 +17,19 @@ ifeq ($(strip $(DATABASE_URL)),)
 DATABASE_URL := postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
 endif
 
-.PHONY: help run build test tidy fmt vet swag migrate-new migrate-up migrate-down migrate-version migrate-force
+# Separate database used by integration tests. Override TEST_DB_NAME or pass
+# TEST_DATABASE_URL directly to point tests at a different instance.
+TEST_DB_NAME      ?= exnodes_hrm_test
+TEST_DATABASE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(TEST_DB_NAME)?sslmode=$(DB_SSLMODE)
+
+.PHONY: help run build test test-db-up tidy fmt vet swag migrate-new migrate-up migrate-down migrate-version migrate-force
 
 help:
 	@echo "Targets:"
 	@echo "  run               Run the API server (go run ./cmd/server)"
 	@echo "  build             Build server binary to ./bin/server"
 	@echo "  test              Run all tests"
+	@echo "  test-db-up        Create the integration test database (idempotent)"
 	@echo "  tidy              go mod tidy"
 	@echo "  fmt               gofmt -s -w ."
 	@echo "  vet               go vet ./..."
@@ -43,6 +49,18 @@ build:
 
 test:
 	go test ./...
+
+# Create the integration-test database if it doesn't exist. Uses the same
+# credentials as the main DB (DB_USER/DB_PASSWORD/DB_HOST/DB_PORT) but a
+# separate dbname (TEST_DB_NAME, defaults to exnodes_hrm_test).
+test-db-up:
+	@PGPASSWORD="$(DB_PASSWORD)" psql -h "$(DB_HOST)" -p "$(DB_PORT)" -U "$(DB_USER)" -d postgres -tAc \
+		"SELECT 1 FROM pg_database WHERE datname='$(TEST_DB_NAME)'" | grep -q 1 || \
+	PGPASSWORD="$(DB_PASSWORD)" psql -h "$(DB_HOST)" -p "$(DB_PORT)" -U "$(DB_USER)" -d postgres -c \
+		"CREATE DATABASE \"$(TEST_DB_NAME)\""
+	@echo "Test DB ready: $(TEST_DB_NAME)"
+	@echo "Export TEST_DATABASE_URL to run integration tests, e.g.:"
+	@echo "  export TEST_DATABASE_URL='$(TEST_DATABASE_URL)'"
 
 tidy:
 	go mod tidy
