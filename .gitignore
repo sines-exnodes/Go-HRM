@@ -1,0 +1,26 @@
+# Binaries
+/bin/
+/tmp/
+server
+*.exe
+*.test
+*.out
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Go
+vendor/
+coverage.out
+coverage.html
+
+# Swagger generated artifacts kept under docs/swagger only; ignore other generated dirs
+/docs/swagger/swagger.json.bak
