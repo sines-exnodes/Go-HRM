@@ -1,0 +1,50 @@
+basePath: /
+definitions:
+  github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData:
+    properties:
+      data:
+        $ref: '#/definitions/internal_handlers.HealthData'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  internal_handlers.HealthData:
+    properties:
+      service:
+        example: exnodes-hrm-api
+        type: string
+      status:
+        example: ok
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: HRM API for Exnodes — see /docs/superpowers/specs/2026-05-15-go-migration-design.md
+    for the migration plan.
+  title: Exnodes HRM API
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      description: 'Returns {success: true, data: {status: "ok"}} when the server
+        is up.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData'
+      summary: Liveness probe
+      tags:
+      - system
+schemes:
+- http
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
