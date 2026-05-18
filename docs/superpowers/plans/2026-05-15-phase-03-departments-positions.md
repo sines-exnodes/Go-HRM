@@ -92,7 +92,7 @@ No placeholders — paste the code verbatim.
 
 ### Task 1 — Migration `000005_create_departments_positions`
 
-- [ ] Confirm the next free migration index:
+- [x] Confirm the next free migration index:
 
   ```bash
   ls /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/migrations | sort
@@ -100,7 +100,7 @@ No placeholders — paste the code verbatim.
 
   Expected: highest prefix is `000004_phase2_extras`. So the new files are `000005_*`. If a `000005` already exists, bump in lockstep and update every filename/command below.
 
-- [ ] Create `migrations/000005_create_departments_positions.up.sql`:
+- [x] Create `migrations/000005_create_departments_positions.up.sql`:
 
   ```sql
   -- =========================================================================
@@ -160,7 +160,7 @@ No placeholders — paste the code verbatim.
           FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE SET NULL;
   ```
 
-- [ ] Create `migrations/000005_create_departments_positions.down.sql`:
+- [x] Create `migrations/000005_create_departments_positions.down.sql`:
 
   ```sql
   ALTER TABLE employees DROP CONSTRAINT IF EXISTS fk_employees_position;
@@ -173,7 +173,7 @@ No placeholders — paste the code verbatim.
   DROP TABLE IF EXISTS departments;
   ```
 
-- [ ] Prove both directions on the main DB:
+- [x] Prove both directions on the main DB:
 
   ```bash
   cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2
@@ -184,7 +184,7 @@ No placeholders — paste the code verbatim.
 
   Expected: after the final `migrate-up`, version `5`, no `dirty` flag. The intermediate down prints `4`.
 
-- [ ] Spot-check the FK constraints exist:
+- [x] Spot-check the FK constraints exist:
 
   ```bash
   psql "postgres://ennam:ennam_dev_2026@localhost:5432/exnodes_hrm?sslmode=disable" -c "\d+ employees" | grep -E "fk_employees_(department|position)"
@@ -192,7 +192,7 @@ No placeholders — paste the code verbatim.
 
   Expected: two `FOREIGN KEY` lines referencing `departments(id)` and `positions(id)`, both `ON DELETE SET NULL`.
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add migrations/000005_create_departments_positions.up.sql migrations/000005_create_departments_positions.down.sql
@@ -205,7 +205,7 @@ No placeholders — paste the code verbatim.
 
 These were already added in Phase 1/2. This task only **confirms** them so later tasks can rely on the exact symbol names.
 
-- [ ] Confirm the constants and groups exist:
+- [x] Confirm the constants and groups exist:
 
   ```bash
   grep -nE 'PermDepartments(Read|Create|Update|Delete)|PermPositions(Read|Create|Update|Delete)' internal/permissions/registry.go
@@ -215,7 +215,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
   `PermDepartmentsRead`, `PermDepartmentsCreate`, `PermDepartmentsUpdate`, `PermDepartmentsDelete`,
   `PermPositionsRead`, `PermPositionsCreate`, `PermPositionsUpdate`, `PermPositionsDelete`.
 
-- [ ] Confirm role grants already wired:
+- [x] Confirm role grants already wired:
 
   ```bash
   grep -nE 'PermDepartments|PermPositions' internal/services/seed_service.go
@@ -223,7 +223,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
   Expected: Admin role grants full `departments:*` + `positions:*`; HR Manager grants read/create/update; Manager grants read. **No change required** — if (and only if) any are unexpectedly missing, add them in the existing `defaultRoles()` slice style and note it in the commit.
 
-- [ ] Build (no-op confirmation):
+- [x] Build (no-op confirmation):
 
   ```bash
   go build ./...
@@ -235,7 +235,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
 ### Task 3 — `internal/models/department.go`
 
-- [ ] Create `internal/models/department.go`:
+- [x] Create `internal/models/department.go`:
 
   ```go
   package models
@@ -259,7 +259,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
   func (Department) TableName() string { return "departments" }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/models/...
@@ -267,7 +267,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
   Expected: clean build.
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/models/department.go
@@ -278,7 +278,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
 ### Task 4 — `internal/models/position.go`
 
-- [ ] Create `internal/models/position.go`:
+- [x] Create `internal/models/position.go`:
 
   ```go
   package models
@@ -300,13 +300,13 @@ These were already added in Phase 1/2. This task only **confirms** them so later
   func (Position) TableName() string { return "positions" }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/models/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/models/position.go
@@ -317,7 +317,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
 ### Task 5 — `internal/dto/department.go`
 
-- [ ] Create `internal/dto/department.go`:
+- [x] Create `internal/dto/department.go`:
 
   ```go
   package dto
@@ -366,13 +366,13 @@ These were already added in Phase 1/2. This task only **confirms** them so later
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/dto/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/dto/department.go
@@ -383,7 +383,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
 ### Task 6 — `internal/dto/position.go`
 
-- [ ] Create `internal/dto/position.go`:
+- [x] Create `internal/dto/position.go`:
 
   ```go
   package dto
@@ -424,13 +424,13 @@ These were already added in Phase 1/2. This task only **confirms** them so later
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/dto/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/dto/position.go
