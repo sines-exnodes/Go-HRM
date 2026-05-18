@@ -12,6 +12,165 @@
     "host": "localhost:8080",
     "basePath": "/",
     "paths": {
+        "/api/v1/auth/login": {
+            "post": {
+                "description": "Exchanges an email + password for a token pair. Required permission: auth:login.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Authenticate and receive access + refresh tokens",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stateless logout — the client must discard its tokens.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Acknowledge logout",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_LogoutResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Exchange a refresh token for a new token pair",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.RefreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/roles/permissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the structured permission catalog. Requires authentication only (no specific permission).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "List grouped permissions (for the role-creation picker)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-array_github_com_exnodes_hrm-api_internal_permissions_PermissionGroup"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Returns {success: true, data: {status: \"ok\"}} when the server is up.",
@@ -34,6 +193,143 @@
         }
     },
     "definitions": {
+        "github_com_exnodes_hrm-api_internal_dto.EmployeeSummary": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "department_id": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "manager_id": {
+                    "type": "string"
+                },
+                "position_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.LoginRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "admin@exnodes.vn"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "ChangeMe!2026"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.UserSummary"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.LogoutResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Logged out"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOi..."
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-any": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-array_github_com_exnodes_hrm-api_internal_permissions_PermissionGroup": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_permissions.PermissionGroup"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_LoginResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.LoginResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_LogoutResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.LogoutResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData": {
             "type": "object",
             "properties": {
@@ -45,6 +341,159 @@
                 },
                 "success": {
                     "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.RoleSummary": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "is_system": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.UserSummary": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "employee": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeSummary"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleSummary"
+                    }
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_permissions.Permission": {
+            "type": "string",
+            "enum": [
+                "*",
+                "auth:login",
+                "users:read",
+                "users:create",
+                "users:update",
+                "users:delete",
+                "users:manage_roles",
+                "users:change_password",
+                "roles:read",
+                "roles:create",
+                "roles:update",
+                "roles:delete",
+                "departments:read",
+                "departments:create",
+                "departments:update",
+                "departments:delete",
+                "positions:read",
+                "positions:create",
+                "positions:update",
+                "positions:delete",
+                "skills:read",
+                "skills:create",
+                "skills:update",
+                "skills:delete",
+                "leave_requests:read",
+                "leave_requests:create",
+                "leave_requests:update",
+                "leave_requests:delete",
+                "leave_requests:approve",
+                "leave_requests:cancel",
+                "leave_requests:manage",
+                "leave_quota:manage",
+                "attendance:read",
+                "attendance:manage_data",
+                "organization_settings:manage",
+                "announcements:manage"
+            ],
+            "x-enum-varnames": [
+                "PermAll",
+                "PermAuthLogin",
+                "PermUsersRead",
+                "PermUsersCreate",
+                "PermUsersUpdate",
+                "PermUsersDelete",
+                "PermUsersManageRoles",
+                "PermUsersChangePwd",
+                "PermRolesRead",
+                "PermRolesCreate",
+                "PermRolesUpdate",
+                "PermRolesDelete",
+                "PermDepartmentsRead",
+                "PermDepartmentsCreate",
+                "PermDepartmentsUpdate",
+                "PermDepartmentsDelete",
+                "PermPositionsRead",
+                "PermPositionsCreate",
+                "PermPositionsUpdate",
+                "PermPositionsDelete",
+                "PermSkillsRead",
+                "PermSkillsCreate",
+                "PermSkillsUpdate",
+                "PermSkillsDelete",
+                "PermLeaveRead",
+                "PermLeaveCreate",
+                "PermLeaveUpdate",
+                "PermLeaveDelete",
+                "PermLeaveApprove",
+                "PermLeaveCancel",
+                "PermLeaveManage",
+                "PermLeaveQuotaManage",
+                "PermAttendanceRead",
+                "PermAttendanceManage",
+                "PermOrgSettings",
+                "PermAnnounceManage"
+            ]
+        },
+        "github_com_exnodes_hrm-api_internal_permissions.PermissionGroup": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_permissions.PermissionItem"
+                    }
+                },
+                "resource": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_permissions.PermissionItem": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "key": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_permissions.Permission"
+                },
+                "label": {
+                    "type": "string"
                 }
             }
         },

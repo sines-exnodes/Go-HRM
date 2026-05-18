@@ -1684,7 +1684,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `internal/services/auth_service.go`
 - Create: `internal/services/auth_service_test.go`
 
-- [ ] **Step 9.1: Write failing tests FIRST.**
+- [x] **Step 9.1: Write failing tests FIRST.**
 
   Create `internal/services/auth_service_test.go`:
 
@@ -1883,7 +1883,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 9.2: Run tests — confirm fail.**
+- [x] **Step 9.2: Run tests — confirm fail.**
 
   ```
   go test ./internal/services/...
@@ -1891,7 +1891,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: compile errors for missing `services.NewAuthService`, `services.AuthConfig`, etc.
 
-- [ ] **Step 9.3: Implement `internal/services/auth_service.go`.**
+- [x] **Step 9.3: Implement `internal/services/auth_service.go`.**
 
   ```go
   package services
@@ -2052,7 +2052,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Note: `errors` and `gorm.ErrRecordNotFound` are imported above only if referenced; the snippet uses `errors.Is(err, gorm.ErrRecordNotFound)` in `Login`, so both imports are required.
 
-- [ ] **Step 9.4: Run tests.**
+- [x] **Step 9.4: Run tests.**
 
   ```
   go test ./internal/services/...
@@ -2060,7 +2060,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: all 9 auth tests pass. If `TEST_DATABASE_URL` is unset they will all skip — confirm `go vet ./...` and `go build ./...` are clean as a fallback.
 
-- [ ] **Step 9.5: Commit.**
+- [x] **Step 9.5: Commit.**
 
   ```
   git add internal/services/auth_service.go internal/services/auth_service_test.go
@@ -2075,7 +2075,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `internal/services/seed_service.go`
 - Create: `internal/services/seed_service_test.go`
 
-- [ ] **Step 10.1: Write failing tests FIRST.**
+- [x] **Step 10.1: Write failing tests FIRST.**
 
   Create `internal/services/seed_service_test.go`:
 
@@ -2204,7 +2204,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 10.2: Implement `internal/services/seed_service.go`.**
+- [x] **Step 10.2: Implement `internal/services/seed_service.go`.**
 
   ```go
   package services
@@ -2472,7 +2472,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 10.3: Run tests.**
+- [x] **Step 10.3: Run tests.**
 
   ```
   go test ./internal/services/...
@@ -2480,7 +2480,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: all auth + seed tests pass (or skip if no DB).
 
-- [ ] **Step 10.4: Commit.**
+- [x] **Step 10.4: Commit.**
 
   ```
   git add internal/services/seed_service.go internal/services/seed_service_test.go
@@ -2494,7 +2494,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/middleware/auth.go`
 
-- [ ] **Step 11.1: Implement `internal/middleware/auth.go`.**
+- [x] **Step 11.1: Implement `internal/middleware/auth.go`.**
 
   ```go
   package middleware
@@ -2618,7 +2618,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 11.2: Build.**
+- [x] **Step 11.2: Build.**
 
   ```
   go build ./...
@@ -2626,7 +2626,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: exit 0.
 
-- [ ] **Step 11.3: Commit.**
+- [x] **Step 11.3: Commit.**
 
   ```
   git add internal/middleware/auth.go
@@ -2640,7 +2640,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/middleware/permissions.go`
 
-- [ ] **Step 12.1: Implement `internal/middleware/permissions.go`.**
+- [x] **Step 12.1: Implement `internal/middleware/permissions.go`.**
 
   ```go
   package middleware
@@ -2707,7 +2707,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 12.2: Build.**
+- [x] **Step 12.2: Build.**
 
   ```
   go build ./...
@@ -2715,7 +2715,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: exit 0.
 
-- [ ] **Step 12.3: Commit.**
+- [x] **Step 12.3: Commit.**
 
   ```
   git add internal/middleware/permissions.go
@@ -2729,7 +2729,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/dto/auth.go`
 
-- [ ] **Step 13.1: Implement `internal/dto/auth.go`.**
+- [x] **Step 13.1: Implement `internal/dto/auth.go`.**
 
   ```go
   package dto
@@ -2791,7 +2791,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 13.2: Commit.**
+- [x] **Step 13.2: Commit.**
 
   ```
   git add internal/dto/auth.go
@@ -2805,7 +2805,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/handlers/auth_handler.go`
 
-- [ ] **Step 14.1: Implement `internal/handlers/auth_handler.go`.**
+- [x] **Step 14.1: Implement `internal/handlers/auth_handler.go`.**
 
   ```go
   package handlers
@@ -2963,13 +2963,13 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 14.2: Build.**
+- [x] **Step 14.2: Build.**
 
   ```
   go build ./...
   ```
 
-- [ ] **Step 14.3: Commit.**
+- [x] **Step 14.3: Commit.**
 
   ```
   git add internal/handlers/auth_handler.go
@@ -2983,7 +2983,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/handlers/role_handler.go`
 
-- [ ] **Step 15.1: Implement `internal/handlers/role_handler.go`.**
+- [x] **Step 15.1: Implement `internal/handlers/role_handler.go`.**
 
   ```go
   package handlers
@@ -3021,7 +3021,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 15.2: Commit.**
+- [x] **Step 15.2: Commit.**
 
   ```
   git add internal/handlers/role_handler.go
@@ -3036,7 +3036,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Modify: `cmd/server/main.go` (additive — preserve Phase 0 wiring)
 - Modify: `internal/config/config.go` if it does not already expose Phase 1 fields
 
-- [ ] **Step 16.1: Ensure config has Phase 1 fields.**
+- [x] **Step 16.1: Ensure config has Phase 1 fields.**
 
   In `internal/config/config.go`, the `Config` struct must include:
   ```go
@@ -3051,7 +3051,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Add these if missing (do not break existing keys).
 
-- [ ] **Step 16.2: Wire in `cmd/server/main.go`.**
+- [x] **Step 16.2: Wire in `cmd/server/main.go`.**
 
   Inside `main()` after DB connect and before `router.Run(...)`, add (adapting variable names to match Phase 0 style):
 
@@ -3112,7 +3112,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   "github.com/exnodes/hrm-api/internal/services"
   ```
 
-- [ ] **Step 16.3: Regenerate Swagger.**
+- [x] **Step 16.3: Regenerate Swagger.**
 
   ```
   make swag
@@ -3127,7 +3127,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   // @description Type "Bearer {token}"
   ```
 
-- [ ] **Step 16.4: Verify build + tests.**
+- [x] **Step 16.4: Verify build + tests.**
 
   ```
   go build ./...
@@ -3137,7 +3137,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: all pass (service tests skip if `TEST_DATABASE_URL` is unset).
 
-- [ ] **Step 16.5: Commit.**
+- [x] **Step 16.5: Commit.**
 
   ```
   git add cmd/server/main.go internal/config/config.go docs/
