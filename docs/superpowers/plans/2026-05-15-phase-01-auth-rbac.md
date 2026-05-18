@@ -3329,24 +3329,24 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
 All items below must be true before declaring the phase complete.
 
-- [ ] `migrations/000002_create_roles_users.up.sql` + `.down.sql` AND `migrations/000003_create_employees_dependents.up.sql` + `.down.sql` exist, applied cleanly, and rollback restores a working DB.
-- [ ] After `make migrate-up`, the DB contains tables `roles`, `users` (auth-only — no `full_name` / `department_id` / `position_id` column), `user_roles`, `employees` (full HR schema), `dependents`. All have 4 audit cols, `is_deleted` index, and a `set_updated_at` trigger. `employees.user_id` is UNIQUE; `employees.manager_id` is a self-ref FK; `dependents.employee_id` cascades on delete. `employees.department_id` and `employees.position_id` are nullable UUIDs with NO FK constraint (constraints added in Phase 3).
-- [ ] `internal/models/role.go`, `internal/models/user.go` (auth-only), `internal/models/employee.go`, `internal/models/dependent.go` compile and embed `BaseModel`.
-- [ ] `internal/models/user.go` does NOT declare a `FullName`, `DepartmentID`, or `PositionID` field — those live on `Employee`.
-- [ ] `internal/permissions/registry.go` defines all 35 permissions from the Python source (1 auth + 6 users + 4 roles + 4 departments + 4 positions + 4 skills + 7 leave_requests + 1 leave_quota + 2 attendance + 1 organization_settings + 1 announcements) plus `PermAll` and the 11-group `PermissionGroups` catalog. Tests pass.
-- [ ] `pkg/utils/password.go` and `pkg/utils/jwt.go` compile, tests pass (`go test ./pkg/utils/...`).
-- [ ] `internal/repositories/role_repo.go`, `user_repo.go`, `employee_repo.go`, `dependent_repo.go` compile.
-- [ ] `internal/services/auth_service.go` implements `Login`, `Refresh`, `Logout`, `ResolveUserPermissions`. `Login` and `Refresh` return `*LoginResult` (Tokens + User-with-Employee-preloaded). Tests pass (or skip if no DB).
-- [ ] `internal/services/seed_service.go` is idempotent. Running twice does not duplicate rows. After seed, the DB contains exactly 5 roles, 1 user, AND 1 employee row whose `full_name` matches `SUPER_ADMIN_NAME` (default "Super Admin") and whose `user_id` equals the super admin user's ID. Tests pass.
-- [ ] `internal/middleware/auth.go` validates Bearer tokens, loads user, checks `is_active` + `is_deleted` + session-invalidation timestamps.
-- [ ] `internal/middleware/permissions.go` enforces `RequirePerms` with wildcard bypass and `{required, missing}` details on 403.
-- [ ] `internal/dto/auth.go` defines `LoginRequest`, `LoginResponse` (with embedded `user.employee` summary), `RefreshRequest`, `LogoutResponse`, `UserSummary`, `EmployeeSummary`, `RoleSummary`.
-- [ ] `internal/handlers/auth_handler.go` exposes login, refresh, logout — all with full Swagger annotations including `@Security BearerAuth` on logout. Login/refresh responses include `data.user.employee.full_name` populated from the seeded Employee row.
-- [ ] `internal/handlers/role_handler.go` exposes `GET /api/v1/roles/permissions` — also annotated.
-- [ ] `cmd/server/main.go` wires repos, services, middleware, routes, and runs the seed on boot.
-- [ ] Swagger UI lists all 4 new endpoints.
-- [ ] `go vet ./...` + `go test ./...` exit 0.
-- [ ] `make migrate-up && make run` boots cleanly with no panic.
-- [ ] All curl flows in Task 17 produce the expected status codes.
-- [ ] `docs/superpowers/verification/phase-01.md` committed.
-- [ ] One commit per task; every commit message starts with `feat(...)`/`test(...)`/`docs(...)`/`chore(...)` and describes the change.
+- [x] `migrations/000002_create_roles_users.up.sql` + `.down.sql` AND `migrations/000003_create_employees_dependents.up.sql` + `.down.sql` exist, applied cleanly, and rollback restores a working DB.
+- [x] After `make migrate-up`, the DB contains tables `roles`, `users` (auth-only — no `full_name` / `department_id` / `position_id` column), `user_roles`, `employees` (full HR schema), `dependents`. All have 4 audit cols, `is_deleted` index, and a `set_updated_at` trigger. `employees.user_id` is UNIQUE; `employees.manager_id` is a self-ref FK; `dependents.employee_id` cascades on delete. `employees.department_id` and `employees.position_id` are nullable UUIDs with NO FK constraint (constraints added in Phase 3).
+- [x] `internal/models/role.go`, `internal/models/user.go` (auth-only), `internal/models/employee.go`, `internal/models/dependent.go` compile and embed `BaseModel`.
+- [x] `internal/models/user.go` does NOT declare a `FullName`, `DepartmentID`, or `PositionID` field — those live on `Employee`.
+- [x] `internal/permissions/registry.go` defines all 35 permissions from the Python source (1 auth + 6 users + 4 roles + 4 departments + 4 positions + 4 skills + 7 leave_requests + 1 leave_quota + 2 attendance + 1 organization_settings + 1 announcements) plus `PermAll` and the 11-group `PermissionGroups` catalog. Tests pass.
+- [x] `pkg/utils/password.go` and `pkg/utils/jwt.go` compile, tests pass (`go test ./pkg/utils/...`).
+- [x] `internal/repositories/role_repo.go`, `user_repo.go`, `employee_repo.go`, `dependent_repo.go` compile.
+- [x] `internal/services/auth_service.go` implements `Login`, `Refresh`, `Logout`, `ResolveUserPermissions`. `Login` and `Refresh` return `*LoginResult` (Tokens + User-with-Employee-preloaded). Tests pass (or skip if no DB).
+- [x] `internal/services/seed_service.go` is idempotent. Running twice does not duplicate rows. After seed, the DB contains exactly 5 roles, 1 user, AND 1 employee row whose `full_name` matches `SUPER_ADMIN_NAME` (default "Super Admin") and whose `user_id` equals the super admin user's ID. Tests pass.
+- [x] `internal/middleware/auth.go` validates Bearer tokens, loads user, checks `is_active` + `is_deleted` + session-invalidation timestamps.
+- [x] `internal/middleware/permissions.go` enforces `RequirePerms` with wildcard bypass and `{required, missing}` details on 403.
+- [x] `internal/dto/auth.go` defines `LoginRequest`, `LoginResponse` (with embedded `user.employee` summary), `RefreshRequest`, `LogoutResponse`, `UserSummary`, `EmployeeSummary`, `RoleSummary`.
+- [x] `internal/handlers/auth_handler.go` exposes login, refresh, logout — all with full Swagger annotations including `@Security BearerAuth` on logout. Login/refresh responses include `data.user.employee.full_name` populated from the seeded Employee row.
+- [x] `internal/handlers/role_handler.go` exposes `GET /api/v1/roles/permissions` — also annotated.
+- [x] `cmd/server/main.go` wires repos, services, middleware, routes, and runs the seed on boot.
+- [x] Swagger UI lists all 4 new endpoints.
+- [x] `go vet ./...` + `go test ./...` exit 0.
+- [x] `make migrate-up && make run` boots cleanly with no panic.
+- [x] All curl flows in Task 17 produce the expected status codes.
+- [x] `docs/superpowers/verification/phase-01.md` committed.
+- [x] One commit per task; every commit message starts with `feat(...)`/`test(...)`/`docs(...)`/`chore(...)` and describes the change.
