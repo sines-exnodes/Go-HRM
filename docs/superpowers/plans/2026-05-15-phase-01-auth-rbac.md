@@ -59,7 +59,7 @@ If any assumption is false, stop and reconcile with the spec (`docs/superpowers/
 
 This task lands the full Phase 1 schema in two migrations (cleaner than one combined file): the auth tables first, then the HR-info tables that depend on `users`.
 
-- [ ] **Step 1.1: Write `000002_create_roles_users.up.sql`.**
+- [x] **Step 1.1: Write `000002_create_roles_users.up.sql`.**
 
   Create file `migrations/000002_create_roles_users.up.sql` with exactly this content:
 
@@ -126,7 +126,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
   ```
 
-- [ ] **Step 1.2: Write `000002_create_roles_users.down.sql`.**
+- [x] **Step 1.2: Write `000002_create_roles_users.down.sql`.**
 
   Create file `migrations/000002_create_roles_users.down.sql` with exactly this content:
 
@@ -139,7 +139,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   DROP TABLE IF EXISTS roles;
   ```
 
-- [ ] **Step 1.3: Write `000003_create_employees_dependents.up.sql`.**
+- [x] **Step 1.3: Write `000003_create_employees_dependents.up.sql`.**
 
   Create file `migrations/000003_create_employees_dependents.up.sql` with exactly this content:
 
@@ -236,7 +236,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
       FOR EACH ROW EXECUTE FUNCTION set_updated_at();
   ```
 
-- [ ] **Step 1.4: Write `000003_create_employees_dependents.down.sql`.**
+- [x] **Step 1.4: Write `000003_create_employees_dependents.down.sql`.**
 
   Create file `migrations/000003_create_employees_dependents.down.sql` with exactly this content:
 
@@ -247,7 +247,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   DROP TABLE IF EXISTS employees;
   ```
 
-- [ ] **Step 1.5: Apply and roll back to confirm all four files work.**
+- [x] **Step 1.5: Apply and roll back to confirm all four files work.**
 
   Run:
   ```
@@ -265,7 +265,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   ```
   Expected: `employees` shows `full_name TEXT NOT NULL`, `department_id UUID NULL` (no FK), `manager_id UUID NULL` (FK to employees), `basic_salary NUMERIC(18,2) NOT NULL DEFAULT 0`, all 4 audit cols, and `trg_employees_set_updated_at` trigger. `dependents` shows `employee_id UUID NOT NULL` with `ON DELETE CASCADE` to employees.
 
-- [ ] **Step 1.6: Commit.**
+- [x] **Step 1.6: Commit.**
 
   ```
   git add migrations/000002_create_roles_users.up.sql migrations/000002_create_roles_users.down.sql \
@@ -283,7 +283,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `internal/models/employee.go`
 - Create: `internal/models/dependent.go`
 
-- [ ] **Step 2.1: Write `internal/models/role.go`.**
+- [x] **Step 2.1: Write `internal/models/role.go`.**
 
   ```go
   package models
@@ -339,7 +339,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   func (Role) TableName() string { return "roles" }
   ```
 
-- [ ] **Step 2.2: Write `internal/models/user.go` (AUTH ONLY — no full_name, no department_id, no position_id).**
+- [x] **Step 2.2: Write `internal/models/user.go` (AUTH ONLY — no full_name, no department_id, no position_id).**
 
   ```go
   package models
@@ -370,7 +370,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   func (User) TableName() string { return "users" }
   ```
 
-- [ ] **Step 2.3: Write `internal/models/employee.go`.**
+- [x] **Step 2.3: Write `internal/models/employee.go`.**
 
   ```go
   package models
@@ -439,7 +439,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   func (Employee) TableName() string { return "employees" }
   ```
 
-- [ ] **Step 2.4: Write `internal/models/dependent.go`.**
+- [x] **Step 2.4: Write `internal/models/dependent.go`.**
 
   ```go
   package models
@@ -463,7 +463,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   func (Dependent) TableName() string { return "dependents" }
   ```
 
-- [ ] **Step 2.5: Verify build.**
+- [x] **Step 2.5: Verify build.**
 
   ```
   go build ./...
@@ -471,7 +471,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: exit 0, no output.
 
-- [ ] **Step 2.6: Commit.**
+- [x] **Step 2.6: Commit.**
 
   ```
   git add internal/models/role.go internal/models/user.go internal/models/employee.go internal/models/dependent.go
@@ -486,7 +486,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `internal/permissions/registry.go`
 - Create: `internal/permissions/registry_test.go`
 
-- [ ] **Step 3.1: Write `internal/permissions/registry.go`.**
+- [x] **Step 3.1: Write `internal/permissions/registry.go`.**
 
   Mirror Python's `Permission` enum verbatim. Use a typed `Permission` (string alias) so callers get compile-time safety.
 
@@ -701,7 +701,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 3.2: Write `internal/permissions/registry_test.go` (TDD round-trip on the registry).**
+- [x] **Step 3.2: Write `internal/permissions/registry_test.go` (TDD round-trip on the registry).**
 
   ```go
   package permissions
@@ -735,7 +735,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 3.3: Run tests.**
+- [x] **Step 3.3: Run tests.**
 
   ```
   go test ./internal/permissions/...
@@ -743,7 +743,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `ok  github.com/exnodes/hrm-api/internal/permissions ...`
 
-- [ ] **Step 3.4: Commit.**
+- [x] **Step 3.4: Commit.**
 
   ```
   git add internal/permissions/
@@ -758,7 +758,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `pkg/utils/password.go`
 - Create: `pkg/utils/password_test.go`
 
-- [ ] **Step 4.1: Write the test FIRST.**
+- [x] **Step 4.1: Write the test FIRST.**
 
   Create `pkg/utils/password_test.go`:
 
@@ -790,7 +790,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 4.2: Run the test — confirm it fails.**
+- [x] **Step 4.2: Run the test — confirm it fails.**
 
   ```
   go test ./pkg/utils/...
@@ -798,7 +798,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: compile error / undefined `HashPassword`/`CheckPassword`.
 
-- [ ] **Step 4.3: Implement `pkg/utils/password.go`.**
+- [x] **Step 4.3: Implement `pkg/utils/password.go`.**
 
   ```go
   package utils
@@ -834,7 +834,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 4.4: Confirm tests pass.**
+- [x] **Step 4.4: Confirm tests pass.**
 
   ```
   go test ./pkg/utils/...
@@ -842,7 +842,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `ok  github.com/exnodes/hrm-api/pkg/utils ...`
 
-- [ ] **Step 4.5: Commit.**
+- [x] **Step 4.5: Commit.**
 
   ```
   git add pkg/utils/password.go pkg/utils/password_test.go
@@ -858,7 +858,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `pkg/utils/jwt.go`
 - Create: `pkg/utils/jwt_test.go`
 
-- [ ] **Step 5.1: Add Phase 1 keys to `.env.example`.**
+- [x] **Step 5.1: Add Phase 1 keys to `.env.example`.**
 
   Append:
   ```
@@ -873,7 +873,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   SUPER_ADMIN_NAME=Super Admin
   ```
 
-- [ ] **Step 5.2: Write the test FIRST.**
+- [x] **Step 5.2: Write the test FIRST.**
 
   Create `pkg/utils/jwt_test.go`:
 
@@ -933,7 +933,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 5.3: Run tests — confirm fail.**
+- [x] **Step 5.3: Run tests — confirm fail.**
 
   ```
   go test ./pkg/utils/...
@@ -941,7 +941,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: undefined `SignToken`, `VerifyToken`, `TokenTypeAccess`, `Claims`.
 
-- [ ] **Step 5.4: Implement `pkg/utils/jwt.go`.**
+- [x] **Step 5.4: Implement `pkg/utils/jwt.go`.**
 
   ```go
   package utils
@@ -1007,7 +1007,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 5.5: Run tests.**
+- [x] **Step 5.5: Run tests.**
 
   ```
   go test ./pkg/utils/...
@@ -1015,7 +1015,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: all tests pass.
 
-- [ ] **Step 5.6: Commit.**
+- [x] **Step 5.6: Commit.**
 
   ```
   git add pkg/utils/jwt.go pkg/utils/jwt_test.go .env.example
@@ -1029,7 +1029,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/repositories/role_repo.go`
 
-- [ ] **Step 6.1: Implement `internal/repositories/role_repo.go`.**
+- [x] **Step 6.1: Implement `internal/repositories/role_repo.go`.**
 
   ```go
   package repositories
@@ -1103,7 +1103,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 6.2: Build.**
+- [x] **Step 6.2: Build.**
 
   ```
   go build ./...
@@ -1111,7 +1111,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: exit 0.
 
-- [ ] **Step 6.3: Commit.**
+- [x] **Step 6.3: Commit.**
 
   ```
   git add internal/repositories/role_repo.go
@@ -1125,7 +1125,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `internal/repositories/user_repo.go`
 
-- [ ] **Step 7.1: Implement `internal/repositories/user_repo.go`.**
+- [x] **Step 7.1: Implement `internal/repositories/user_repo.go`.**
 
   ```go
   package repositories
@@ -1275,7 +1275,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 7.2: Build.**
+- [x] **Step 7.2: Build.**
 
   ```
   go build ./...
@@ -1283,7 +1283,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: exit 0.
 
-- [ ] **Step 7.3: Commit.**
+- [x] **Step 7.3: Commit.**
 
   ```
   git add internal/repositories/user_repo.go
@@ -1298,7 +1298,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Create: `internal/repositories/employee_repo.go`
 - Create: `internal/repositories/dependent_repo.go`
 
-- [ ] **Step 7b.1: Implement `internal/repositories/employee_repo.go`.**
+- [x] **Step 7b.1: Implement `internal/repositories/employee_repo.go`.**
 
   ```go
   package repositories
@@ -1384,7 +1384,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 7b.2: Implement `internal/repositories/dependent_repo.go`.**
+- [x] **Step 7b.2: Implement `internal/repositories/dependent_repo.go`.**
 
   ```go
   package repositories
@@ -1458,7 +1458,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 7b.3: Build.**
+- [x] **Step 7b.3: Build.**
 
   ```
   go build ./...
@@ -1466,7 +1466,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: exit 0.
 
-- [ ] **Step 7b.4: Commit.**
+- [x] **Step 7b.4: Commit.**
 
   ```
   git add internal/repositories/employee_repo.go internal/repositories/dependent_repo.go
@@ -1481,11 +1481,11 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 - Modify: `Makefile` (add `test-db-up` target if missing — only add, do not break existing targets)
 - Create: `internal/services/testhelper_test.go`
 
-- [ ] **Step 8.1: Confirm the test DB DSN convention.**
+- [x] **Step 8.1: Confirm the test DB DSN convention.**
 
   The test suite uses env var `TEST_DATABASE_URL` (e.g., `postgres://postgres:postgres@localhost:5432/exnodes_hrm_test?sslmode=disable`). If unset, the helper skips with a clear message so CI without a DB still passes vetting.
 
-- [ ] **Step 8.2: Write `internal/services/testhelper_test.go`.**
+- [x] **Step 8.2: Write `internal/services/testhelper_test.go`.**
 
   ```go
   package services_test
@@ -1661,7 +1661,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   }
   ```
 
-- [ ] **Step 8.3: Validate the helper compiles.**
+- [x] **Step 8.3: Validate the helper compiles.**
 
   ```
   go test -run x ./internal/services/...
@@ -1669,7 +1669,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `ok` (no tests yet; -run x matches nothing).
 
-- [ ] **Step 8.4: Commit.**
+- [x] **Step 8.4: Commit.**
 
   ```
   git add internal/services/testhelper_test.go
