@@ -115,3 +115,63 @@ SELECT email FROM users;       -> e2e_1779080151@exnodes.vn
 SELECT full_name,phone ...     -> E2E Updated | 0123-456-789
 SELECT full_name,is_deleted    -> Child Renamed | t   (soft-deleted)
 ```
+
+## Error cases
+
+> Note: the JWT access TTL is 60 min. An expired admin token returns
+> HTTP 401 `"Could not validate credentials"` (token validation, not the
+> business rule). Steps E8–E11 were re-run with a fresh admin token; the
+> outputs below are the authoritative results.
+
+### E1. Create employee WITHOUT token — `POST /api/v1/employees` → **HTTP 401**
+`{"success":false,"code":"unauthorized","message":"Could not validate credentials"}`
+
+### E2. Non-admin LIST — `GET /api/v1/employees` (Employee token) → **HTTP 403**
+`{"success":false,"code":"forbidden"}` (lacks `employees:read`)
+
+### E3. Non-admin CREATE — `POST /api/v1/employees` (Employee token) → **HTTP 403**
+`{"success":false,"code":"forbidden"}` (lacks `employees:create`)
+
+### E4. Duplicate email — `POST /api/v1/employees` (admin, existing email) → **HTTP 409**
+`{"success":false,"code":"conflict","message":"A user with this email already exists"}`
+
+### E5. Stranger accesses another employee's dependents → **HTTP 403**
+`GET /api/v1/employees/<SECOND_ID>/dependents` with the first employee's token:
+`{"success":false,"code":"forbidden","message":"You may only manage your own dependents"}`
+
+### E6. Not-found employee — `GET /api/v1/employees/000...000` (admin) → **HTTP 404**
+`{"success":false,"code":"not_found"}`
+
+### E7. Unauthenticated /employees/me — no token → **HTTP 401**
+`{"success":false,"code":"unauthorized"}`
+
+### E8. Wrong-password admin delete — `DELETE /api/v1/users/:id` `{"current_password":"WrongPass"}` → **HTTP 400**
+`{"success":false,"code":"bad_request","message":"Incorrect password. Please try again."}`
+
+### E9–E11. Soft-delete + cascade — `DELETE /api/v1/employees/:id` (admin) → **HTTP 200**
+
+Pre-delete DB state: `emp_deleted=f | user_active=t`
+
+`{"success":true}`
+
+**SQL PROOF of soft-delete cascade:**
+```
+SELECT e.is_deleted, e.deleted_at IS NOT NULL, u.is_active
+FROM employees e JOIN users u ON u.id=e.user_id WHERE e.id='333544ae-...';
+
+ emp_deleted | emp_del_at_set | user_active
+-------------+----------------+-------------
+ t           | t              | f
+```
+`employees.is_deleted=t`, `deleted_at` set, **linked `users.is_active=f`**
+(cascade deactivation).
+
+- `GET /api/v1/employees/:id` after delete → **HTTP 404** `{"success":false,"code":"not_found"}`
+- Deleted user re-login → **HTTP 401**
+  `{"success":false,"code":"unauthorized","message":"Your account has been deactivated. Contact your administrator."}`
+
+## Result
+
+All happy-path and error-path assertions pass against a live server +
+real Postgres. One bug found and fixed (default-role-on-create, see top).
+The self-update whitelist and soft-delete cascade are both proven by direct SQL.
