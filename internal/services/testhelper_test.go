@@ -101,7 +101,7 @@ func truncateAll(t *testing.T) {
 		return
 	}
 	// Order matters because of FK constraints; CASCADE covers the rest.
-	if err := testDB.Exec(`TRUNCATE TABLE device_tokens, user_notification_settings, employee_leave_quotas, dependents, employees, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+	if err := testDB.Exec(`TRUNCATE TABLE device_tokens, user_notification_settings, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }
@@ -168,6 +168,26 @@ func makeEmployee(t *testing.T, forUser *models.User, fullName string) *models.E
 	}
 	if err := testEmployeeRepo.Create(context.Background(), e); err != nil {
 		t.Fatalf("create employee: %v", err)
+	}
+	return e
+}
+
+// makeEmployeeInDept inserts an employee assigned to the given department
+// (and optionally a position). Used to exercise the delete-conflict guards.
+func makeEmployeeInDept(t *testing.T, deptID uuid.UUID, posID *uuid.UUID) *models.Employee {
+	t.Helper()
+	u := makeUser(t, fmt.Sprintf("emp-%s@example.com", uuid.NewString()[:8]), "pw-Aa123456")
+	e := &models.Employee{
+		UserID:          u.ID,
+		FullName:        "Dept Member",
+		ContractType:    "official",
+		ContractRenewal: 1,
+		PaymentMethod:   "bank_transfer",
+		DepartmentID:    &deptID,
+		PositionID:      posID,
+	}
+	if err := testEmployeeRepo.Create(context.Background(), e); err != nil {
+		t.Fatalf("create employee in dept: %v", err)
 	}
 	return e
 }
