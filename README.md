@@ -184,3 +184,34 @@ sent to `PATCH /employees/me` does not change the stored row).
 Employee creation auto-assigns the seeded **"Employee"** role (carries
 `auth:login`) when the admin supplies no `role_ids`, so every created
 employee is a usable self-service account.
+
+## Phase 3 — Departments + Positions module endpoints
+
+### Departments
+
+| Method | Path                     | Permission          |
+|--------|--------------------------|---------------------|
+| GET    | /api/v1/departments      | departments:read    |
+| POST   | /api/v1/departments      | departments:create  |
+| GET    | /api/v1/departments/{id} | departments:read    |
+| PATCH  | /api/v1/departments/{id} | departments:update  |
+| DELETE | /api/v1/departments/{id} | departments:delete  |
+
+Self-referential `parent_id` (UUID or `"root"` filter on list). Delete is
+blocked (409) while child departments, active positions, or assigned
+employees exist.
+
+### Positions
+
+| Method | Path                   | Permission        |
+|--------|------------------------|-------------------|
+| GET    | /api/v1/positions      | positions:read    |
+| POST   | /api/v1/positions      | positions:create  |
+| GET    | /api/v1/positions/{id} | positions:read    |
+| PATCH  | /api/v1/positions/{id} | positions:update  |
+| DELETE | /api/v1/positions/{id} | positions:delete  |
+
+Each position belongs to exactly one department. Delete is blocked (409)
+while employees are assigned. The `employees.department_id` /
+`employees.position_id` FK constraints (deferred from migration 000003) are
+added in migration 000005.
