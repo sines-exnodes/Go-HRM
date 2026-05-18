@@ -12,10 +12,10 @@ import (
 
 // Config holds all environment-driven settings for the API server.
 type Config struct {
-	AppEnv          string
-	Port            string
-	GinMode         string
-	SwaggerEnabled  bool
+	AppEnv         string
+	Port           string
+	GinMode        string
+	SwaggerEnabled bool
 
 	// CORSAllowedOrigins is a comma-separated list of origins permitted by
 	// the CORS middleware. Empty is allowed only in development.

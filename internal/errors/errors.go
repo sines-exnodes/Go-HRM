@@ -51,7 +51,9 @@ func (e *AppError) WithDetails(details map[string]any) *AppError {
 }
 
 // As is a tiny helper so callers can write
-//     if ae, ok := apperrors.As(err); ok { ... }
+//
+//	if ae, ok := apperrors.As(err); ok { ... }
+//
 // instead of importing the stdlib errors package just for this.
 func As(err error) (*AppError, bool) {
 	var ae *AppError

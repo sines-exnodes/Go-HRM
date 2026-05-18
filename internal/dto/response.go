@@ -3,7 +3,8 @@ package dto
 import "math"
 
 // Response is the standard success envelope. T is the data type.
-//   { "success": true, "message": "...", "data": T }
+//
+//	{ "success": true, "message": "...", "data": T }
 type Response[T any] struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`

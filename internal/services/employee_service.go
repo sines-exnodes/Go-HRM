@@ -584,4 +584,3 @@ func (s *EmployeeService) UpdateLeaveQuota(ctx context.Context, id uuid.UUID, in
 	}
 	return s.Get(ctx, id)
 }
-

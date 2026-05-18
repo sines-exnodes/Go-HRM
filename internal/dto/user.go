@@ -34,8 +34,8 @@ type UserAdminRead struct {
 type UserListQuery struct {
 	Page     int    `form:"page,default=1"       binding:"min=1"`
 	PageSize int    `form:"page_size,default=10" binding:"min=1,max=100"`
-	Search   string `form:"search"`              // substring match on email (ILIKE)
-	IsActive *bool  `form:"is_active"`           // optional active filter
+	Search   string `form:"search"`    // substring match on email (ILIKE)
+	IsActive *bool  `form:"is_active"` // optional active filter
 }
 
 // ---- Auth-side requests (live under /api/v1/users/me* and /api/v1/users/:id*) ----
