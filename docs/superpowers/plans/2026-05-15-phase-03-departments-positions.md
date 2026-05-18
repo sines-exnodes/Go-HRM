@@ -443,7 +443,7 @@ These were already added in Phase 1/2. This task only **confirms** them so later
 
 Note: `HasEmployees` queries the **`employees`** table (the FK lives on `employees`, NOT `users`). Uses the existing `utils.BuildILIKEPattern` and `models.NotDeleted`.
 
-- [ ] Create `internal/repositories/department_repo.go`:
+- [x] Create `internal/repositories/department_repo.go`:
 
   ```go
   package repositories
@@ -592,13 +592,13 @@ Note: `HasEmployees` queries the **`employees`** table (the FK lives on `employe
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/repositories/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/repositories/department_repo.go
@@ -611,7 +611,7 @@ Note: `HasEmployees` queries the **`employees`** table (the FK lives on `employe
 
 Note: `CountEmployees` queries the **`employees`** table.
 
-- [ ] Create `internal/repositories/position_repo.go`:
+- [x] Create `internal/repositories/position_repo.go`:
 
   ```go
   package repositories
@@ -748,13 +748,13 @@ Note: `CountEmployees` queries the **`employees`** table.
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/repositories/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/repositories/position_repo.go
@@ -767,7 +767,7 @@ Note: `CountEmployees` queries the **`employees`** table.
 
 Error package is `apperrors` (package name) at import path `internal/errors`. Delete rejects when children, positions, or employees reference the department.
 
-- [ ] Create `internal/services/department_service.go`:
+- [x] Create `internal/services/department_service.go`:
 
   ```go
   package services
@@ -1033,13 +1033,13 @@ Error package is `apperrors` (package name) at import path `internal/errors`. De
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/services/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/services/department_service.go
@@ -1050,7 +1050,7 @@ Error package is `apperrors` (package name) at import path `internal/errors`. De
 
 ### Task 10 — `internal/services/position_service.go`
 
-- [ ] Create `internal/services/position_service.go`:
+- [x] Create `internal/services/position_service.go`:
 
   ```go
   package services
@@ -1256,13 +1256,13 @@ Error package is `apperrors` (package name) at import path `internal/errors`. De
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/services/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/services/position_service.go
@@ -1275,7 +1275,7 @@ Error package is `apperrors` (package name) at import path `internal/errors`. De
 
 Uses `dto.Response[...]` (matches `internal/dto/response.go`) and surfaces errors via `_ = c.Error(err)` so `middleware.ErrorHandler()` renders them. The cross-aggregate position guard is inside the service now (Task 9), so the handler is a thin pass-through.
 
-- [ ] Create `internal/handlers/department_handler.go`:
+- [x] Create `internal/handlers/department_handler.go`:
 
   ```go
   package handlers
@@ -1430,13 +1430,13 @@ Uses `dto.Response[...]` (matches `internal/dto/response.go`) and surfaces error
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/handlers/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/handlers/department_handler.go
@@ -1447,7 +1447,7 @@ Uses `dto.Response[...]` (matches `internal/dto/response.go`) and surfaces error
 
 ### Task 12 — `internal/handlers/position_handler.go`
 
-- [ ] Create `internal/handlers/position_handler.go`:
+- [x] Create `internal/handlers/position_handler.go`:
 
   ```go
   package handlers
@@ -1601,13 +1601,13 @@ Uses `dto.Response[...]` (matches `internal/dto/response.go`) and surfaces error
   }
   ```
 
-- [ ] Build:
+- [x] Build:
 
   ```bash
   go build ./internal/handlers/...
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/handlers/position_handler.go
@@ -1620,28 +1620,28 @@ Uses `dto.Response[...]` (matches `internal/dto/response.go`) and surfaces error
 
 The actual `main.go` builds repos → services → handlers inline, then registers routes inside the `authed := v1.Group("")` block. **`RequirePerms`'s first argument is `authSvc`** (see `internal/middleware/permissions.go`). Mirror the existing `adminEmps` block exactly.
 
-- [ ] In `cmd/server/main.go`, in the `// ---- repositories ----` section, after `settingsRepo := ...`, add:
+- [x] In `cmd/server/main.go`, in the `// ---- repositories ----` section, after `settingsRepo := ...`, add:
 
   ```go
   	departmentRepo := repositories.NewDepartmentRepository(db)
   	positionRepo := repositories.NewPositionRepository(db)
   ```
 
-- [ ] In the `// ---- services ----` section, after `userSvc := services.NewUserService(...)`, add:
+- [x] In the `// ---- services ----` section, after `userSvc := services.NewUserService(...)`, add:
 
   ```go
   	departmentSvc := services.NewDepartmentService(departmentRepo, positionRepo)
   	positionSvc := services.NewPositionService(positionRepo, departmentRepo)
   ```
 
-- [ ] In the `// ---- handlers ----` section, after `userH := handlers.NewUserHandler(userSvc)`, add:
+- [x] In the `// ---- handlers ----` section, after `userH := handlers.NewUserHandler(userSvc)`, add:
 
   ```go
   	departmentH := handlers.NewDepartmentHandler(departmentSvc)
   	positionH := handlers.NewPositionHandler(positionSvc)
   ```
 
-- [ ] Inside the `authed` block, after the dependents routes (the `authed.DELETE("/employees/:id/dependents/:dependentID", depH.Delete)` line), add:
+- [x] Inside the `authed` block, after the dependents routes (the `authed.DELETE("/employees/:id/dependents/:dependentID", depH.Delete)` line), add:
 
   ```go
   		// ---- /departments ----
@@ -1661,7 +1661,7 @@ The actual `main.go` builds repos → services → handlers inline, then registe
   		positions.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsDelete), positionH.Delete)
   ```
 
-- [ ] Build the whole module:
+- [x] Build the whole module:
 
   ```bash
   go build ./...
@@ -1669,7 +1669,7 @@ The actual `main.go` builds repos → services → handlers inline, then registe
 
   Expected: clean build, no output.
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add cmd/server/main.go
@@ -1682,7 +1682,7 @@ The actual `main.go` builds repos → services → handlers inline, then registe
 
 `SeedService` (`internal/services/seed_service.go`) has no department/position repos; it uses `s.db` directly. Seed only when `departments` is empty (idempotent). Match the existing `log.Printf("seed: …")` style and the `s.Seed(ctx)` entrypoint.
 
-- [ ] Add a `seedOrgDefaults` method and call it from `Seed`:
+- [x] Add a `seedOrgDefaults` method and call it from `Seed`:
 
   ```go
   // (in Seed, after seedSuperAdmin)
@@ -1746,7 +1746,7 @@ The actual `main.go` builds repos → services → handlers inline, then registe
   }
   ```
 
-- [ ] Build + run the existing seed test to confirm nothing broke:
+- [x] Build + run the existing seed test to confirm nothing broke:
 
   ```bash
   go build ./... && TEST_DATABASE_URL='postgres://ennam:ennam_dev_2026@localhost:5432/exnodes_hrm_test?sslmode=disable' go test ./internal/services/ -run TestSeed -count=1
@@ -1754,7 +1754,7 @@ The actual `main.go` builds repos → services → handlers inline, then registe
 
   Expected: `ok  github.com/exnodes/hrm-api/internal/services`.
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/services/seed_service.go
