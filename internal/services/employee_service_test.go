@@ -152,16 +152,23 @@ func TestEmployeeService_SelfUpdate_WhitelistEnforced(t *testing.T) {
 	require.NoError(t, err)
 
 	// A real employee to satisfy the manager_id FK (employees.manager_id
-	// REFERENCES employees(id)). department_id/position_id are FK-free until
-	// Phase 3, so synthetic UUIDs are acceptable for those.
+	// REFERENCES employees(id)). Since Phase 3, employees.department_id and
+	// employees.position_id also carry FK constraints, so we must reference
+	// real departments/positions rows (synthetic UUIDs would violate the FK).
 	boss, err := svc.Create(ctx, dto.EmployeeCreate{
 		Email: "boss@example.com", Password: "Pass12345", FullName: "The Boss",
 	})
 	require.NoError(t, err)
 
-	// Stamp restricted FK/role columns directly so we can prove they survive.
+	// Create a real department + position to satisfy the employees FKs.
 	dept := uuid.New()
+	require.NoError(t, testDB.Exec(
+		"INSERT INTO departments (id, name) VALUES (?, ?)",
+		dept, "Self-Update Test Dept").Error)
 	pos := uuid.New()
+	require.NoError(t, testDB.Exec(
+		"INSERT INTO positions (id, name, department_id) VALUES (?, ?, ?)",
+		pos, "Self-Update Test Position", dept).Error)
 	mgr := boss.ID
 	require.NoError(t, testDB.Exec(
 		"UPDATE employees SET department_id = ?, position_id = ?, manager_id = ? WHERE id = ?",
