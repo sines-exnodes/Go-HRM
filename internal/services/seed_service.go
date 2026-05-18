@@ -126,6 +126,55 @@ func (s *SeedService) Seed(ctx context.Context) error {
 	if err := s.seedSuperAdmin(ctx); err != nil {
 		return err
 	}
+	if err := s.seedOrgDefaults(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedOrgDefaults inserts a small default department/position tree the first
+// time the departments table is empty. Idempotent: a non-empty table is left
+// untouched so manual edits are never clobbered.
+func (s *SeedService) seedOrgDefaults(ctx context.Context) error {
+	var deptCount int64
+	if err := s.db.WithContext(ctx).
+		Model(&models.Department{}).
+		Where("is_deleted = ?", false).
+		Count(&deptCount).Error; err != nil {
+		return err
+	}
+	if deptCount > 0 {
+		return nil
+	}
+
+	eng := &models.Department{Name: "Engineering"}
+	hr := &models.Department{Name: "Human Resources"}
+	if err := s.db.WithContext(ctx).Create(eng).Error; err != nil {
+		return err
+	}
+	if err := s.db.WithContext(ctx).Create(hr).Error; err != nil {
+		return err
+	}
+	backend := &models.Department{Name: "Backend", ParentID: &eng.ID}
+	mobile := &models.Department{Name: "Mobile", ParentID: &eng.ID}
+	if err := s.db.WithContext(ctx).Create(backend).Error; err != nil {
+		return err
+	}
+	if err := s.db.WithContext(ctx).Create(mobile).Error; err != nil {
+		return err
+	}
+
+	positions := []*models.Position{
+		{Name: "Software Engineer", DepartmentID: backend.ID},
+		{Name: "Mobile Engineer", DepartmentID: mobile.ID},
+		{Name: "HR Specialist", DepartmentID: hr.ID},
+	}
+	for _, p := range positions {
+		if err := s.db.WithContext(ctx).Create(p).Error; err != nil {
+			return err
+		}
+	}
+	log.Printf("seed: created default org tree (4 departments, 3 positions)")
 	return nil
 }
 
