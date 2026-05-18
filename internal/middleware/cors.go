@@ -6,12 +6,36 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CORS returns a permissive CORS middleware suitable for early development
-// (`Access-Control-Allow-Origin: *`). Production deployments should swap this
-// for a stricter allow-list — tracked as a Phase 2+ hardening item.
-func CORS() gin.HandlerFunc {
+// CORS returns a CORS middleware whose allowed origins are gated by
+// configuration.
+//
+//   - If allowedOrigins is non-empty, the request Origin is echoed back only
+//     when it appears in the list (with `Vary: Origin` so caches key on it).
+//   - If allowedOrigins is empty and appEnv == "development", a permissive
+//     `Access-Control-Allow-Origin: *` is used to ease local work.
+//
+// An empty list in production is a misconfiguration and must be caught at
+// startup (see cmd/server/main.go) — this middleware does not fail per-request.
+func CORS(allowedOrigins []string, appEnv string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		if o != "" {
+			allowed[o] = struct{}{}
+		}
+	}
+
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+
+		if len(allowed) > 0 {
+			if _, ok := allowed[origin]; ok {
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Vary", "Origin")
+			}
+		} else if appEnv == "development" {
+			c.Header("Access-Control-Allow-Origin", "*")
+		}
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization, Accept")
 		c.Header("Access-Control-Expose-Headers", "Content-Length")

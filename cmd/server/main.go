@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -92,6 +93,17 @@ func main() {
 	departmentH := handlers.NewDepartmentHandler(departmentSvc)
 	positionH := handlers.NewPositionHandler(positionSvc)
 
+	// ---- CORS origin allow-list ----
+	var corsOrigins []string
+	for _, o := range strings.Split(cfg.CORSAllowedOrigins, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			corsOrigins = append(corsOrigins, o)
+		}
+	}
+	if len(corsOrigins) == 0 && cfg.AppEnv == "production" {
+		log.Fatal("config: CORS_ALLOWED_ORIGINS must be set in production")
+	}
+
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
 
@@ -100,7 +112,7 @@ func main() {
 	// the envelope at the end of the chain).
 	r.Use(middleware.Recovery())
 	r.Use(gin.Logger())
-	r.Use(middleware.CORS())
+	r.Use(middleware.CORS(corsOrigins, cfg.AppEnv))
 	r.Use(middleware.ErrorHandler())
 
 	handlers.RegisterRoutes(r, handlers.NewHandlers(), cfg.SwaggerEnabled)

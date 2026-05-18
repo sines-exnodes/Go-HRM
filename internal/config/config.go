@@ -17,6 +17,10 @@ type Config struct {
 	GinMode         string
 	SwaggerEnabled  bool
 
+	// CORSAllowedOrigins is a comma-separated list of origins permitted by
+	// the CORS middleware. Empty is allowed only in development.
+	CORSAllowedOrigins string
+
 	DBHost     string
 	DBPort     string
 	DBUser     string
@@ -58,6 +62,8 @@ func Load() *Config {
 		Port:           getEnv("PORT", "8080"),
 		GinMode:        getEnv("GIN_MODE", "debug"),
 		SwaggerEnabled: getEnvBool("SWAGGER_ENABLED", true),
+
+		CORSAllowedOrigins: getEnv("CORS_ALLOWED_ORIGINS", ""),
 
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),
