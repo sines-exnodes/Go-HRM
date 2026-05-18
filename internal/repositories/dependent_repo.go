@@ -3,7 +3,6 @@ package repositories
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -11,59 +10,70 @@ import (
 	"github.com/exnodes/hrm-api/internal/models"
 )
 
-// DependentRepository defines data access for the dependents of an employee.
-type DependentRepository interface {
-	Create(ctx context.Context, d *models.Dependent) error
-	Update(ctx context.Context, d *models.Dependent) error
-	SoftDelete(ctx context.Context, id uuid.UUID) error
-	FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error)
-	ListByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Dependent, error)
+// DependentRepository is the Postgres-backed data access for the dependents of
+// an employee. (Reconciled with the Phase 1 stub: the Phase 1 version exposed
+// an interface with a non-paginated ListByEmployee and a struct-based Update;
+// this Phase 2 version is a superset — paginated list + field-map update — and
+// has no interface consumers, so it replaces the stub directly.)
+type DependentRepository struct {
+	db *gorm.DB
 }
 
-type dependentRepository struct{ db *gorm.DB }
-
-// NewDependentRepository constructs a Postgres-backed DependentRepository.
-func NewDependentRepository(db *gorm.DB) DependentRepository {
-	return &dependentRepository{db: db}
+func NewDependentRepository(db *gorm.DB) *DependentRepository {
+	return &DependentRepository{db: db}
 }
 
-func (r *dependentRepository) Create(ctx context.Context, d *models.Dependent) error {
+func (r *DependentRepository) Create(ctx context.Context, d *models.Dependent) error {
 	return r.db.WithContext(ctx).Create(d).Error
 }
 
-func (r *dependentRepository) Update(ctx context.Context, d *models.Dependent) error {
-	return r.db.WithContext(ctx).Save(d).Error
-}
-
-func (r *dependentRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
-	now := time.Now().UTC()
-	res := r.db.WithContext(ctx).Model(&models.Dependent{}).
-		Where("id = ? AND is_deleted = false", id).
-		Updates(map[string]interface{}{"is_deleted": true, "deleted_at": now})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return errors.New("dependent not found or already deleted")
-	}
-	return nil
-}
-
-func (r *dependentRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error) {
+func (r *DependentRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error) {
 	var d models.Dependent
-	err := r.db.WithContext(ctx).Scopes(notDeleted).First(&d, "id = ?", id).Error
-	if err != nil {
-		return nil, err
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND is_deleted = ?", id, false).
+		First(&d).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, gorm.ErrRecordNotFound
 	}
-	return &d, nil
+	return &d, err
 }
 
-func (r *dependentRepository) ListByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Dependent, error) {
-	var out []models.Dependent
-	err := r.db.WithContext(ctx).
-		Scopes(notDeleted).
-		Where("employee_id = ?", employeeID).
+func (r *DependentRepository) ListByEmployee(ctx context.Context, employeeID uuid.UUID, page, pageSize int) ([]models.Dependent, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 50
+	}
+	tx := r.db.WithContext(ctx).Model(&models.Dependent{}).
+		Where("employee_id = ? AND is_deleted = ?", employeeID, false)
+
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var deps []models.Dependent
+	if err := tx.
 		Order("created_at ASC").
-		Find(&out).Error
-	return out, err
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&deps).Error; err != nil {
+		return nil, 0, err
+	}
+	return deps, total, nil
+}
+
+func (r *DependentRepository) Update(ctx context.Context, id uuid.UUID, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(&models.Dependent{}).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Updates(fields).Error
+}
+
+func (r *DependentRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Model(&models.Dependent{}).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error
 }
