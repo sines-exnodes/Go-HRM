@@ -9,13 +9,17 @@ import (
 // ErrEmptyPassword is returned when an empty password is provided.
 var ErrEmptyPassword = errors.New("password must not be empty")
 
-// HashPassword returns a bcrypt hash of the plaintext password using the
-// default cost (10).
+// bcryptCost is the bcrypt work factor. OWASP recommends a cost of at
+// least 12 for password hashing.
+const bcryptCost = 12
+
+// HashPassword returns a bcrypt hash of the plaintext password using a
+// cost factor of 12 (OWASP recommendation).
 func HashPassword(plain string) (string, error) {
 	if plain == "" {
 		return "", ErrEmptyPassword
 	}
-	h, err := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
+	h, err := bcrypt.GenerateFromPassword([]byte(plain), bcryptCost)
 	if err != nil {
 		return "", err
 	}
