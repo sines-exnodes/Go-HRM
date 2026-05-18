@@ -1,0 +1,295 @@
+package handlers
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/exnodes/hrm-api/internal/dto"
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
+	"github.com/exnodes/hrm-api/internal/services"
+)
+
+type UserHandler struct {
+	svc *services.UserService
+}
+
+func NewUserHandler(svc *services.UserService) *UserHandler {
+	return &UserHandler{svc: svc}
+}
+
+// GetMe godoc
+// @Summary      Get current user (auth profile + embedded employee summary)
+// @Tags         users
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/me [get]
+func (h *UserHandler) GetMe(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	view, err := h.svc.GetMe(c.Request.Context(), u)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	ok(c, http.StatusOK, view, "")
+}
+
+// ChangeMyPassword godoc
+// @Summary      Change current user password
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.ChangePasswordRequest true "current and new password"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/me/change-password [post]
+func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var in dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if in.CurrentPassword == "" {
+		_ = c.Error(apperrors.ErrBadRequest("Current password is required"))
+		return
+	}
+	if err := h.svc.ChangePassword(c.Request.Context(), u, in.CurrentPassword, in.NewPassword); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "Password changed successfully")
+}
+
+// ChangeMyEmail godoc
+// @Summary      Change current user email
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.ChangeEmailRequest true "new email + current password"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/me/change-email [post]
+func (h *UserHandler) ChangeMyEmail(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var in dto.ChangeEmailRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	view, err := h.svc.ChangeEmail(c.Request.Context(), u, in.NewEmail, in.CurrentPassword)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	ok(c, http.StatusOK, view, "Email updated successfully")
+}
+
+// RegisterDeviceToken godoc
+// @Summary      Register a device token for push notifications
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.FcmTokenRequest true "device id + token"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/me/device-tokens [post]
+func (h *UserHandler) RegisterDeviceToken(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var in dto.FcmTokenRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.svc.RegisterDeviceToken(c.Request.Context(), u.ID, in); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "Device token registered")
+}
+
+// RemoveDeviceToken godoc
+// @Summary      Remove a device token
+// @Tags         users
+// @Security     BearerAuth
+// @Produce      json
+// @Param        token path string true "FCM token"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/me/device-tokens/{token} [delete]
+func (h *UserHandler) RemoveDeviceToken(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	token := c.Param("token")
+	if token == "" {
+		_ = c.Error(apperrors.ErrBadRequest("token is required"))
+		return
+	}
+	if err := h.svc.RemoveDeviceToken(c.Request.Context(), u.ID, token); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "Device token removed")
+}
+
+// UpdateMyNotificationSettings godoc
+// @Summary      Update push notification settings
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        body body dto.NotificationSettingsRequest true "settings"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/me/notification-settings [patch]
+func (h *UserHandler) UpdateMyNotificationSettings(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var in dto.NotificationSettingsRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.svc.UpdateNotificationSettings(c.Request.Context(), u.ID, in.NotificationsEnabled); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "Notification settings updated")
+}
+
+// ---- Admin user endpoints ----
+
+// AdminChangePassword godoc
+// @Summary      Admin resets a user's password
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path string true "user uuid"
+// @Param        body body dto.ChangePasswordRequest true "new password (current ignored)"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/{id}/change-password [patch]
+func (h *UserHandler) AdminChangePassword(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	var in dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.svc.AdminChangePassword(c.Request.Context(), id, in.NewPassword); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "Password changed")
+}
+
+// AdminPatch godoc
+// @Summary      Admin toggle is_active on a user
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path string true "user uuid"
+// @Param        body body dto.AdminUserPatch true "fields"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/{id} [patch]
+func (h *UserHandler) AdminPatch(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	var in dto.AdminUserPatch
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.svc.AdminPatch(c.Request.Context(), id, in); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "User updated")
+}
+
+// AdminDelete godoc
+// @Summary      Soft-delete a user account (admin reauth)
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path string true "user uuid"
+// @Param        body body dto.DeleteUserRequest true "admin's current password"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/{id} [delete]
+func (h *UserHandler) AdminDelete(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	admin, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var in dto.DeleteUserRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.svc.AdminDelete(c.Request.Context(), id, admin, in.CurrentPassword); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "User deleted")
+}
+
+// AssignRoles godoc
+// @Summary      Assign roles to a user (admin)
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path string true "user uuid"
+// @Param        body body dto.RoleAssignmentRequest true "role ids"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/{id}/roles [put]
+func (h *UserHandler) AssignRoles(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	admin, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var in dto.RoleAssignmentRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.svc.AssignRoles(c.Request.Context(), id, in.RoleIDs, admin); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	okEmpty(c, "Roles assigned")
+}
