@@ -129,3 +129,58 @@ docs/
 - Schema changes are versioned SQL migration files only. `db.AutoMigrate()`
   is **prohibited**. The app verifies migration version on boot and refuses
   to start if behind or dirty.
+
+## Phase 2 — Employees + Dependents module endpoints
+
+Self-service (JWT only):
+
+| Method | Path                                       | Purpose                                       |
+|--------|--------------------------------------------|-----------------------------------------------|
+| GET    | `/api/v1/users/me`                         | auth profile + embedded employee summary      |
+| POST   | `/api/v1/users/me/change-password`         | change own password                           |
+| POST   | `/api/v1/users/me/change-email`            | change own email (reauth)                     |
+| POST   | `/api/v1/users/me/device-tokens`           | register FCM/APNs token                       |
+| DELETE | `/api/v1/users/me/device-tokens/:token`    | remove a device token                         |
+| PATCH  | `/api/v1/users/me/notification-settings`   | toggle push notifications                     |
+| GET    | `/api/v1/employees/me`                     | own HR profile (with dependents)              |
+| PATCH  | `/api/v1/employees/me`                     | update own HR profile (restricted whitelist)  |
+| PATCH  | `/api/v1/employees/me/avatar`              | upload own avatar (multipart, 5MB image only) |
+
+Admin (per-route perms):
+
+| Method | Path                                              | Required perm              |
+|--------|---------------------------------------------------|----------------------------|
+| GET    | `/api/v1/employees`                               | `employees:read`           |
+| POST   | `/api/v1/employees`                               | `employees:create`         |
+| GET    | `/api/v1/employees/:id`                           | `employees:read`           |
+| PATCH  | `/api/v1/employees/:id`                           | `employees:update`         |
+| DELETE | `/api/v1/employees/:id`                           | `employees:delete`         |
+| PATCH  | `/api/v1/employees/:id/avatar`                    | `employees:update`         |
+| PATCH  | `/api/v1/employees/:id/leave-quota`               | `leave_quota:manage`       |
+| PATCH  | `/api/v1/users/:id`                               | `users:update`             |
+| DELETE | `/api/v1/users/:id`                               | `users:delete`             |
+| PATCH  | `/api/v1/users/:id/change-password`               | `users:change_password`    |
+| PUT    | `/api/v1/users/:id/roles`                         | `users:manage_roles`       |
+
+Dependents — owner OR `dependents:manage` (enforced in handler; the employee
+segment uses `:id` and the nested dependent uses `:dependentID`):
+
+| Method | Path                                                       |
+|--------|------------------------------------------------------------|
+| GET    | `/api/v1/employees/:id/dependents`                         |
+| POST   | `/api/v1/employees/:id/dependents`                         |
+| PATCH  | `/api/v1/employees/:id/dependents/:dependentID`            |
+| DELETE | `/api/v1/employees/:id/dependents/:dependentID`            |
+
+Self-service `PATCH /employees/me` whitelist:
+`phone, personal_email, permanent_address, current_address, marital_status,
+emergency_contact_name, emergency_contact_relation, emergency_contact_phone`.
+Any other field is **silently rejected at the DTO boundary** —
+`EmployeeSelfUpdate` has no field for it, and the service applies a manual
+field-by-field copy from the DTO only. Verified by direct SQL in
+`docs/superpowers/verification/phase-02.md` (a `basic_salary`/`department_id`
+sent to `PATCH /employees/me` does not change the stored row).
+
+Employee creation auto-assigns the seeded **"Employee"** role (carries
+`auth:login`) when the admin supplies no `role_ids`, so every created
+employee is a usable self-service account.

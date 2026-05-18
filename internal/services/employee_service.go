@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 
 	"github.com/google/uuid"
@@ -287,29 +288,36 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		// role_ids, honour them. Otherwise fall back to the system default
 		// "Employee" role so every created employee is a usable self-service
 		// account (carries auth:login) — without this, a freshly created
-		// employee has zero permissions and cannot log in.
+		// employee has zero permissions and cannot log in. The seed service
+		// guarantees this role exists on every boot; if it is genuinely
+		// missing we log and proceed role-less rather than failing the whole
+		// creation (the admin can assign roles afterwards).
 		roleIDs := in.RoleIDs
 		if len(roleIDs) == 0 {
 			defRole, derr := s.roles.FindByName(ctx, defaultEmployeeRoleName)
-			if derr != nil {
-				if errors.Is(derr, gorm.ErrRecordNotFound) {
-					return apperrors.ErrBadRequest(
-						"default \"Employee\" role not found; supply role_ids or seed roles")
-				}
+			switch {
+			case derr == nil:
+				roleIDs = []uuid.UUID{defRole.ID}
+			case errors.Is(derr, gorm.ErrRecordNotFound):
+				log.Printf("employees: default %q role not found; "+
+					"creating user %q with no roles (cannot self-login until "+
+					"a role is assigned)", defaultEmployeeRoleName, email)
+			default:
 				return derr
 			}
-			roleIDs = []uuid.UUID{defRole.ID}
 		}
-		rows := make([]map[string]any, 0, len(roleIDs))
-		for _, rid := range roleIDs {
-			rows = append(rows, map[string]any{
-				"user_id": u.ID, "role_id": rid,
-				"created_at": gorm.Expr("NOW()"), "updated_at": gorm.Expr("NOW()"),
-				"is_deleted": false,
-			})
-		}
-		if err := tx.Table("user_roles").Create(&rows).Error; err != nil {
-			return err
+		if len(roleIDs) > 0 {
+			rows := make([]map[string]any, 0, len(roleIDs))
+			for _, rid := range roleIDs {
+				rows = append(rows, map[string]any{
+					"user_id": u.ID, "role_id": rid,
+					"created_at": gorm.Expr("NOW()"), "updated_at": gorm.Expr("NOW()"),
+					"is_deleted": false,
+				})
+			}
+			if err := tx.Table("user_roles").Create(&rows).Error; err != nil {
+				return err
+			}
 		}
 		createdEmp = *e
 		return nil
