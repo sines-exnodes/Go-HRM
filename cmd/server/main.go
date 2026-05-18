@@ -53,6 +53,8 @@ func main() {
 	tokenRepo := repositories.NewDeviceTokenRepository(db)
 	quotaRepo := repositories.NewLeaveQuotaRepository(db)
 	settingsRepo := repositories.NewNotificationSettingsRepository(db)
+	departmentRepo := repositories.NewDepartmentRepository(db)
+	positionRepo := repositories.NewPositionRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -73,6 +75,8 @@ func main() {
 	empSvc := services.NewEmployeeService(db, employeeRepo, dependentRepo, userRepo, roleRepo, quotaRepo, uploadSvc)
 	depSvc := services.NewDependentService(dependentRepo, employeeRepo)
 	userSvc := services.NewUserService(userRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
+	departmentSvc := services.NewDepartmentService(departmentRepo, positionRepo)
+	positionSvc := services.NewPositionService(positionRepo, departmentRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -85,6 +89,8 @@ func main() {
 	empH := handlers.NewEmployeeHandler(empSvc)
 	depH := handlers.NewDependentHandler(depSvc)
 	userH := handlers.NewUserHandler(userSvc)
+	departmentH := handlers.NewDepartmentHandler(departmentSvc)
+	positionH := handlers.NewPositionHandler(positionSvc)
 
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
@@ -152,6 +158,22 @@ func main() {
 		authed.POST("/employees/:id/dependents", depH.Create)
 		authed.PATCH("/employees/:id/dependents/:dependentID", depH.Update)
 		authed.DELETE("/employees/:id/dependents/:dependentID", depH.Delete)
+
+		// ---- /departments ----
+		departments := authed.Group("/departments")
+		departments.GET("", middleware.RequirePerms(authSvc, permissions.PermDepartmentsRead), departmentH.List)
+		departments.POST("", middleware.RequirePerms(authSvc, permissions.PermDepartmentsCreate), departmentH.Create)
+		departments.GET(":id", middleware.RequirePerms(authSvc, permissions.PermDepartmentsRead), departmentH.Get)
+		departments.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermDepartmentsUpdate), departmentH.Update)
+		departments.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermDepartmentsDelete), departmentH.Delete)
+
+		// ---- /positions ----
+		positions := authed.Group("/positions")
+		positions.GET("", middleware.RequirePerms(authSvc, permissions.PermPositionsRead), positionH.List)
+		positions.POST("", middleware.RequirePerms(authSvc, permissions.PermPositionsCreate), positionH.Create)
+		positions.GET(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsRead), positionH.Get)
+		positions.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsUpdate), positionH.Update)
+		positions.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsDelete), positionH.Delete)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

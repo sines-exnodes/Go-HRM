@@ -35,6 +35,34 @@ definitions:
     required:
     - current_password
     type: object
+  github_com_exnodes_hrm-api_internal_dto.DepartmentCreate:
+    properties:
+      description:
+        maxLength: 1000
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      parent_id:
+        type: string
+    required:
+    - name
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.DepartmentUpdate:
+    properties:
+      clear_parent:
+        type: boolean
+      description:
+        maxLength: 1000
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      parent_id:
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.DependentCreate:
     properties:
       dob:
@@ -368,6 +396,33 @@ definitions:
       notifications_enabled:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.PositionCreate:
+    properties:
+      department_id:
+        type: string
+      description:
+        maxLength: 1000
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+    required:
+    - department_id
+    - name
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.PositionUpdate:
+    properties:
+      department_id:
+        type: string
+      description:
+        maxLength: 1000
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.RefreshRequest:
     properties:
       refresh_token:
@@ -665,6 +720,136 @@ paths:
       summary: Exchange a refresh token for a new token pair
       tags:
       - Authentication
+  /api/v1/departments:
+    get:
+      description: Paginated list with optional name search and parent filter ("root"
+        returns top-level only).
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Substring match on name (ILIKE)
+        in: query
+        name: search
+        type: string
+      - description: Filter by parent UUID, or \
+        in: query
+        name: parent_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List departments
+      tags:
+      - departments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Department payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.DepartmentCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create department
+      tags:
+      - departments
+  /api/v1/departments/{id}:
+    delete:
+      description: Soft-deletes a department. Rejected with 409 if it has child departments,
+        active positions, or assigned employees.
+      parameters:
+      - description: Department UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete department
+      tags:
+      - departments
+    get:
+      parameters:
+      - description: Department UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get department by ID
+      tags:
+      - departments
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Department UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update (PATCH semantics)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.DepartmentUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update department
+      tags:
+      - departments
   /api/v1/employees:
     get:
       parameters:
@@ -1039,6 +1224,134 @@ paths:
       summary: Replace current employee avatar
       tags:
       - employees
+  /api/v1/positions:
+    get:
+      parameters:
+      - default: 1
+        description: Page
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Substring match on name
+        in: query
+        name: search
+        type: string
+      - description: Filter by department UUID
+        in: query
+        name: department_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List positions
+      tags:
+      - positions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Position payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.PositionCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create position
+      tags:
+      - positions
+  /api/v1/positions/{id}:
+    delete:
+      description: Soft-deletes a position. Rejected with 409 if any employee is still
+        assigned.
+      parameters:
+      - description: Position UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete position
+      tags:
+      - positions
+    get:
+      parameters:
+      - description: Position UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get position by ID
+      tags:
+      - positions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Position UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.PositionUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update position
+      tags:
+      - positions
   /api/v1/roles/permissions:
     get:
       description: Returns the structured permission catalog. Requires authentication
