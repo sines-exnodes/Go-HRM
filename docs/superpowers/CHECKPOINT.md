@@ -1,9 +1,15 @@
 # Resume Checkpoint
 
 **Last updated:** 2026-05-18
-**Stopped at:** Phase 3 COMPLETE (all 18 tasks, live-verified, FK guard SQL-proven). Next: Phase 4 — Skills + Labels.
-**HEAD commit:** ~91 commits on `main` (run `git log --oneline -1`)
+**Stopped at:** Phase 0-3 COMPLETE + code review done + all chosen fixes applied & live-verified. Next: Phase 4 — Skills + Labels.
+**HEAD commit:** ~103 commits on `main` (run `git log --oneline -1`)
 **Branch:** `main`
+
+## Code review status (Phase 0-3)
+
+Full review done (verdict was REQUEST_CHANGES). Fixed: all 5 Critical (refresh session-invalidation, avatar content-sniff, atomic admin employee update, GET /users + /users/:id, user_roles soft-delete) + Important #6 (Dependent/LeaveQuota repo interfaces), #8 (bcrypt cost 12), #9 (CORS env-gate). Both top security fixes live-verified (`docs/superpowers/verification/review-fixes.md`). 68 service tests pass. Deferred (NOT fixed): review #7 (unreachable guard) + all 4 Minor + the EmployeeService.toRead nil department/position projection gap.
+
+**Storage env note:** the app reads `STORAGE_*` env keys (`internal/config/storage.go`), NOT `SUPABASE_*`. The dead duplicate `SUPABASE_*` block was removed from `.env.example` + `config.go`. Any avatar/file upload (Phase 2 avatar, Phase 9 uploads) needs a real Supabase S3 `STORAGE_*` config; local dev can point at MinIO. Storage is optional at boot (non-fatal) — upload endpoints 500 if unconfigured.
 
 ## How to resume next session
 
