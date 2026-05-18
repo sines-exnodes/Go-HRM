@@ -1767,7 +1767,7 @@ The actual `main.go` builds repos → services → handlers inline, then registe
 
 Tests are package `services_test` and use the real test DB. `truncateAll` must also wipe `departments, positions` (FK from `employees` → `departments`/`positions` means order/CASCADE matters).
 
-- [ ] In `internal/services/testhelper_test.go`, update `truncateAll` to include the new tables (departments/positions must be truncated together with employees; CASCADE handles the FK):
+- [x] In `internal/services/testhelper_test.go`, update `truncateAll` to include the new tables (departments/positions must be truncated together with employees; CASCADE handles the FK):
 
   ```go
   if err := testDB.Exec(`TRUNCATE TABLE device_tokens, user_notification_settings, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
@@ -1775,7 +1775,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
   }
   ```
 
-- [ ] Add helpers to `testhelper_test.go` (place after `makeEmployee`):
+- [x] Add helpers to `testhelper_test.go` (place after `makeEmployee`):
 
   ```go
   // makeEmployeeInDept inserts an employee assigned to the given department
@@ -1801,7 +1801,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
   (`fmt` and `uuid` are already imported in `testhelper_test.go`.)
 
-- [ ] Create `internal/services/department_service_test.go`. Cover at minimum these cases (package `services_test`, gate with `skipIfNoDB(t)`, `truncateAll(t)` at the top, build the service with real repos: `repositories.NewDepartmentRepository(testDB)` and `repositories.NewPositionRepository(testDB)`):
+- [x] Create `internal/services/department_service_test.go`. Cover at minimum these cases (package `services_test`, gate with `skipIfNoDB(t)`, `truncateAll(t)` at the top, build the service with real repos: `repositories.NewDepartmentRepository(testDB)` and `repositories.NewPositionRepository(testDB)`):
 
   - `TestDepartmentService_Create_OK`
   - `TestDepartmentService_Create_DuplicateName_Conflict`
@@ -1879,7 +1879,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
   }
   ```
 
-- [ ] Create `internal/services/position_service_test.go` covering:
+- [x] Create `internal/services/position_service_test.go` covering:
 
   - `TestPositionService_Create_OK`
   - `TestPositionService_Create_MissingDept_BadRequest`
@@ -1890,7 +1890,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
   - `TestPositionService_Delete_SoftDeletesBothColumns`
   - `TestPositionService_List_SearchAndDeptFilter`
 
-- [ ] Run:
+- [x] Run:
 
   ```bash
   TEST_DATABASE_URL='postgres://ennam:ennam_dev_2026@localhost:5432/exnodes_hrm_test?sslmode=disable' \
@@ -1904,7 +1904,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
   ok  	github.com/exnodes/hrm-api/internal/services	X.XXXs
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add internal/services/department_service_test.go internal/services/position_service_test.go internal/services/testhelper_test.go
@@ -1915,7 +1915,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
 ### Task 16 — Regenerate Swagger + full build/test
 
-- [ ] Regenerate Swagger:
+- [x] Regenerate Swagger:
 
   ```bash
   cd /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2
@@ -1924,7 +1924,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
   Expected last line includes `create docs/swagger/docs.go` (plus `swagger.json`, `swagger.yaml`).
 
-- [ ] Full build + test (DB-backed tests need the test DB URL; without it they self-skip but must still compile):
+- [x] Full build + test (DB-backed tests need the test DB URL; without it they self-skip but must still compile):
 
   ```bash
   go build ./...
@@ -1934,7 +1934,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
   Expected: all packages `ok` (or `[no test files]`), no `FAIL`.
 
-- [ ] Confirm no `AutoMigrate`:
+- [x] Confirm no `AutoMigrate`:
 
   ```bash
   grep -R AutoMigrate internal cmd | wc -l
@@ -1942,7 +1942,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
   Expected: `0`.
 
-- [ ] Boot + swagger sanity check:
+- [x] Boot + swagger sanity check:
 
   ```bash
   make migrate-up
@@ -1963,7 +1963,7 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
   Leave the server running for Task 17 (or restart it there).
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add docs/swagger
