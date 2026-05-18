@@ -1,16 +1,20 @@
 # Resume Checkpoint
 
 **Last updated:** 2026-05-18
-**Stopped at:** Phase 2 COMPLETE (all 26 tasks, live-verified). Next: Phase 3 — Departments + Positions.
-**HEAD commit:** ~68 commits on `main` (run `git log --oneline -1`)
+**Stopped at:** Phase 3 COMPLETE (all 18 tasks, live-verified, FK guard SQL-proven). Next: Phase 4 — Skills + Labels.
+**HEAD commit:** ~91 commits on `main` (run `git log --oneline -1`)
 **Branch:** `main`
 
 ## How to resume next session
 
-Tell Claude: *"Resume the Go migration — start Phase 3 per docs/superpowers/CHECKPOINT.md"*.
-Plan: `docs/superpowers/plans/2026-05-15-phase-03-departments-positions.md` (18 tasks).
+Tell Claude: *"Resume the Go migration — start Phase 4 per docs/superpowers/CHECKPOINT.md"*.
+Plan: `docs/superpowers/plans/2026-05-15-phase-04-skills-labels.md` (16 tasks).
 
-NOTE: Phase 3 adds FK constraints `employees.department_id → departments(id)` and `employees.position_id → positions(id)` (deferred from Phase 1). Phase 3 plan was written against the OLD pre-split assumptions — re-audit it against the actual `employees` table before executing (department_id/position_id live on employees, NOT users).
+NOTE: Phase 4 plan was written pre-schema-split — re-audit it first (skills/labels likely reference employee_id not user_id; check existing permission constants + migration number — next free is 000006).
+
+## KNOWN FOLLOW-UP (deferred, not yet actioned)
+
+`EmployeeService.toRead` / `toSummary` leave `department` / `position` nested refs nil (TODO carried from Phase 2 — DB FKs are correct & SQL-proven, only the JSON projection omits the embedded objects). Wiring the employee read view to preload+embed department/position was NOT in any phase plan task list. Address as a small dedicated task before/within a later phase or when FE needs the embedded objects.
 
 Claude should:
 1. Read this file + `docs/superpowers/specs/2026-05-15-go-migration-design.md`

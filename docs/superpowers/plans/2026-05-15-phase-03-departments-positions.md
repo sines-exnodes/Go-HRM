@@ -1976,14 +1976,14 @@ Tests are package `services_test` and use the real test DB. `truncateAll` must a
 
 This must prove the **deferred FK constraint works**: assign an employee to a created department via the existing employee admin endpoint, then attempt to delete that department → expect 409, plus an SQL spot-check.
 
-- [ ] Ensure the server runs:
+- [x] Ensure the server runs:
 
   ```bash
   curl -sf http://localhost:8080/health >/dev/null || { make run & SERVER_PID=$!; until curl -sf http://localhost:8080/health >/dev/null; do sleep 1; done; }
   mkdir -p /Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/docs/superpowers/verification
   ```
 
-- [ ] Walk these steps, capturing each command + HTTP code + abridged JSON (NO tokens/secrets) into `docs/superpowers/verification/phase-03.md`:
+- [x] Walk these steps, capturing each command + HTTP code + abridged JSON (NO tokens/secrets) into `docs/superpowers/verification/phase-03.md`:
 
   1. **Login as super admin** (credentials from `.env`):
 
@@ -2062,15 +2062,15 @@ This must prove the **deferred FK constraint works**: assign an employee to a cr
   18. **Error path — missing permission**: log in as a user lacking `departments:create` (create one with the super admin token via `POST /api/v1/employees` with no roles, or reuse a seeded non-admin), POST a department → `403`.
   19. **Cleanup**: delete the root department and the FK-probe employee. Expect 200 each.
 
-- [ ] Stop the server:
+- [x] Stop the server:
 
   ```bash
   kill "$SERVER_PID" 2>/dev/null || pkill -f 'exnodes-hrm-api' || true
   ```
 
-- [ ] Write all sections (command + HTTP code + abridged JSON, no secrets) into `docs/superpowers/verification/phase-03.md`.
+- [x] Write all sections (command + HTTP code + abridged JSON, no secrets) into `docs/superpowers/verification/phase-03.md`.
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add docs/superpowers/verification/phase-03.md
@@ -2081,7 +2081,7 @@ This must prove the **deferred FK constraint works**: assign an employee to a cr
 
 ### Task 18 — Update `README.md`
 
-- [ ] In `README.md`, in the **Endpoints** section, after the Phase 2 `Employees`/`Users` block, add:
+- [x] In `README.md`, in the **Endpoints** section, after the Phase 2 `Employees`/`Users` block, add:
 
   ```md
   ### Departments
@@ -2114,7 +2114,7 @@ This must prove the **deferred FK constraint works**: assign an employee to a cr
   added in migration 000005.
   ```
 
-- [ ] Commit:
+- [x] Commit:
 
   ```bash
   git add README.md
@@ -2125,20 +2125,20 @@ This must prove the **deferred FK constraint works**: assign an employee to a cr
 
 ## Definition of Done (checklist)
 
-- [ ] Migration `000005` up + down applies cleanly forward and reverse (`make migrate-up`/`migrate-down`/`migrate-up`, version `5`, not dirty).
-- [ ] `departments` + `positions` have UUID PK, 4 audit cols, `set_updated_at` trigger, `is_deleted` index.
-- [ ] `employees.department_id` → `departments(id)` and `employees.position_id` → `positions(id)` FK constraints exist with `ON DELETE SET NULL` (verified via `\d+ employees`).
-- [ ] Models embed `BaseModel`; soft-delete sets **both** `is_deleted = true` and `deleted_at = NOW()` (asserted in `*_SoftDeletesBothColumns` tests).
-- [ ] All five department + all five position routes appear in Swagger with `@Security BearerAuth`.
-- [ ] Every route uses `middleware.RequirePerms(authSvc, permissions.PermXxx)` with the EXISTING constant names.
-- [ ] No new permission constants/groups/role grants were added (they already existed) — Task 2 verified only.
-- [ ] Repos follow the interface + lowercase-impl convention; lists use `models.NotDeleted` + `utils.BuildILIKEPattern`.
-- [ ] Delete guards return 409 for: child departments, active positions, assigned employees (dept); assigned employees (position) — proven by service tests AND the e2e log.
-- [ ] Service tests pass: `go test ./internal/services/ -run 'Department|Position' -count=1 -v` (with `TEST_DATABASE_URL`).
-- [ ] Full suite passes: `go test ./... -count=1` (with `TEST_DATABASE_URL`), no `FAIL`.
-- [ ] `grep -R AutoMigrate internal cmd | wc -l` returns `0`.
-- [ ] End-to-end log committed at `docs/superpowers/verification/phase-03.md` including the FK exercise (employee assigned via existing endpoint → dept delete returns 409) and the SQL spot-check.
-- [ ] `README.md` updated.
+- [x] Migration `000005` up + down applies cleanly forward and reverse (`make migrate-up`/`migrate-down`/`migrate-up`, version `5`, not dirty).
+- [x] `departments` + `positions` have UUID PK, 4 audit cols, `set_updated_at` trigger, `is_deleted` index.
+- [x] `employees.department_id` → `departments(id)` and `employees.position_id` → `positions(id)` FK constraints exist with `ON DELETE SET NULL` (verified via `\d+ employees`).
+- [x] Models embed `BaseModel`; soft-delete sets **both** `is_deleted = true` and `deleted_at = NOW()` (asserted in `*_SoftDeletesBothColumns` tests).
+- [x] All five department + all five position routes appear in Swagger with `@Security BearerAuth`.
+- [x] Every route uses `middleware.RequirePerms(authSvc, permissions.PermXxx)` with the EXISTING constant names.
+- [x] No new permission constants/groups/role grants were added (they already existed) — Task 2 verified only.
+- [x] Repos follow the interface + lowercase-impl convention; lists use `models.NotDeleted` + `utils.BuildILIKEPattern`.
+- [x] Delete guards return 409 for: child departments, active positions, assigned employees (dept); assigned employees (position) — proven by service tests AND the e2e log.
+- [x] Service tests pass: `go test ./internal/services/ -run 'Department|Position' -count=1 -v` (with `TEST_DATABASE_URL`).
+- [x] Full suite passes: `go test ./... -count=1` (with `TEST_DATABASE_URL`), no `FAIL`.
+- [x] `grep -R AutoMigrate internal cmd | wc -l` returns `0`.
+- [x] End-to-end log committed at `docs/superpowers/verification/phase-03.md` including the FK exercise (employee assigned via existing endpoint → dept delete returns 409) and the SQL spot-check.
+- [x] `README.md` updated.
 
 ## Out of scope (this phase)
 
