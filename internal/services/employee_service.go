@@ -15,6 +15,11 @@ import (
 	"github.com/exnodes/hrm-api/pkg/utils"
 )
 
+// defaultEmployeeRoleName is the system role assigned to a newly created
+// employee when the admin does not supply explicit role_ids. It must match
+// the role name created by the seed service.
+const defaultEmployeeRoleName = "Employee"
+
 // boolToRenewal converts the DTO *bool contract-renewal flag to the model's
 // integer column (1 = renew, 0 = do not renew).
 func boolToRenewal(b *bool) int {
@@ -278,18 +283,33 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		if err := tx.Create(e).Error; err != nil {
 			return err
 		}
-		if len(in.RoleIDs) > 0 {
-			rows := make([]map[string]any, 0, len(in.RoleIDs))
-			for _, rid := range in.RoleIDs {
-				rows = append(rows, map[string]any{
-					"user_id": u.ID, "role_id": rid,
-					"created_at": gorm.Expr("NOW()"), "updated_at": gorm.Expr("NOW()"),
-					"is_deleted": false,
-				})
+		// Resolve which roles to attach. When the admin supplies explicit
+		// role_ids, honour them. Otherwise fall back to the system default
+		// "Employee" role so every created employee is a usable self-service
+		// account (carries auth:login) — without this, a freshly created
+		// employee has zero permissions and cannot log in.
+		roleIDs := in.RoleIDs
+		if len(roleIDs) == 0 {
+			defRole, derr := s.roles.FindByName(ctx, defaultEmployeeRoleName)
+			if derr != nil {
+				if errors.Is(derr, gorm.ErrRecordNotFound) {
+					return apperrors.ErrBadRequest(
+						"default \"Employee\" role not found; supply role_ids or seed roles")
+				}
+				return derr
 			}
-			if err := tx.Table("user_roles").Create(&rows).Error; err != nil {
-				return err
-			}
+			roleIDs = []uuid.UUID{defRole.ID}
+		}
+		rows := make([]map[string]any, 0, len(roleIDs))
+		for _, rid := range roleIDs {
+			rows = append(rows, map[string]any{
+				"user_id": u.ID, "role_id": rid,
+				"created_at": gorm.Expr("NOW()"), "updated_at": gorm.Expr("NOW()"),
+				"is_deleted": false,
+			})
+		}
+		if err := tx.Table("user_roles").Create(&rows).Error; err != nil {
+			return err
 		}
 		createdEmp = *e
 		return nil
