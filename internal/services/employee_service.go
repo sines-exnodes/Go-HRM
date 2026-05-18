@@ -406,13 +406,29 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 		fields["manager_id"] = *in.ManagerID
 	}
 
-	if err := s.emps.UpdateFields(ctx, e.ID, fields); err != nil {
-		return nil, err
-	}
-	if in.IsActive != nil && e.User != nil {
-		if err := s.users.ToggleActive(ctx, e.UserID, *in.IsActive); err != nil {
-			return nil, err
+	// Atomic: the employee-fields write and the user active toggle must
+	// commit or roll back together so a partial admin update cannot leave
+	// the employee row and its auth user in an inconsistent state. Mirrors
+	// the transaction in SoftDelete; writes go through tx directly.
+	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if len(fields) > 0 {
+			if err := tx.Model(&models.Employee{}).
+				Where("id = ? AND is_deleted = ?", e.ID, false).
+				Updates(fields).Error; err != nil {
+				return err
+			}
 		}
+		if in.IsActive != nil {
+			// UserID FK is always set — no nil guard needed.
+			if err := tx.Model(&models.User{}).
+				Where("id = ? AND is_deleted = ?", e.UserID, false).
+				Update("is_active", *in.IsActive).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return s.Get(ctx, id)
 }
