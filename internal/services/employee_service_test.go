@@ -327,6 +327,25 @@ func TestEmployeeService_UpdateAvatar_ChecksImageType(t *testing.T) {
 	assert.Equal(t, up.uploadedURL, *avatar)
 }
 
+func TestEmployeeService_UpdateAvatar_RejectsSpoofedContentType(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, up := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	view, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "spoof@example.com", Password: "Pass12345", FullName: "Spoof Test",
+	})
+	require.NoError(t, err)
+
+	// Bytes are plain text (sniffs as text/plain) but the client claims
+	// image/jpeg — the authoritative byte sniff must reject this.
+	evil := []byte("GIF-looking but actually not; <script>alert(1)</script>")
+	_, err = svc.UpdateAvatarAdmin(ctx, view.ID, evil, "image/jpeg", ".jpg")
+	require.Error(t, err)
+	assert.Empty(t, up.uploadedURL, "spoofed content type must not reach storage")
+}
+
 func TestEmployeeService_UpdateAvatar_SelfReplacesAndDeletesOld(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)

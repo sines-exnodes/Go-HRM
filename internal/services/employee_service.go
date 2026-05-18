@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
@@ -491,13 +492,33 @@ const (
 	avatarSubdir   = "avatars"
 )
 
+// allowedAvatarMIME is the set of image content types permitted for an
+// avatar. The authoritative check sniffs the actual file bytes rather than
+// trusting the client-supplied Content-Type header.
+var allowedAvatarMIME = map[string]bool{
+	"image/jpeg": true,
+	"image/png":  true,
+	"image/gif":  true,
+	"image/webp": true,
+}
+
 func (s *EmployeeService) uploadAvatar(ctx context.Context, employeeID uuid.UUID, prev *string, content []byte, contentType, ext string) (*dto.EmployeeRead, error) {
 	if len(content) > maxAvatarBytes {
 		return nil, apperrors.ErrBadRequest("Avatar must not exceed 5MB")
 	}
-	if !strings.HasPrefix(contentType, "image/") {
-		return nil, apperrors.ErrBadRequest("Avatar must be an image (PNG, JPEG, or WEBP)")
+	// Authoritative content check: sniff the real bytes (RFC 2046 / WHATWG
+	// mime-sniff via http.DetectContentType) instead of trusting the
+	// client-supplied Content-Type header, which is attacker-controlled.
+	sniffLen := len(content)
+	if sniffLen > 512 {
+		sniffLen = 512
 	}
+	sniffed := http.DetectContentType(content[:sniffLen])
+	if !allowedAvatarMIME[sniffed] {
+		return nil, apperrors.ErrBadRequest("Avatar must be a valid image (PNG, JPEG, GIF, or WEBP)")
+	}
+	// Use the verified type for storage, not the client's header.
+	contentType = sniffed
 	url, err := s.uploads.Upload(ctx, avatarSubdir, ext, content, contentType)
 	if err != nil {
 		return nil, err
