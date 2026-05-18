@@ -218,13 +218,13 @@ func TestPositionService_List_SearchAndDeptFilter(t *testing.T) {
 	require.Equal(t, int64(2), res.Total)
 
 	// Filter by deptB -> 1.
-	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 10, DepartmentID: &deptB.ID})
+	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 10, DepartmentID: deptB.ID.String()})
 	require.NoError(t, err)
 	require.Equal(t, int64(1), res.Total)
 	require.Equal(t, "Content Manager", res.Items[0].Name)
 
 	// Pagination over deptA's 2 positions, page size 1 -> 2 total pages.
-	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 1, DepartmentID: &deptA.ID})
+	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 1, DepartmentID: deptA.ID.String()})
 	require.NoError(t, err)
 	require.Equal(t, int64(2), res.Total)
 	require.Equal(t, 2, res.TotalPages)

@@ -166,12 +166,19 @@ func (s *PositionService) Get(ctx context.Context, id uuid.UUID) (*dto.PositionR
 }
 
 func (s *PositionService) List(ctx context.Context, q dto.PositionListQuery) (*dto.PaginatedData[dto.PositionRead], error) {
-	items, total, err := s.repo.List(ctx, repositories.PositionFilter{
-		Page:         q.Page,
-		PageSize:     q.PageSize,
-		Search:       q.Search,
-		DepartmentID: q.DepartmentID,
-	})
+	f := repositories.PositionFilter{
+		Page:     q.Page,
+		PageSize: q.PageSize,
+		Search:   q.Search,
+	}
+	if dep := strings.TrimSpace(q.DepartmentID); dep != "" {
+		parsed, err := uuid.Parse(dep)
+		if err != nil {
+			return nil, apperrors.ErrBadRequest("Invalid department_id")
+		}
+		f.DepartmentID = &parsed
+	}
+	items, total, err := s.repo.List(ctx, f)
 	if err != nil {
 		return nil, err
 	}
