@@ -35,10 +35,16 @@ func (r *NotificationSettingsRepository) Upsert(ctx context.Context, userID uuid
 		return err
 	}
 	if existing == nil {
-		return r.db.WithContext(ctx).Create(&models.UserNotificationSettings{
-			UserID:               userID,
-			NotificationsEnabled: enabled,
-		}).Error
+		// Insert via an explicit column map so a zero value (false) is always
+		// written. A struct Create would let the column's `default:true`
+		// override an intended "disable notifications" on first write, because
+		// GORM omits zero-value fields that have a default tag.
+		return r.db.WithContext(ctx).
+			Model(&models.UserNotificationSettings{}).
+			Create(map[string]any{
+				"user_id":               userID,
+				"notifications_enabled": enabled,
+			}).Error
 	}
 	return r.db.WithContext(ctx).Model(&models.UserNotificationSettings{}).
 		Where("id = ?", existing.ID).

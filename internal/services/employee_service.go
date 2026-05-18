@@ -34,7 +34,7 @@ type EmployeeService struct {
 	users   repositories.UserRepository
 	roles   repositories.RoleRepository
 	quota   *repositories.LeaveQuotaRepository
-	uploads *UploadService
+	uploads Uploader
 }
 
 func NewEmployeeService(
@@ -44,7 +44,7 @@ func NewEmployeeService(
 	users repositories.UserRepository,
 	roles repositories.RoleRepository,
 	quota *repositories.LeaveQuotaRepository,
-	uploads *UploadService,
+	uploads Uploader,
 ) *EmployeeService {
 	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads}
 }
@@ -213,6 +213,17 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		}
 		if err := tx.Create(u).Error; err != nil {
 			return err
+		}
+		// The users.is_active column is `default:true`, so GORM drops a
+		// zero-value (false) on INSERT and the DB default silently reactivates
+		// an intentionally-inactive user. Force the value explicitly when the
+		// caller asked for an inactive account.
+		if !active {
+			if err := tx.Model(&models.User{}).
+				Where("id = ?", u.ID).
+				Update("is_active", false).Error; err != nil {
+				return err
+			}
 		}
 		// Model/DTO reconciliation: ContractType, PaymentMethod are non-pointer
 		// strings on the model (with NOT NULL defaults), salaries are float64,

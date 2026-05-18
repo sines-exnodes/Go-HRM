@@ -101,7 +101,7 @@ func truncateAll(t *testing.T) {
 		return
 	}
 	// Order matters because of FK constraints; CASCADE covers the rest.
-	if err := testDB.Exec(`TRUNCATE TABLE dependents, employees, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+	if err := testDB.Exec(`TRUNCATE TABLE device_tokens, user_notification_settings, employee_leave_quotas, dependents, employees, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }
