@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/exnodes/hrm-api/internal/dto"
 	apperrors "github.com/exnodes/hrm-api/internal/errors"
@@ -36,6 +37,55 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 	ok(c, http.StatusOK, view, "")
+}
+
+// List godoc
+// @Summary      List users (admin)
+// @Description  Paginated list with optional email search and is_active filter. Each item embeds roles and the employee summary.
+// @Tags         users
+// @Security     BearerAuth
+// @Produce      json
+// @Param        page       query    int     false  "Page number"  default(1)
+// @Param        page_size  query    int     false  "Page size"    default(10)
+// @Param        search     query    string  false  "Substring match on email (ILIKE)"
+// @Param        is_active  query    bool    false  "Filter by active status"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /api/v1/users [get]
+func (h *UserHandler) List(c *gin.Context) {
+	var q dto.UserListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	data, err := h.svc.List(c.Request.Context(), q)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[*dto.PaginatedData[dto.UserAdminRead]]{Success: true, Data: data})
+}
+
+// Get godoc
+// @Summary      Get user by ID (admin)
+// @Description  Returns the user with roles and embedded employee summary.
+// @Tags         users
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id   path      string  true  "User UUID"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /api/v1/users/{id} [get]
+func (h *UserHandler) Get(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		_ = c.Error(apperrors.ErrBadRequest("invalid id"))
+		return
+	}
+	out, err := h.svc.Get(c.Request.Context(), id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[*dto.UserAdminRead]{Success: true, Data: out})
 }
 
 // ChangeMyPassword godoc

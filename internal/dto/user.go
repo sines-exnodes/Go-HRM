@@ -18,6 +18,26 @@ type UserMeRead struct {
 	UpdatedAt            time.Time        `json:"updated_at"`
 }
 
+// UserAdminRead is the user view returned by the admin GET /users and
+// GET /users/:id endpoints: auth profile + roles + embedded employee summary.
+type UserAdminRead struct {
+	ID        uuid.UUID        `json:"id"`
+	Email     string           `json:"email"`
+	IsActive  bool             `json:"is_active"`
+	Roles     []RoleRead       `json:"roles"`
+	Employee  *EmployeeSummary `json:"employee,omitempty"`
+	CreatedAt time.Time        `json:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at"`
+}
+
+// UserListQuery binds the querystring for GET /api/v1/users.
+type UserListQuery struct {
+	Page     int    `form:"page,default=1"       binding:"min=1"`
+	PageSize int    `form:"page_size,default=10" binding:"min=1,max=100"`
+	Search   string `form:"search"`              // substring match on email (ILIKE)
+	IsActive *bool  `form:"is_active"`           // optional active filter
+}
+
 // ---- Auth-side requests (live under /api/v1/users/me* and /api/v1/users/:id*) ----
 
 type ChangePasswordRequest struct {

@@ -1372,6 +1372,42 @@ paths:
       summary: List grouped permissions (for the role-creation picker)
       tags:
       - Roles
+  /api/v1/users:
+    get:
+      description: Paginated list with optional email search and is_active filter.
+        Each item embeds roles and the employee summary.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Substring match on email (ILIKE)
+        in: query
+        name: search
+        type: string
+      - description: Filter by active status
+        in: query
+        name: is_active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List users (admin)
+      tags:
+      - users
   /api/v1/users/{id}:
     delete:
       consumes:
@@ -1399,6 +1435,27 @@ paths:
       security:
       - BearerAuth: []
       summary: Soft-delete a user account (admin reauth)
+      tags:
+      - users
+    get:
+      description: Returns the user with roles and embedded employee summary.
+      parameters:
+      - description: User UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user by ID (admin)
       tags:
       - users
     patch:

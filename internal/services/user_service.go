@@ -78,6 +78,83 @@ func (s *UserService) GetMe(ctx context.Context, u *models.User) (*dto.UserMeRea
 	return out, nil
 }
 
+// ---- Admin list / get ----
+
+// toAdminRead maps a user (with Roles preloaded and Employee optionally
+// preloaded) to the admin read shape, embedding the employee summary.
+func (s *UserService) toAdminRead(u *models.User) *dto.UserAdminRead {
+	roles := make([]dto.RoleRead, 0, len(u.Roles))
+	for _, r := range u.Roles {
+		roles = append(roles, dto.RoleRead{
+			ID:          r.ID,
+			Name:        r.Name,
+			Description: r.Description,
+			IsSystem:    r.IsSystem,
+			Permissions: []string(r.Permissions),
+		})
+	}
+	out := &dto.UserAdminRead{
+		ID:        u.ID,
+		Email:     u.Email,
+		IsActive:  u.IsActive,
+		Roles:     roles,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
+	if u.Employee != nil {
+		out.Employee = s.empSvc.toSummary(u.Employee)
+	}
+	return out
+}
+
+// List returns a paginated slice of users with roles + employee summary.
+func (s *UserService) List(ctx context.Context, q dto.UserListQuery) (*dto.PaginatedData[dto.UserAdminRead], error) {
+	users, total, err := s.users.List(ctx, repositories.UserListFilter{
+		Page:     q.Page,
+		PageSize: q.PageSize,
+		Search:   q.Search,
+		IsActive: q.IsActive,
+	})
+	if err != nil {
+		return nil, err
+	}
+	reads := make([]dto.UserAdminRead, 0, len(users))
+	for i := range users {
+		reads = append(reads, *s.toAdminRead(&users[i]))
+	}
+	page := q.Page
+	if page < 1 {
+		page = 1
+	}
+	size := q.PageSize
+	if size < 1 {
+		size = 10
+	}
+	totalPages := 0
+	if total > 0 {
+		totalPages = int((total + int64(size) - 1) / int64(size))
+	}
+	return &dto.PaginatedData[dto.UserAdminRead]{
+		Items:      reads,
+		Total:      total,
+		Page:       page,
+		PageSize:   size,
+		TotalPages: totalPages,
+	}, nil
+}
+
+// Get returns a single user (roles + employee summary) by ID.
+func (s *UserService) Get(ctx context.Context, id uuid.UUID) (*dto.UserAdminRead, error) {
+	u, err := s.users.FindByIDWithRolesAndEmployee(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrNotFound("User")
+		}
+		return nil, err
+	}
+	return s.toAdminRead(u), nil
+}
+
 // ---- Change password (self) ----
 
 func (s *UserService) ChangePassword(ctx context.Context, user *models.User, current, next string) error {

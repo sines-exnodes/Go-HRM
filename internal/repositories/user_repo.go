@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,11 +13,20 @@ import (
 	"github.com/exnodes/hrm-api/internal/models"
 )
 
+// UserListFilter is the querystring-derived filter for the admin user list.
+type UserListFilter struct {
+	Page     int
+	PageSize int
+	Search   string // substring match on email (ILIKE)
+	IsActive *bool  // optional is_active filter
+}
+
 // UserRepository defines data access for users.
 type UserRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	FindByIDWithRoles(ctx context.Context, id uuid.UUID) (*models.User, error)
 	FindByIDWithRolesAndEmployee(ctx context.Context, id uuid.UUID) (*models.User, error)
+	List(ctx context.Context, f UserListFilter) ([]models.User, int64, error)
 	FindByEmail(ctx context.Context, email string) (*models.User, error)
 	FindByEmailWithRoles(ctx context.Context, email string) (*models.User, error)
 	FindByEmailWithRolesAndEmployee(ctx context.Context, email string) (*models.User, error)
@@ -137,6 +147,47 @@ func (r *userRepository) FindByEmailWithRolesAndEmployee(ctx context.Context, em
 		return nil, err
 	}
 	return &u, nil
+}
+
+// List returns a paginated slice of non-deleted users (ordered by created_at
+// DESC) with active roles loaded, plus the total count. An optional email
+// substring and is_active filter narrow the result.
+func (r *userRepository) List(ctx context.Context, f UserListFilter) ([]models.User, int64, error) {
+	page := f.Page
+	if page < 1 {
+		page = 1
+	}
+	size := f.PageSize
+	if size < 1 {
+		size = 10
+	}
+	q := r.db.WithContext(ctx).Model(&models.User{}).Scopes(notDeleted)
+	if s := strings.TrimSpace(f.Search); s != "" {
+		q = q.Where("email ILIKE ?", "%"+s+"%")
+	}
+	if f.IsActive != nil {
+		q = q.Where("is_active = ?", *f.IsActive)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var users []models.User
+	if err := q.
+		Preload("Employee", notDeleted).
+		Order("created_at DESC").
+		Offset((page - 1) * size).
+		Limit(size).
+		Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	for i := range users {
+		if err := loadActiveRoles(r.db, ctx, &users[i]); err != nil {
+			return nil, 0, err
+		}
+	}
+	return users, total, nil
 }
 
 func (r *userRepository) Create(ctx context.Context, user *models.User) error {

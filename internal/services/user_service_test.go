@@ -221,3 +221,50 @@ func TestUserService_NotificationSettings_Toggle(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, out.NotificationsEnabled)
 }
+
+func TestUserService_ListAndGet(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	empSvc, _ := newEmpSvc(testDB)
+	userSvc := newUserSvc(testDB, empSvc)
+	ctx := context.Background()
+
+	role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
+	a, err := empSvc.Create(ctx, dto.EmployeeCreate{
+		Email: "list-a@example.com", Password: "Pass12345", FullName: "List A", RoleIDs: []uuid.UUID{role.ID},
+	})
+	require.NoError(t, err)
+	_, err = empSvc.Create(ctx, dto.EmployeeCreate{
+		Email: "list-b@example.com", Password: "Pass12345", FullName: "List B",
+	})
+	require.NoError(t, err)
+
+	// List returns both users with pagination metadata.
+	page, err := userSvc.List(ctx, dto.UserListQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	assert.EqualValues(t, 2, page.Total)
+	assert.Len(t, page.Items, 2)
+
+	// Email search narrows the result.
+	filtered, err := userSvc.List(ctx, dto.UserListQuery{Page: 1, PageSize: 10, Search: "list-a"})
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, filtered.Total)
+	require.Len(t, filtered.Items, 1)
+	assert.Equal(t, "list-a@example.com", filtered.Items[0].Email)
+
+	// Get returns the user with roles + embedded employee summary.
+	got, err := userSvc.Get(ctx, a.UserID)
+	require.NoError(t, err)
+	assert.Equal(t, "list-a@example.com", got.Email)
+	require.NotNil(t, got.Employee)
+	assert.Equal(t, "List A", got.Employee.FullName)
+	require.Len(t, got.Roles, 1)
+	assert.Equal(t, "Employee", got.Roles[0].Name)
+
+	// Unknown ID -> not found.
+	_, err = userSvc.Get(ctx, uuid.New())
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, 404, appErr.HTTP)
+}

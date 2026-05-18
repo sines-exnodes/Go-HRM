@@ -142,6 +142,8 @@ func main() {
 
 		// ---- /users/:id admin ----
 		adminUsers := authed.Group("/users")
+		adminUsers.GET("", middleware.RequirePerms(authSvc, permissions.PermUsersRead), userH.List)
+		adminUsers.GET(":id", middleware.RequirePerms(authSvc, permissions.PermUsersRead), userH.Get)
 		adminUsers.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermUsersUpdate), userH.AdminPatch)
 		adminUsers.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermUsersDelete), userH.AdminDelete)
 		adminUsers.PATCH(":id/change-password", middleware.RequirePerms(authSvc, permissions.PermUsersChangePwd), userH.AdminChangePassword)
