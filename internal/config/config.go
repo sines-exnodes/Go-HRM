@@ -43,6 +43,8 @@ type Config struct {
 	SupabaseS3Region       string
 	SupabaseS3AccessKey    string
 	SupabaseS3SecretKey    string
+
+	Storage StorageConfig
 }
 
 // Load reads the .env file (if present) and returns the populated Config.
@@ -87,6 +89,12 @@ func Load() *Config {
 
 	if strings.TrimSpace(cfg.JWTSecret) == "" {
 		log.Fatal("config: JWT_SECRET_KEY must be set")
+	}
+
+	// Storage is optional at boot; the upload module surfaces a clear error
+	// if it is used while unconfigured. Only attach it when fully provided.
+	if storage, err := LoadStorageConfig(); err == nil {
+		cfg.Storage = storage
 	}
 
 	return cfg
