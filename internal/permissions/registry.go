@@ -19,6 +19,15 @@ const (
 	PermUsersManageRoles Permission = "users:manage_roles"
 	PermUsersChangePwd   Permission = "users:change_password"
 
+	// Employees
+	PermEmployeesRead   Permission = "employees:read"
+	PermEmployeesCreate Permission = "employees:create"
+	PermEmployeesUpdate Permission = "employees:update"
+	PermEmployeesDelete Permission = "employees:delete"
+
+	// Dependents
+	PermDependentsManage Permission = "dependents:manage"
+
 	// Roles
 	PermRolesRead   Permission = "roles:read"
 	PermRolesCreate Permission = "roles:create"
@@ -72,6 +81,8 @@ func AllPermissions() []Permission {
 		PermAuthLogin,
 		PermUsersRead, PermUsersCreate, PermUsersUpdate, PermUsersDelete,
 		PermUsersManageRoles, PermUsersChangePwd,
+		PermEmployeesRead, PermEmployeesCreate, PermEmployeesUpdate, PermEmployeesDelete,
+		PermDependentsManage,
 		PermRolesRead, PermRolesCreate, PermRolesUpdate, PermRolesDelete,
 		PermDepartmentsRead, PermDepartmentsCreate, PermDepartmentsUpdate, PermDepartmentsDelete,
 		PermPositionsRead, PermPositionsCreate, PermPositionsUpdate, PermPositionsDelete,
@@ -130,6 +141,21 @@ var PermissionGroups = []PermissionGroup{
 			{PermUsersDelete, "Activate / Deactivate Users", "Enable or disable user accounts"},
 			{PermUsersManageRoles, "Manage User Roles", "Assign or remove roles from users"},
 			{PermUsersChangePwd, "Change User Password", "Reset passwords for other users"},
+		},
+	},
+	{
+		Resource: "employees", Label: "Employees",
+		Permissions: []PermissionItem{
+			{PermEmployeesRead, "View Employees", "List and view employee HR profiles"},
+			{PermEmployeesCreate, "Create Employees", "Create new employee + user accounts"},
+			{PermEmployeesUpdate, "Edit Employees", "Update employee HR fields (admin)"},
+			{PermEmployeesDelete, "Delete Employees", "Soft-delete employee profiles"},
+		},
+	},
+	{
+		Resource: "dependents", Label: "Dependents",
+		Permissions: []PermissionItem{
+			{PermDependentsManage, "Manage Dependents", "Manage any employee's dependents (admin)"},
 		},
 	},
 	{
