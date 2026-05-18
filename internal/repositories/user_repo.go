@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/exnodes/hrm-api/internal/models"
 )
@@ -40,6 +41,28 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepository{db: db}
 }
 
+// loadActiveRoles populates u.Roles with only the roles whose user_roles
+// membership AND role row are both not soft-deleted. GORM's many2many preload
+// fetches the join rows and the roles in separate queries, so the join-table
+// soft-delete flag cannot be expressed as a preload condition; an explicit
+// join query is used instead so a soft-deleted membership does not grant the
+// role.
+func loadActiveRoles(db *gorm.DB, ctx context.Context, u *models.User) error {
+	var roles []models.Role
+	err := db.WithContext(ctx).
+		Table("roles").
+		Joins("JOIN user_roles ur ON ur.role_id = roles.id").
+		Where("ur.user_id = ?", u.ID).
+		Where("ur.is_deleted = ?", false).
+		Where("roles.is_deleted = ?", false).
+		Find(&roles).Error
+	if err != nil {
+		return err
+	}
+	u.Roles = roles
+	return nil
+}
+
 func (r *userRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var u models.User
 	err := r.db.WithContext(ctx).Scopes(notDeleted).First(&u, "id = ?", id).Error
@@ -53,9 +76,11 @@ func (r *userRepository) FindByIDWithRoles(ctx context.Context, id uuid.UUID) (*
 	var u models.User
 	err := r.db.WithContext(ctx).
 		Scopes(notDeleted).
-		Preload("Roles", notDeleted).
 		First(&u, "id = ?", id).Error
 	if err != nil {
+		return nil, err
+	}
+	if err := loadActiveRoles(r.db, ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -74,9 +99,11 @@ func (r *userRepository) FindByEmailWithRoles(ctx context.Context, email string)
 	var u models.User
 	err := r.db.WithContext(ctx).
 		Scopes(notDeleted).
-		Preload("Roles", notDeleted).
 		First(&u, "email = ?", email).Error
 	if err != nil {
+		return nil, err
+	}
+	if err := loadActiveRoles(r.db, ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -86,10 +113,12 @@ func (r *userRepository) FindByIDWithRolesAndEmployee(ctx context.Context, id uu
 	var u models.User
 	err := r.db.WithContext(ctx).
 		Scopes(notDeleted).
-		Preload("Roles", notDeleted).
 		Preload("Employee", notDeleted).
 		First(&u, "id = ?", id).Error
 	if err != nil {
+		return nil, err
+	}
+	if err := loadActiveRoles(r.db, ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -99,10 +128,12 @@ func (r *userRepository) FindByEmailWithRolesAndEmployee(ctx context.Context, em
 	var u models.User
 	err := r.db.WithContext(ctx).
 		Scopes(notDeleted).
-		Preload("Roles", notDeleted).
 		Preload("Employee", notDeleted).
 		First(&u, "email = ?", email).Error
 	if err != nil {
+		return nil, err
+	}
+	if err := loadActiveRoles(r.db, ctx, &u); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -130,26 +161,51 @@ func (r *userRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-// ReplaceRoles atomically replaces the user's role set.
+// ReplaceRoles atomically replaces the user's role set. Memberships are
+// soft-deleted (audit trail preserved) rather than physically removed; a
+// previously soft-deleted (user_id, role_id) pair is revived in place to
+// respect the (user_id, role_id) primary key.
 func (r *userRepository) ReplaceRoles(ctx context.Context, userID uuid.UUID, roleIDs []uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Hard delete is acceptable on the join table — soft delete on a
-		// many2many is rarely useful and complicates GORM associations.
-		if err := tx.Exec("DELETE FROM user_roles WHERE user_id = ?", userID).Error; err != nil {
-			return err
-		}
-		if len(roleIDs) == 0 {
-			return nil
-		}
-		rows := make([]map[string]interface{}, 0, len(roleIDs))
-		for _, rid := range roleIDs {
-			rows = append(rows, map[string]interface{}{
-				"user_id": userID,
-				"role_id": rid,
-			})
-		}
-		return tx.Table("user_roles").Create(&rows).Error
+		return replaceUserRolesTx(tx, userID, roleIDs)
 	})
+}
+
+// replaceUserRolesTx soft-deletes the user's current memberships then revives
+// or inserts the desired set within the supplied transaction.
+func replaceUserRolesTx(tx *gorm.DB, userID uuid.UUID, roleIDs []uuid.UUID) error {
+	if err := tx.Exec(
+		"UPDATE user_roles SET is_deleted = TRUE, deleted_at = NOW() WHERE user_id = ? AND is_deleted = FALSE",
+		userID,
+	).Error; err != nil {
+		return err
+	}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	// Upsert on the (user_id, role_id) PK: a soft-deleted row is revived
+	// (is_deleted=FALSE, deleted_at=NULL); a fresh pair is inserted.
+	rows := make([]map[string]any, 0, len(roleIDs))
+	for _, rid := range roleIDs {
+		rows = append(rows, map[string]any{
+			"user_id":    userID,
+			"role_id":    rid,
+			"created_at": gorm.Expr("NOW()"),
+			"updated_at": gorm.Expr("NOW()"),
+			"is_deleted": false,
+			"deleted_at": gorm.Expr("NULL"),
+		})
+	}
+	return tx.Table("user_roles").
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "user_id"}, {Name: "role_id"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"is_deleted": false,
+				"deleted_at": nil,
+				"updated_at": gorm.Expr("NOW()"),
+			}),
+		}).
+		Create(&rows).Error
 }
 
 func (r *userRepository) ExistsByEmail(ctx context.Context, email string, excludeID *uuid.UUID) (bool, error) {
@@ -191,23 +247,7 @@ func (r *userRepository) ToggleActive(ctx context.Context, id uuid.UUID, active 
 
 func (r *userRepository) AssignRoles(ctx context.Context, id uuid.UUID, roleIDs []uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("DELETE FROM user_roles WHERE user_id = ?", id).Error; err != nil {
-			return err
-		}
-		if len(roleIDs) == 0 {
-			return nil
-		}
-		rows := make([]map[string]any, 0, len(roleIDs))
-		for _, rid := range roleIDs {
-			rows = append(rows, map[string]any{
-				"user_id":    id,
-				"role_id":    rid,
-				"created_at": gorm.Expr("NOW()"),
-				"updated_at": gorm.Expr("NOW()"),
-				"is_deleted": false,
-			})
-		}
-		return tx.Table("user_roles").Create(&rows).Error
+		return replaceUserRolesTx(tx, id, roleIDs)
 	})
 }
 
