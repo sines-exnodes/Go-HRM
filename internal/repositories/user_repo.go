@@ -23,6 +23,14 @@ type UserRepository interface {
 	Update(ctx context.Context, user *models.User) error
 	SoftDelete(ctx context.Context, id uuid.UUID) error
 	ReplaceRoles(ctx context.Context, userID uuid.UUID, roleIDs []uuid.UUID) error
+
+	// Phase 2 auth-side admin queries.
+	ExistsByEmail(ctx context.Context, email string, excludeID *uuid.UUID) (bool, error)
+	UpdateEmail(ctx context.Context, id uuid.UUID, newEmail string) error
+	UpdatePassword(ctx context.Context, id uuid.UUID, hashed string) error
+	ToggleActive(ctx context.Context, id uuid.UUID, active bool) error
+	AssignRoles(ctx context.Context, id uuid.UUID, roleIDs []uuid.UUID) error
+	CreateTx(ctx context.Context, tx *gorm.DB, u *models.User) error
 }
 
 type userRepository struct{ db *gorm.DB }
@@ -112,7 +120,7 @@ func (r *userRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	now := time.Now().UTC()
 	res := r.db.WithContext(ctx).Model(&models.User{}).
 		Where("id = ? AND is_deleted = false", id).
-		Updates(map[string]interface{}{"is_deleted": true, "deleted_at": now})
+		Updates(map[string]interface{}{"is_deleted": true, "deleted_at": now, "is_active": false})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -142,4 +150,71 @@ func (r *userRepository) ReplaceRoles(ctx context.Context, userID uuid.UUID, rol
 		}
 		return tx.Table("user_roles").Create(&rows).Error
 	})
+}
+
+func (r *userRepository) ExistsByEmail(ctx context.Context, email string, excludeID *uuid.UUID) (bool, error) {
+	q := r.db.WithContext(ctx).Model(&models.User{}).
+		Where("email = ? AND is_deleted = ?", email, false)
+	if excludeID != nil {
+		q = q.Where("id <> ?", *excludeID)
+	}
+	var n int64
+	if err := q.Count(&n).Error; err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (r *userRepository) UpdateEmail(ctx context.Context, id uuid.UUID, newEmail string) error {
+	return r.db.WithContext(ctx).Model(&models.User{}).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Updates(map[string]any{
+			"email":            newEmail,
+			"email_changed_at": gorm.Expr("NOW()"),
+		}).Error
+}
+
+func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, hashed string) error {
+	return r.db.WithContext(ctx).Model(&models.User{}).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Updates(map[string]any{
+			"password_hash":     hashed,
+			"password_reset_at": gorm.Expr("NOW()"),
+		}).Error
+}
+
+func (r *userRepository) ToggleActive(ctx context.Context, id uuid.UUID, active bool) error {
+	return r.db.WithContext(ctx).Model(&models.User{}).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Update("is_active", active).Error
+}
+
+func (r *userRepository) AssignRoles(ctx context.Context, id uuid.UUID, roleIDs []uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("DELETE FROM user_roles WHERE user_id = ?", id).Error; err != nil {
+			return err
+		}
+		if len(roleIDs) == 0 {
+			return nil
+		}
+		rows := make([]map[string]any, 0, len(roleIDs))
+		for _, rid := range roleIDs {
+			rows = append(rows, map[string]any{
+				"user_id":    id,
+				"role_id":    rid,
+				"created_at": gorm.Expr("NOW()"),
+				"updated_at": gorm.Expr("NOW()"),
+				"is_deleted": false,
+			})
+		}
+		return tx.Table("user_roles").Create(&rows).Error
+	})
+}
+
+// CreateTx is used by employee.Create within a transaction.
+func (r *userRepository) CreateTx(ctx context.Context, tx *gorm.DB, u *models.User) error {
+	if tx == nil {
+		tx = r.db
+	}
+	return tx.WithContext(ctx).Create(u).Error
 }
