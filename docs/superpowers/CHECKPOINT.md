@@ -1,13 +1,14 @@
 # Resume Checkpoint
 
-**Last updated:** 2026-05-15
-**Stopped at:** Phase 1, after Task 8 (test harness ready). Next action: Task 9 (Auth service TDD).
-**HEAD commit:** `3a60c84 test(services): add Postgres-backed test harness and factories`
-**Branch:** `main`
+**Last updated:** 2026-05-18
+**Stopped at:** Phase 1 COMPLETE (all 18 tasks). Next action: Phase 2 — Employees + Dependents Module (26 tasks).
+**HEAD commit:** `46c5d26 docs(plan): tick Phase 1 Tasks 16-17 + DoD complete`
+**Branch:** `main` (36 commits)
 
 ## How to resume next session
 
-Tell Claude: *"Resume the Go migration — pick up at Phase 1 Task 9 per docs/superpowers/CHECKPOINT.md"*.
+Tell Claude: *"Resume the Go migration — start Phase 2 per docs/superpowers/CHECKPOINT.md"*.
+Plan: `docs/superpowers/plans/2026-05-15-phase-02-users.md` (26 tasks, Employees + Dependents Module).
 
 Claude should:
 1. Read this file + `docs/superpowers/specs/2026-05-15-go-migration-design.md`
