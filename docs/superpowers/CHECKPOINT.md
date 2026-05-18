@@ -1,14 +1,16 @@
 # Resume Checkpoint
 
 **Last updated:** 2026-05-18
-**Stopped at:** Phase 1 COMPLETE (all 18 tasks). Next action: Phase 2 — Employees + Dependents Module (26 tasks).
-**HEAD commit:** `46c5d26 docs(plan): tick Phase 1 Tasks 16-17 + DoD complete`
-**Branch:** `main` (36 commits)
+**Stopped at:** Phase 2 COMPLETE (all 26 tasks, live-verified). Next: Phase 3 — Departments + Positions.
+**HEAD commit:** ~68 commits on `main` (run `git log --oneline -1`)
+**Branch:** `main`
 
 ## How to resume next session
 
-Tell Claude: *"Resume the Go migration — start Phase 2 per docs/superpowers/CHECKPOINT.md"*.
-Plan: `docs/superpowers/plans/2026-05-15-phase-02-users.md` (26 tasks, Employees + Dependents Module).
+Tell Claude: *"Resume the Go migration — start Phase 3 per docs/superpowers/CHECKPOINT.md"*.
+Plan: `docs/superpowers/plans/2026-05-15-phase-03-departments-positions.md` (18 tasks).
+
+NOTE: Phase 3 adds FK constraints `employees.department_id → departments(id)` and `employees.position_id → positions(id)` (deferred from Phase 1). Phase 3 plan was written against the OLD pre-split assumptions — re-audit it against the actual `employees` table before executing (department_id/position_id live on employees, NOT users).
 
 Claude should:
 1. Read this file + `docs/superpowers/specs/2026-05-15-go-migration-design.md`
