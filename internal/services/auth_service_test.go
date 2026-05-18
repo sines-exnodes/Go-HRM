@@ -158,6 +158,34 @@ func TestAuthService_Refresh_RejectsAccessToken(t *testing.T) {
 	}
 }
 
+func TestAuthService_Refresh_RejectsTokenIssuedBeforePasswordReset(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
+	u := makeUser(t, "alice@test.com", "Secret123!", role)
+
+	svc := newAuthSvc()
+	refresh, err := utils.SignToken(u.ID.String(), utils.TokenTypeRefresh, jwtSecret, refreshTTL)
+	if err != nil {
+		t.Fatalf("sign refresh: %v", err)
+	}
+
+	// Reset the password AFTER the refresh token was issued — this stamps
+	// password_reset_at = NOW(), which is strictly after the token iat.
+	time.Sleep(1100 * time.Millisecond)
+	newHash, err := utils.HashPassword("NewSecret123!")
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+	if err := testUserRepo.UpdatePassword(context.Background(), u.ID, newHash); err != nil {
+		t.Fatalf("update password: %v", err)
+	}
+
+	if _, err := svc.Refresh(context.Background(), refresh); err == nil {
+		t.Fatal("expected error: refresh token issued before password reset must be rejected")
+	}
+}
+
 func TestAuthService_ResolveUserPermissions_UnionAcrossRoles(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)

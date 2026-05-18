@@ -105,6 +105,21 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginR
 	if !user.IsActive {
 		return nil, apperr.ErrUnauthorized("User not found or inactive")
 	}
+
+	// Session invalidation: reject refresh tokens issued before a
+	// credential change, mirroring the access-token check in
+	// middleware.JWT so a stolen pre-change refresh token cannot mint
+	// fresh access tokens.
+	if claims.IssuedAt != nil {
+		iat := claims.IssuedAt.Time
+		if tokenInvalidatedBy(user.EmailChangedAt, iat) {
+			return nil, apperr.ErrUnauthorized("Session expired due to email change — please log in again")
+		}
+		if tokenInvalidatedBy(user.PasswordResetAt, iat) {
+			return nil, apperr.ErrUnauthorized("Session expired due to password reset — please log in again")
+		}
+	}
+
 	tokens, err := s.issueTokenPair(user.ID)
 	if err != nil {
 		return nil, err
@@ -139,6 +154,13 @@ func (s *AuthService) resolvePermsFromUser(roles []models.Role) (map[permissions
 		}
 	}
 	return out, nil
+}
+
+// tokenInvalidatedBy reports whether a token issued at iat predates the
+// credential-change timestamp ts (nil ts means no change recorded). Same
+// semantics as middleware.invalidatedBy.
+func tokenInvalidatedBy(ts *time.Time, iat time.Time) bool {
+	return ts != nil && iat.Before(ts.UTC())
 }
 
 func (s *AuthService) issueTokenPair(userID uuid.UUID) (*TokenPair, error) {
