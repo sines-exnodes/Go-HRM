@@ -40,14 +40,6 @@ type Config struct {
 	SuperAdminPassword string
 	SuperAdminName     string
 
-	SupabaseURL            string
-	SupabaseServiceRoleKey string
-	SupabaseBucket         string
-	SupabaseS3Endpoint     string
-	SupabaseS3Region       string
-	SupabaseS3AccessKey    string
-	SupabaseS3SecretKey    string
-
 	Storage StorageConfig
 }
 
@@ -83,14 +75,6 @@ func Load() *Config {
 		SuperAdminEmail:    getEnv("SUPER_ADMIN_EMAIL", ""),
 		SuperAdminPassword: getEnv("SUPER_ADMIN_PASSWORD", ""),
 		SuperAdminName:     getEnv("SUPER_ADMIN_NAME", "Super Admin"),
-
-		SupabaseURL:            getEnv("SUPABASE_URL", ""),
-		SupabaseServiceRoleKey: getEnv("SUPABASE_SERVICE_ROLE_KEY", ""),
-		SupabaseBucket:         getEnv("SUPABASE_BUCKET", ""),
-		SupabaseS3Endpoint:     getEnv("SUPABASE_S3_ENDPOINT", ""),
-		SupabaseS3Region:       getEnv("SUPABASE_S3_REGION", "ap-southeast-1"),
-		SupabaseS3AccessKey:    getEnv("SUPABASE_S3_ACCESS_KEY", ""),
-		SupabaseS3SecretKey:    getEnv("SUPABASE_S3_SECRET_KEY", ""),
 	}
 
 	if strings.TrimSpace(cfg.JWTSecret) == "" {
