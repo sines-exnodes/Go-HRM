@@ -10,15 +10,22 @@ import (
 	"github.com/exnodes/hrm-api/internal/models"
 )
 
-type LeaveQuotaRepository struct {
+// LeaveQuotaRepository defines data access for an employee's leave quota.
+type LeaveQuotaRepository interface {
+	GetByEmployee(ctx context.Context, employeeID uuid.UUID) (*models.EmployeeLeaveQuota, error)
+	Upsert(ctx context.Context, employeeID uuid.UUID, annual, sick float64) error
+}
+
+type leaveQuotaRepository struct {
 	db *gorm.DB
 }
 
-func NewLeaveQuotaRepository(db *gorm.DB) *LeaveQuotaRepository {
-	return &LeaveQuotaRepository{db: db}
+// NewLeaveQuotaRepository constructs a Postgres-backed LeaveQuotaRepository.
+func NewLeaveQuotaRepository(db *gorm.DB) LeaveQuotaRepository {
+	return &leaveQuotaRepository{db: db}
 }
 
-func (r *LeaveQuotaRepository) GetByEmployee(ctx context.Context, employeeID uuid.UUID) (*models.EmployeeLeaveQuota, error) {
+func (r *leaveQuotaRepository) GetByEmployee(ctx context.Context, employeeID uuid.UUID) (*models.EmployeeLeaveQuota, error) {
 	var q models.EmployeeLeaveQuota
 	err := r.db.WithContext(ctx).
 		Where("employee_id = ? AND is_deleted = ?", employeeID, false).
@@ -29,7 +36,7 @@ func (r *LeaveQuotaRepository) GetByEmployee(ctx context.Context, employeeID uui
 	return &q, err
 }
 
-func (r *LeaveQuotaRepository) Upsert(ctx context.Context, employeeID uuid.UUID, annual, sick float64) error {
+func (r *leaveQuotaRepository) Upsert(ctx context.Context, employeeID uuid.UUID, annual, sick float64) error {
 	existing, err := r.GetByEmployee(ctx, employeeID)
 	if err != nil {
 		return err

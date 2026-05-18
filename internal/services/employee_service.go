@@ -30,26 +30,25 @@ func boolToRenewal(b *bool) int {
 	return 1
 }
 
-// EmployeeService owns the HR-profile business logic. Repository fields use the
-// repository INTERFACE types where the repo exposes one (employee/user/role)
-// and concrete struct pointers for the struct-only repos (dependent/quota).
+// EmployeeService owns the HR-profile business logic. All repository fields
+// use the repository INTERFACE types for mockability.
 type EmployeeService struct {
 	db      *gorm.DB
 	emps    repositories.EmployeeRepository
-	deps    *repositories.DependentRepository
+	deps    repositories.DependentRepository
 	users   repositories.UserRepository
 	roles   repositories.RoleRepository
-	quota   *repositories.LeaveQuotaRepository
+	quota   repositories.LeaveQuotaRepository
 	uploads Uploader
 }
 
 func NewEmployeeService(
 	db *gorm.DB,
 	emps repositories.EmployeeRepository,
-	deps *repositories.DependentRepository,
+	deps repositories.DependentRepository,
 	users repositories.UserRepository,
 	roles repositories.RoleRepository,
-	quota *repositories.LeaveQuotaRepository,
+	quota repositories.LeaveQuotaRepository,
 	uploads Uploader,
 ) *EmployeeService {
 	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads}

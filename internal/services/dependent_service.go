@@ -14,14 +14,14 @@ import (
 )
 
 // DependentService manages an employee's dependents with owner-or-admin
-// authorization. DependentRepository is a concrete struct (no interface in the
-// Phase 1 stub); EmployeeRepository is reconciled to its interface type.
+// authorization. Both repositories are consumed via their interfaces for
+// mockability.
 type DependentService struct {
-	deps *repositories.DependentRepository
+	deps repositories.DependentRepository
 	emps repositories.EmployeeRepository
 }
 
-func NewDependentService(deps *repositories.DependentRepository, emps repositories.EmployeeRepository) *DependentService {
+func NewDependentService(deps repositories.DependentRepository, emps repositories.EmployeeRepository) *DependentService {
 	return &DependentService{deps: deps, emps: emps}
 }
 

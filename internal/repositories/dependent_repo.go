@@ -10,24 +10,29 @@ import (
 	"github.com/exnodes/hrm-api/internal/models"
 )
 
-// DependentRepository is the Postgres-backed data access for the dependents of
-// an employee. (Reconciled with the Phase 1 stub: the Phase 1 version exposed
-// an interface with a non-paginated ListByEmployee and a struct-based Update;
-// this Phase 2 version is a superset — paginated list + field-map update — and
-// has no interface consumers, so it replaces the stub directly.)
-type DependentRepository struct {
+// DependentRepository defines data access for the dependents of an employee.
+type DependentRepository interface {
+	Create(ctx context.Context, d *models.Dependent) error
+	FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error)
+	ListByEmployee(ctx context.Context, employeeID uuid.UUID, page, pageSize int) ([]models.Dependent, int64, error)
+	Update(ctx context.Context, id uuid.UUID, fields map[string]any) error
+	SoftDelete(ctx context.Context, id uuid.UUID) error
+}
+
+type dependentRepository struct {
 	db *gorm.DB
 }
 
-func NewDependentRepository(db *gorm.DB) *DependentRepository {
-	return &DependentRepository{db: db}
+// NewDependentRepository constructs a Postgres-backed DependentRepository.
+func NewDependentRepository(db *gorm.DB) DependentRepository {
+	return &dependentRepository{db: db}
 }
 
-func (r *DependentRepository) Create(ctx context.Context, d *models.Dependent) error {
+func (r *dependentRepository) Create(ctx context.Context, d *models.Dependent) error {
 	return r.db.WithContext(ctx).Create(d).Error
 }
 
-func (r *DependentRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error) {
+func (r *dependentRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Dependent, error) {
 	var d models.Dependent
 	err := r.db.WithContext(ctx).
 		Where("id = ? AND is_deleted = ?", id, false).
@@ -38,7 +43,7 @@ func (r *DependentRepository) FindByID(ctx context.Context, id uuid.UUID) (*mode
 	return &d, err
 }
 
-func (r *DependentRepository) ListByEmployee(ctx context.Context, employeeID uuid.UUID, page, pageSize int) ([]models.Dependent, int64, error) {
+func (r *dependentRepository) ListByEmployee(ctx context.Context, employeeID uuid.UUID, page, pageSize int) ([]models.Dependent, int64, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -63,7 +68,7 @@ func (r *DependentRepository) ListByEmployee(ctx context.Context, employeeID uui
 	return deps, total, nil
 }
 
-func (r *DependentRepository) Update(ctx context.Context, id uuid.UUID, fields map[string]any) error {
+func (r *dependentRepository) Update(ctx context.Context, id uuid.UUID, fields map[string]any) error {
 	if len(fields) == 0 {
 		return nil
 	}
@@ -72,7 +77,7 @@ func (r *DependentRepository) Update(ctx context.Context, id uuid.UUID, fields m
 		Updates(fields).Error
 }
 
-func (r *DependentRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+func (r *dependentRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Model(&models.Dependent{}).
 		Where("id = ? AND is_deleted = ?", id, false).
 		Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error
