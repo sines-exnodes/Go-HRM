@@ -3151,7 +3151,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 **Files:**
 - Create: `docs/superpowers/verification/phase-01.md`
 
-- [ ] **Step 17.1: Create a clean database.**
+- [x] **Step 17.1: Create a clean database.**
 
   ```
   make migrate-down || true
@@ -3166,7 +3166,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   ```
   Expected columns include `full_name`, `department_id`, `position_id`, `manager_id` (FK to employees), `basic_salary numeric(18,2)`, `contract_type`, plus 4 audit cols.
 
-- [ ] **Step 17.2: Run the server in the background.**
+- [x] **Step 17.2: Run the server in the background.**
 
   Start the server (foreground in one terminal, or `make run &` in another). Confirm the seed log lines appear:
   - `seed: created role "Super Admin"`
@@ -3179,7 +3179,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   ```
   Expected: `{"success":true,"data":{"status":"ok"}}` (or whatever Phase 0 produced — non-empty 200).
 
-- [ ] **Step 17.3: Login as super admin.**
+- [x] **Step 17.3: Login as super admin.**
 
   ```
   curl -s -X POST http://localhost:8080/api/v1/auth/login \
@@ -3214,7 +3214,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Capture `access_token` as `ACCESS` and `refresh_token` as `REFRESH` env vars. Confirm `data.user.employee.full_name == "Super Admin"` (or whatever `SUPER_ADMIN_NAME` was set to).
 
-- [ ] **Step 17.4: Hit a protected endpoint with the token.**
+- [x] **Step 17.4: Hit a protected endpoint with the token.**
 
   ```
   curl -s -H "Authorization: Bearer $ACCESS" http://localhost:8080/api/v1/roles/permissions | head -c 400
@@ -3222,7 +3222,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `200` with `data` being an array of 11 `PermissionGroup` entries: `auth`, `users`, `roles`, `departments`, `positions`, `skills`, `leave_requests`, `leave_quota`, `attendance`, `organization_settings`, `announcements`. Count must match `len(permissions.PermissionGroups)`.
 
-- [ ] **Step 17.5: Hit the protected endpoint with NO token.**
+- [x] **Step 17.5: Hit the protected endpoint with NO token.**
 
   ```
   curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/api/v1/roles/permissions
@@ -3230,7 +3230,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `401`.
 
-- [ ] **Step 17.6: Hit with a tampered token.**
+- [x] **Step 17.6: Hit with a tampered token.**
 
   ```
   curl -s -o /dev/null -w '%{http_code}\n' \
@@ -3240,7 +3240,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `401`.
 
-- [ ] **Step 17.7: Wrong password.**
+- [x] **Step 17.7: Wrong password.**
 
   ```
   curl -s -X POST http://localhost:8080/api/v1/auth/login \
@@ -3251,7 +3251,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `401`.
 
-- [ ] **Step 17.8: Login with a non-existent email.**
+- [x] **Step 17.8: Login with a non-existent email.**
 
   ```
   curl -s -X POST http://localhost:8080/api/v1/auth/login \
@@ -3262,7 +3262,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `401`.
 
-- [ ] **Step 17.9: Refresh flow.**
+- [x] **Step 17.9: Refresh flow.**
 
   ```
   curl -s -X POST http://localhost:8080/api/v1/auth/refresh \
@@ -3281,7 +3281,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   ```
   Expected: `400` or `401`.
 
-- [ ] **Step 17.10: Logout.**
+- [x] **Step 17.10: Logout.**
 
   ```
   curl -s -X POST http://localhost:8080/api/v1/auth/logout \
@@ -3291,7 +3291,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: `200` (stateless — the token remains technically valid until expiry; documented as a Phase 1 limitation).
 
-- [ ] **Step 17.11: Confirm Swagger UI lists the new endpoints.**
+- [x] **Step 17.11: Confirm Swagger UI lists the new endpoints.**
 
   Visit `http://localhost:8080/swagger/index.html` in a browser (or `curl -s http://localhost:8080/swagger/doc.json | jq '.paths | keys'`). Expected paths include:
   - `/api/v1/auth/login`
@@ -3299,7 +3299,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   - `/api/v1/auth/logout`
   - `/api/v1/roles/permissions`
 
-- [ ] **Step 17.12: Write the verification log.**
+- [x] **Step 17.12: Write the verification log.**
 
   Create `docs/superpowers/verification/phase-01.md` containing:
   - Date, phase name, agent name.
@@ -3308,7 +3308,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
   - The list of Swagger paths emitted in 17.11.
   - A short "Limitations" section noting that logout is currently stateless.
 
-- [ ] **Step 17.13: Final test pass.**
+- [x] **Step 17.13: Final test pass.**
 
   ```
   go test ./...
@@ -3316,7 +3316,7 @@ This task lands the full Phase 1 schema in two migrations (cleaner than one comb
 
   Expected: all green; any service tests that require a DB either pass or skip cleanly with no failures.
 
-- [ ] **Step 17.14: Commit the verification log.**
+- [x] **Step 17.14: Commit the verification log.**
 
   ```
   git add docs/superpowers/verification/phase-01.md
