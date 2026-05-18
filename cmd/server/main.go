@@ -22,6 +22,7 @@ import (
 	"github.com/exnodes/hrm-api/internal/config"
 	"github.com/exnodes/hrm-api/internal/handlers"
 	"github.com/exnodes/hrm-api/internal/middleware"
+	"github.com/exnodes/hrm-api/internal/permissions"
 	"github.com/exnodes/hrm-api/internal/repositories"
 	"github.com/exnodes/hrm-api/internal/services"
 
@@ -49,7 +50,9 @@ func main() {
 	roleRepo := repositories.NewRoleRepository(db)
 	employeeRepo := repositories.NewEmployeeRepository(db)
 	dependentRepo := repositories.NewDependentRepository(db)
-	_ = dependentRepo // wired in later phases
+	tokenRepo := repositories.NewDeviceTokenRepository(db)
+	quotaRepo := repositories.NewLeaveQuotaRepository(db)
+	settingsRepo := repositories.NewNotificationSettingsRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -63,6 +66,14 @@ func main() {
 		SuperAdminName:     cfg.SuperAdminName,
 	})
 
+	uploadSvc, err := services.NewUploadService(context.Background(), cfg.Storage)
+	if err != nil {
+		log.Fatalf("upload service: %v", err)
+	}
+	empSvc := services.NewEmployeeService(db, employeeRepo, dependentRepo, userRepo, roleRepo, quotaRepo, uploadSvc)
+	depSvc := services.NewDependentService(dependentRepo, employeeRepo)
+	userSvc := services.NewUserService(userRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
+
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
 		log.Fatalf("seed: %v", err)
@@ -71,6 +82,9 @@ func main() {
 	// ---- handlers ----
 	authH := handlers.NewAuthHandler(authSvc)
 	roleH := handlers.NewRoleHandler()
+	empH := handlers.NewEmployeeHandler(empSvc)
+	depH := handlers.NewDependentHandler(depSvc)
+	userH := handlers.NewUserHandler(userSvc)
 
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
@@ -99,6 +113,45 @@ func main() {
 
 		authed.POST("/auth/logout", authH.Logout)
 		authed.GET("/roles/permissions", roleH.ListPermissions)
+
+		// ---- /users/me* self-service (auth only) ----
+		authed.GET("/users/me", userH.GetMe)
+		authed.POST("/users/me/change-password", userH.ChangeMyPassword)
+		authed.POST("/users/me/change-email", userH.ChangeMyEmail)
+		authed.POST("/users/me/device-tokens", userH.RegisterDeviceToken)
+		authed.DELETE("/users/me/device-tokens/:token", userH.RemoveDeviceToken)
+		authed.PATCH("/users/me/notification-settings", userH.UpdateMyNotificationSettings)
+
+		// ---- /users/:id admin ----
+		adminUsers := authed.Group("/users")
+		adminUsers.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermUsersUpdate), userH.AdminPatch)
+		adminUsers.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermUsersDelete), userH.AdminDelete)
+		adminUsers.PATCH(":id/change-password", middleware.RequirePerms(authSvc, permissions.PermUsersChangePwd), userH.AdminChangePassword)
+		adminUsers.PUT(":id/roles", middleware.RequirePerms(authSvc, permissions.PermUsersManageRoles), userH.AssignRoles)
+
+		// ---- /employees/me* self-service (auth only) ----
+		authed.GET("/employees/me", empH.GetMe)
+		authed.PATCH("/employees/me", empH.UpdateMe)
+		authed.PATCH("/employees/me/avatar", empH.UpdateMyAvatar)
+
+		// ---- /employees admin ----
+		adminEmps := authed.Group("/employees")
+		adminEmps.GET("", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), empH.List)
+		adminEmps.POST("", middleware.RequirePerms(authSvc, permissions.PermEmployeesCreate), empH.Create)
+		adminEmps.GET(":id", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), empH.Get)
+		adminEmps.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermEmployeesUpdate), empH.Update)
+		adminEmps.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermEmployeesDelete), empH.Delete)
+		adminEmps.PATCH(":id/avatar", middleware.RequirePerms(authSvc, permissions.PermEmployeesUpdate), empH.UpdateAvatarAdmin)
+		adminEmps.PATCH(":id/leave-quota", middleware.RequirePerms(authSvc, permissions.PermLeaveQuotaManage), empH.UpdateLeaveQuota)
+
+		// ---- /employees/:id/dependents (owner or PermDependentsManage — enforced in handler) ----
+		// NOTE: gin requires a single wildcard name per path position, so the
+		// employee segment uses :id (shared with the admin /employees/:id tree)
+		// and the nested dependent uses :dependentID.
+		authed.GET("/employees/:id/dependents", depH.List)
+		authed.POST("/employees/:id/dependents", depH.Create)
+		authed.PATCH("/employees/:id/dependents/:dependentID", depH.Update)
+		authed.DELETE("/employees/:id/dependents/:dependentID", depH.Delete)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

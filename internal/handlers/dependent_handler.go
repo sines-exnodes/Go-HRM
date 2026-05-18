@@ -40,13 +40,13 @@ func hasManageAll(c *gin.Context) bool {
 // @Tags         dependents
 // @Security     BearerAuth
 // @Produce      json
-// @Param        employeeID path string true "employee uuid"
+// @Param        id         path string true "employee uuid"
 // @Param        page       query int  false "page"
 // @Param        page_size  query int  false "page size"
 // @Success      200 {object} map[string]interface{}
-// @Router       /api/v1/employees/{employeeID}/dependents [get]
+// @Router       /api/v1/employees/{id}/dependents [get]
 func (h *DependentHandler) List(c *gin.Context) {
-	employeeID, err := parseIDParam(c, "employeeID")
+	employeeID, err := parseIDParam(c, "id")
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -78,12 +78,12 @@ func (h *DependentHandler) List(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        employeeID path string true "employee uuid"
+// @Param        id         path string true "employee uuid"
 // @Param        body body dto.DependentCreate true "dependent fields"
 // @Success      201 {object} map[string]interface{}
-// @Router       /api/v1/employees/{employeeID}/dependents [post]
+// @Router       /api/v1/employees/{id}/dependents [post]
 func (h *DependentHandler) Create(c *gin.Context) {
-	employeeID, err := parseIDParam(c, "employeeID")
+	employeeID, err := parseIDParam(c, "id")
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -115,18 +115,18 @@ func (h *DependentHandler) Create(c *gin.Context) {
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        employeeID path string true "employee uuid"
-// @Param        id         path string true "dependent uuid"
+// @Param        id           path string true "employee uuid"
+// @Param        dependentID  path string true "dependent uuid"
 // @Param        body body dto.DependentUpdate true "fields"
 // @Success      200 {object} map[string]interface{}
-// @Router       /api/v1/employees/{employeeID}/dependents/{id} [patch]
+// @Router       /api/v1/employees/{id}/dependents/{dependentID} [patch]
 func (h *DependentHandler) Update(c *gin.Context) {
-	employeeID, err := parseIDParam(c, "employeeID")
+	employeeID, err := parseIDParam(c, "id")
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	id, err := parseIDParam(c, "id")
+	id, err := parseIDParam(c, "dependentID")
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -167,17 +167,17 @@ func (h *DependentHandler) Update(c *gin.Context) {
 // @Tags         dependents
 // @Security     BearerAuth
 // @Produce      json
-// @Param        employeeID path string true "employee uuid"
-// @Param        id         path string true "dependent uuid"
+// @Param        id           path string true "employee uuid"
+// @Param        dependentID  path string true "dependent uuid"
 // @Success      200 {object} map[string]interface{}
-// @Router       /api/v1/employees/{employeeID}/dependents/{id} [delete]
+// @Router       /api/v1/employees/{id}/dependents/{dependentID} [delete]
 func (h *DependentHandler) Delete(c *gin.Context) {
-	employeeID, err := parseIDParam(c, "employeeID")
+	employeeID, err := parseIDParam(c, "id")
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	id, err := parseIDParam(c, "id")
+	id, err := parseIDParam(c, "dependentID")
 	if err != nil {
 		_ = c.Error(err)
 		return

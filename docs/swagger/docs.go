@@ -143,6 +143,599 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/employees": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "List employees (admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "free text (full_name/phone/personal_email/user.email)",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "department uuid",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "position uuid",
+                        "name": "position_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "manager uuid",
+                        "name": "manager_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "role uuid",
+                        "name": "role_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter by user.is_active",
+                        "name": "is_active",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Create employee (admin) — creates user + employee in tx",
+                "parameters": [
+                    {
+                        "description": "user creds + HR fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeCreate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Get current employee HR profile",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Update current employee HR profile (restricted whitelist)",
+                "parameters": [
+                    {
+                        "description": "allowed fields only",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeSelfUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/me/avatar": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Replace current employee avatar",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Image (PNG/JPEG/WEBP, max 5MB)",
+                        "name": "avatar",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Get employee by id (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Soft-delete employee + deactivate user (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Update employee (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}/avatar": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Update an employee's avatar (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "image (PNG/JPEG/WEBP, max 5MB)",
+                        "name": "avatar",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}/dependents": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dependents"
+                ],
+                "summary": "List dependents for an employee",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dependents"
+                ],
+                "summary": "Create a dependent for an employee",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "dependent fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DependentCreate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}/dependents/{dependentID}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dependents"
+                ],
+                "summary": "Delete a dependent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "dependent uuid",
+                        "name": "dependentID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dependents"
+                ],
+                "summary": "Update a dependent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "dependent uuid",
+                        "name": "dependentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DependentUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}/leave-quota": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Update employee leave quota (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "quotas",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.LeaveQuotaUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/roles/permissions": {
             "get": {
                 "security": [
@@ -174,6 +767,403 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/users/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get current user (auth profile + embedded employee summary)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/me/change-email": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Change current user email",
+                "parameters": [
+                    {
+                        "description": "new email + current password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/me/change-password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Change current user password",
+                "parameters": [
+                    {
+                        "description": "current and new password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/me/device-tokens": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Register a device token for push notifications",
+                "parameters": [
+                    {
+                        "description": "device id + token",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.FcmTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/me/device-tokens/{token}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Remove a device token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "FCM token",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/me/notification-settings": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Update push notification settings",
+                "parameters": [
+                    {
+                        "description": "settings",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Soft-delete a user account (admin reauth)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "admin's current password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DeleteUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Admin toggle is_active on a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "fields",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.AdminUserPatch"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/{id}/change-password": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Admin resets a user's password",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "new password (current ignored)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/{id}/roles": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Assign roles to a user (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "role ids",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleAssignmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Returns {success: true, data: {status: \"ok\"}} when the server is up.",
@@ -196,6 +1186,296 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_exnodes_hrm-api_internal_dto.AdminUserPatch": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest": {
+            "type": "object",
+            "required": [
+                "current_password",
+                "new_email"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "new_email": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.ChangePasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "new_password": {
+                    "type": "string",
+                    "minLength": 8
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DeleteUserRequest": {
+            "type": "object",
+            "required": [
+                "current_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DependentCreate": {
+            "type": "object",
+            "required": [
+                "full_name",
+                "relationship"
+            ],
+            "properties": {
+                "dob": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1
+                },
+                "gender": {
+                    "type": "string",
+                    "enum": [
+                        "male",
+                        "female",
+                        "other"
+                    ]
+                },
+                "relationship": {
+                    "type": "string",
+                    "enum": [
+                        "child",
+                        "parent",
+                        "spouse",
+                        "sibling",
+                        "other"
+                    ]
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DependentUpdate": {
+            "type": "object",
+            "properties": {
+                "dob": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "gender": {
+                    "type": "string",
+                    "enum": [
+                        "male",
+                        "female",
+                        "other"
+                    ]
+                },
+                "relationship": {
+                    "type": "string",
+                    "enum": [
+                        "child",
+                        "parent",
+                        "spouse",
+                        "sibling",
+                        "other"
+                    ]
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.EmployeeCreate": {
+            "type": "object",
+            "required": [
+                "email",
+                "full_name",
+                "password"
+            ],
+            "properties": {
+                "bank_account": {
+                    "type": "string"
+                },
+                "bank_holder_name": {
+                    "type": "string"
+                },
+                "bank_name": {
+                    "type": "string"
+                },
+                "basic_salary": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "contract_end_date": {
+                    "type": "string"
+                },
+                "contract_renewal": {
+                    "type": "boolean"
+                },
+                "contract_sign_date": {
+                    "type": "string"
+                },
+                "contract_type": {
+                    "description": "Contract / salary / bank",
+                    "type": "string"
+                },
+                "current_address": {
+                    "type": "string"
+                },
+                "department_id": {
+                    "description": "Work",
+                    "type": "string"
+                },
+                "dob": {
+                    "type": "string"
+                },
+                "education": {
+                    "type": "string"
+                },
+                "email": {
+                    "description": "User credentials (created in tx)",
+                    "type": "string"
+                },
+                "emergency_contact_name": {
+                    "type": "string"
+                },
+                "emergency_contact_phone": {
+                    "type": "string"
+                },
+                "emergency_contact_relation": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "description": "HR personal info",
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1
+                },
+                "gender": {
+                    "type": "string",
+                    "enum": [
+                        "male",
+                        "female",
+                        "other"
+                    ]
+                },
+                "id_back_image": {
+                    "type": "string"
+                },
+                "id_front_image": {
+                    "type": "string"
+                },
+                "id_issue_date": {
+                    "type": "string"
+                },
+                "id_number": {
+                    "type": "string"
+                },
+                "insurance_salary": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "join_date": {
+                    "type": "string"
+                },
+                "manager_id": {
+                    "type": "string"
+                },
+                "marital_status": {
+                    "type": "string",
+                    "enum": [
+                        "single",
+                        "married",
+                        "divorced",
+                        "widowed"
+                    ]
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "payment_method": {
+                    "type": "string"
+                },
+                "permanent_address": {
+                    "type": "string"
+                },
+                "personal_email": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "position_id": {
+                    "type": "string"
+                },
+                "role_ids": {
+                    "description": "Roles assigned at creation",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.EmployeeSelfUpdate": {
+            "type": "object",
+            "properties": {
+                "current_address": {
+                    "type": "string"
+                },
+                "emergency_contact_name": {
+                    "type": "string"
+                },
+                "emergency_contact_phone": {
+                    "type": "string"
+                },
+                "emergency_contact_relation": {
+                    "type": "string"
+                },
+                "marital_status": {
+                    "type": "string",
+                    "enum": [
+                        "single",
+                        "married",
+                        "divorced",
+                        "widowed"
+                    ]
+                },
+                "permanent_address": {
+                    "type": "string"
+                },
+                "personal_email": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.EmployeeSummary": {
             "type": "object",
             "properties": {
@@ -216,6 +1496,169 @@ const docTemplate = `{
                 },
                 "position_id": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.EmployeeUpdate": {
+            "type": "object",
+            "properties": {
+                "bank_account": {
+                    "type": "string"
+                },
+                "bank_holder_name": {
+                    "type": "string"
+                },
+                "bank_name": {
+                    "type": "string"
+                },
+                "basic_salary": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "clear_department": {
+                    "type": "boolean"
+                },
+                "clear_manager": {
+                    "type": "boolean"
+                },
+                "clear_position": {
+                    "type": "boolean"
+                },
+                "contract_end_date": {
+                    "type": "string"
+                },
+                "contract_renewal": {
+                    "type": "boolean"
+                },
+                "contract_sign_date": {
+                    "type": "string"
+                },
+                "contract_type": {
+                    "type": "string"
+                },
+                "current_address": {
+                    "type": "string"
+                },
+                "department_id": {
+                    "type": "string"
+                },
+                "dob": {
+                    "type": "string"
+                },
+                "education": {
+                    "type": "string"
+                },
+                "emergency_contact_name": {
+                    "type": "string"
+                },
+                "emergency_contact_phone": {
+                    "type": "string"
+                },
+                "emergency_contact_relation": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "gender": {
+                    "type": "string",
+                    "enum": [
+                        "male",
+                        "female",
+                        "other"
+                    ]
+                },
+                "id_back_image": {
+                    "type": "string"
+                },
+                "id_front_image": {
+                    "type": "string"
+                },
+                "id_issue_date": {
+                    "type": "string"
+                },
+                "id_number": {
+                    "type": "string"
+                },
+                "insurance_salary": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "is_active": {
+                    "description": "toggles user.is_active",
+                    "type": "boolean"
+                },
+                "join_date": {
+                    "type": "string"
+                },
+                "manager_id": {
+                    "type": "string"
+                },
+                "marital_status": {
+                    "type": "string",
+                    "enum": [
+                        "single",
+                        "married",
+                        "divorced",
+                        "widowed"
+                    ]
+                },
+                "nationality": {
+                    "type": "string"
+                },
+                "payment_method": {
+                    "type": "string"
+                },
+                "permanent_address": {
+                    "type": "string"
+                },
+                "personal_email": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "position_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.FcmTokenRequest": {
+            "type": "object",
+            "required": [
+                "device_id",
+                "token"
+            ],
+            "properties": {
+                "device_id": {
+                    "type": "string"
+                },
+                "platform": {
+                    "type": "string",
+                    "enum": [
+                        "android",
+                        "ios",
+                        "web",
+                        "unknown"
+                    ]
+                },
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.LeaveQuotaUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "annual_leave_quota": {
+                    "type": "number",
+                    "maximum": 365,
+                    "minimum": 0
+                },
+                "sick_leave_quota": {
+                    "type": "number",
+                    "maximum": 365,
+                    "minimum": 0
                 }
             }
         },
@@ -261,6 +1704,14 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "Logged out"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest": {
+            "type": "object",
+            "properties": {
+                "notifications_enabled": {
+                    "type": "boolean"
                 }
             }
         },
@@ -347,6 +1798,20 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.RoleAssignmentRequest": {
+            "type": "object",
+            "required": [
+                "role_ids"
+            ],
+            "properties": {
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.RoleSummary": {
             "type": "object",
             "properties": {
@@ -401,6 +1866,11 @@ const docTemplate = `{
                 "users:delete",
                 "users:manage_roles",
                 "users:change_password",
+                "employees:read",
+                "employees:create",
+                "employees:update",
+                "employees:delete",
+                "dependents:manage",
                 "roles:read",
                 "roles:create",
                 "roles:update",
@@ -439,6 +1909,11 @@ const docTemplate = `{
                 "PermUsersDelete",
                 "PermUsersManageRoles",
                 "PermUsersChangePwd",
+                "PermEmployeesRead",
+                "PermEmployeesCreate",
+                "PermEmployeesUpdate",
+                "PermEmployeesDelete",
+                "PermDependentsManage",
                 "PermRolesRead",
                 "PermRolesCreate",
                 "PermRolesUpdate",

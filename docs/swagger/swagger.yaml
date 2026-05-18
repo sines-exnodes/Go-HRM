@@ -1,5 +1,209 @@
 basePath: /
 definitions:
+  github_com_exnodes_hrm-api_internal_dto.AdminUserPatch:
+    properties:
+      is_active:
+        type: boolean
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest:
+    properties:
+      current_password:
+        minLength: 1
+        type: string
+      new_email:
+        type: string
+    required:
+    - current_password
+    - new_email
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.ChangePasswordRequest:
+    properties:
+      current_password:
+        minLength: 1
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+    required:
+    - new_password
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.DeleteUserRequest:
+    properties:
+      current_password:
+        minLength: 1
+        type: string
+    required:
+    - current_password
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.DependentCreate:
+    properties:
+      dob:
+        type: string
+      full_name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      gender:
+        enum:
+        - male
+        - female
+        - other
+        type: string
+      relationship:
+        enum:
+        - child
+        - parent
+        - spouse
+        - sibling
+        - other
+        type: string
+    required:
+    - full_name
+    - relationship
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.DependentUpdate:
+    properties:
+      dob:
+        type: string
+      full_name:
+        type: string
+      gender:
+        enum:
+        - male
+        - female
+        - other
+        type: string
+      relationship:
+        enum:
+        - child
+        - parent
+        - spouse
+        - sibling
+        - other
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.EmployeeCreate:
+    properties:
+      bank_account:
+        type: string
+      bank_holder_name:
+        type: string
+      bank_name:
+        type: string
+      basic_salary:
+        minimum: 0
+        type: number
+      contract_end_date:
+        type: string
+      contract_renewal:
+        type: boolean
+      contract_sign_date:
+        type: string
+      contract_type:
+        description: Contract / salary / bank
+        type: string
+      current_address:
+        type: string
+      department_id:
+        description: Work
+        type: string
+      dob:
+        type: string
+      education:
+        type: string
+      email:
+        description: User credentials (created in tx)
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_phone:
+        type: string
+      emergency_contact_relation:
+        type: string
+      full_name:
+        description: HR personal info
+        maxLength: 200
+        minLength: 1
+        type: string
+      gender:
+        enum:
+        - male
+        - female
+        - other
+        type: string
+      id_back_image:
+        type: string
+      id_front_image:
+        type: string
+      id_issue_date:
+        type: string
+      id_number:
+        type: string
+      insurance_salary:
+        minimum: 0
+        type: number
+      is_active:
+        type: boolean
+      join_date:
+        type: string
+      manager_id:
+        type: string
+      marital_status:
+        enum:
+        - single
+        - married
+        - divorced
+        - widowed
+        type: string
+      nationality:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      payment_method:
+        type: string
+      permanent_address:
+        type: string
+      personal_email:
+        type: string
+      phone:
+        type: string
+      position_id:
+        type: string
+      role_ids:
+        description: Roles assigned at creation
+        items:
+          type: string
+        type: array
+    required:
+    - email
+    - full_name
+    - password
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.EmployeeSelfUpdate:
+    properties:
+      current_address:
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_phone:
+        type: string
+      emergency_contact_relation:
+        type: string
+      marital_status:
+        enum:
+        - single
+        - married
+        - divorced
+        - widowed
+        type: string
+      permanent_address:
+        type: string
+      personal_email:
+        type: string
+      phone:
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.EmployeeSummary:
     properties:
       avatar_url:
@@ -14,6 +218,119 @@ definitions:
         type: string
       position_id:
         type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.EmployeeUpdate:
+    properties:
+      bank_account:
+        type: string
+      bank_holder_name:
+        type: string
+      bank_name:
+        type: string
+      basic_salary:
+        minimum: 0
+        type: number
+      clear_department:
+        type: boolean
+      clear_manager:
+        type: boolean
+      clear_position:
+        type: boolean
+      contract_end_date:
+        type: string
+      contract_renewal:
+        type: boolean
+      contract_sign_date:
+        type: string
+      contract_type:
+        type: string
+      current_address:
+        type: string
+      department_id:
+        type: string
+      dob:
+        type: string
+      education:
+        type: string
+      emergency_contact_name:
+        type: string
+      emergency_contact_phone:
+        type: string
+      emergency_contact_relation:
+        type: string
+      full_name:
+        type: string
+      gender:
+        enum:
+        - male
+        - female
+        - other
+        type: string
+      id_back_image:
+        type: string
+      id_front_image:
+        type: string
+      id_issue_date:
+        type: string
+      id_number:
+        type: string
+      insurance_salary:
+        minimum: 0
+        type: number
+      is_active:
+        description: toggles user.is_active
+        type: boolean
+      join_date:
+        type: string
+      manager_id:
+        type: string
+      marital_status:
+        enum:
+        - single
+        - married
+        - divorced
+        - widowed
+        type: string
+      nationality:
+        type: string
+      payment_method:
+        type: string
+      permanent_address:
+        type: string
+      personal_email:
+        type: string
+      phone:
+        type: string
+      position_id:
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.FcmTokenRequest:
+    properties:
+      device_id:
+        type: string
+      platform:
+        enum:
+        - android
+        - ios
+        - web
+        - unknown
+        type: string
+      token:
+        type: string
+    required:
+    - device_id
+    - token
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.LeaveQuotaUpdateRequest:
+    properties:
+      annual_leave_quota:
+        maximum: 365
+        minimum: 0
+        type: number
+      sick_leave_quota:
+        maximum: 365
+        minimum: 0
+        type: number
     type: object
   github_com_exnodes_hrm-api_internal_dto.LoginRequest:
     properties:
@@ -45,6 +362,11 @@ definitions:
       message:
         example: Logged out
         type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest:
+    properties:
+      notifications_enabled:
+        type: boolean
     type: object
   github_com_exnodes_hrm-api_internal_dto.RefreshRequest:
     properties:
@@ -100,6 +422,15 @@ definitions:
       success:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.RoleAssignmentRequest:
+    properties:
+      role_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - role_ids
+    type: object
   github_com_exnodes_hrm-api_internal_dto.RoleSummary:
     properties:
       id:
@@ -138,6 +469,11 @@ definitions:
     - users:delete
     - users:manage_roles
     - users:change_password
+    - employees:read
+    - employees:create
+    - employees:update
+    - employees:delete
+    - dependents:manage
     - roles:read
     - roles:create
     - roles:update
@@ -176,6 +512,11 @@ definitions:
     - PermUsersDelete
     - PermUsersManageRoles
     - PermUsersChangePwd
+    - PermEmployeesRead
+    - PermEmployeesCreate
+    - PermEmployeesUpdate
+    - PermEmployeesDelete
+    - PermDependentsManage
     - PermRolesRead
     - PermRolesCreate
     - PermRolesUpdate
@@ -324,6 +665,380 @@ paths:
       summary: Exchange a refresh token for a new token pair
       tags:
       - Authentication
+  /api/v1/employees:
+    get:
+      parameters:
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 20, max 100)
+        in: query
+        name: page_size
+        type: integer
+      - description: free text (full_name/phone/personal_email/user.email)
+        in: query
+        name: search
+        type: string
+      - description: department uuid
+        in: query
+        name: department_id
+        type: string
+      - description: position uuid
+        in: query
+        name: position_id
+        type: string
+      - description: manager uuid
+        in: query
+        name: manager_id
+        type: string
+      - description: role uuid
+        in: query
+        name: role_id
+        type: string
+      - description: filter by user.is_active
+        in: query
+        name: is_active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List employees (admin)
+      tags:
+      - employees
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: user creds + HR fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create employee (admin) — creates user + employee in tx
+      tags:
+      - employees
+  /api/v1/employees/{id}:
+    delete:
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Soft-delete employee + deactivate user (admin)
+      tags:
+      - employees
+    get:
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get employee by id (admin)
+      tags:
+      - employees
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update employee (admin)
+      tags:
+      - employees
+  /api/v1/employees/{id}/avatar:
+    patch:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: image (PNG/JPEG/WEBP, max 5MB)
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update an employee's avatar (admin)
+      tags:
+      - employees
+  /api/v1/employees/{id}/dependents:
+    get:
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List dependents for an employee
+      tags:
+      - dependents
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: dependent fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.DependentCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a dependent for an employee
+      tags:
+      - dependents
+  /api/v1/employees/{id}/dependents/{dependentID}:
+    delete:
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: dependent uuid
+        in: path
+        name: dependentID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a dependent
+      tags:
+      - dependents
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: dependent uuid
+        in: path
+        name: dependentID
+        required: true
+        type: string
+      - description: fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.DependentUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a dependent
+      tags:
+      - dependents
+  /api/v1/employees/{id}/leave-quota:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: quotas
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.LeaveQuotaUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update employee leave quota (admin)
+      tags:
+      - employees
+  /api/v1/employees/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current employee HR profile
+      tags:
+      - employees
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: allowed fields only
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeSelfUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update current employee HR profile (restricted whitelist)
+      tags:
+      - employees
+  /api/v1/employees/me/avatar:
+    patch:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Image (PNG/JPEG/WEBP, max 5MB)
+        in: formData
+        name: avatar
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Replace current employee avatar
+      tags:
+      - employees
   /api/v1/roles/permissions:
     get:
       description: Returns the structured permission catalog. Requires authentication
@@ -344,6 +1059,253 @@ paths:
       summary: List grouped permissions (for the role-creation picker)
       tags:
       - Roles
+  /api/v1/users/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: admin's current password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.DeleteUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Soft-delete a user account (admin reauth)
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AdminUserPatch'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Admin toggle is_active on a user
+      tags:
+      - users
+  /api/v1/users/{id}/change-password:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: new password (current ignored)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Admin resets a user's password
+      tags:
+      - users
+  /api/v1/users/{id}/roles:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: role ids
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleAssignmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Assign roles to a user (admin)
+      tags:
+      - users
+  /api/v1/users/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user (auth profile + embedded employee summary)
+      tags:
+      - users
+  /api/v1/users/me/change-email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: new email + current password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change current user email
+      tags:
+      - users
+  /api/v1/users/me/change-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: current and new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Change current user password
+      tags:
+      - users
+  /api/v1/users/me/device-tokens:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: device id + token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.FcmTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Register a device token for push notifications
+      tags:
+      - users
+  /api/v1/users/me/device-tokens/{token}:
+    delete:
+      parameters:
+      - description: FCM token
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove a device token
+      tags:
+      - users
+  /api/v1/users/me/notification-settings:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: settings
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update push notification settings
+      tags:
+      - users
   /health:
     get:
       description: 'Returns {success: true, data: {status: "ok"}} when the server
