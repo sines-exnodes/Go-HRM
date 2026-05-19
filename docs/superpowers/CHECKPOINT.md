@@ -1,9 +1,17 @@
 # Resume Checkpoint
 
 **Last updated:** 2026-05-18
-**Stopped at:** Phase 0-3 COMPLETE + code review done + all chosen fixes applied & live-verified. Next: Phase 4 — Skills + Labels.
-**HEAD commit:** ~103 commits on `main` (run `git log --oneline -1`)
+**Stopped at:** Phase 0-3 done+reviewed+fixed+verified. Phase 4 plan re-audited & corrected (REVISION NOTES in plan). NOT yet executed. Next: execute Phase 4 — Skills + Labels.
+**HEAD commit:** ~105 commits on `main` (run `git log --oneline -1`)
 **Branch:** `main`
+
+## Phase 4 readiness
+
+Plan `docs/superpowers/plans/2026-05-15-phase-04-skills-labels.md` has an authoritative `## ⚠️ REVISION NOTES (2026-05-18)` block right after the header — it supersedes the older task bodies. Key corrections: migrations are **000006_create_skills** + **000007_create_labels** (final migrate-version after phase = 7); employee↔skill via **`employee_skills`** join (NOT user_skills); skill icon upload reuses Phase-2 `UploadService` + review-fix-#2 content-sniff; **labels = Python scope only** (GET list + POST get-or-create under `/api/v1/announcement-labels`, gated by `PermAnnounceManage`, NO update/delete); **seed gap: `PermAnnounceManage` is granted to NO role in `seed_service.go`** — Phase 4 must add it to Admin (idempotent). No new permission constants needed. Execute per REVISION NOTES, not the raw task bodies where they conflict.
+
+## TOOLING NOTE (2026-05-18)
+
+During this session the subagent (`Agent`), `TodoWrite`, and `ToolSearch` tools became unavailable (serena MCP disconnected, tool context degraded). Phase 0-3 were executed via the efficient subagent-driven batch pattern. If those tools are still unavailable on resume, Phase 4+ must be executed inline (slower, more context-heavy) OR the session restarted to restore tooling. Prefer restoring subagent capability before executing further phases.
 
 ## Code review status (Phase 0-3)
 
