@@ -8,6 +8,30 @@
 
 **Tech Stack:** Go 1.24, Gin, GORM, Postgres 15, golang-migrate, swaggo/swag, testify, uuid.
 
+---
+
+## ⚠️ REVISION NOTES (2026-05-18) — AUTHORITATIVE, read & apply before executing any task
+
+This plan was drafted pre-schema-split and pre-Phase-0-3. The codebase audit (Python source + current Go state) supersedes the task bodies below wherever they conflict. Apply these corrections:
+
+1. **Migration numbers.** `000001`–`000005` are taken (latest = `000005_create_departments_positions`). The two Phase-4 migrations are **`000006_create_skills`** and **`000007_create_labels`** (NOT 000005/000006 as written below). Renumber every filename, `make migrate-*` reference, and `migrate-version` expectation (final version after this phase = **7**) accordingly.
+
+2. **Skill = catalog entity** (Python `app/models/skill.py`): fields `name TEXT NOT NULL`, `description TEXT NOT NULL DEFAULT ''`, `icon_url TEXT NULL`, + 4 audit cols + trigger + `is_deleted` index + `UNIQUE (LOWER(name)) WHERE is_deleted = FALSE`. Name validated (1–100 chars, regex `^[a-zA-Z0-9 &.+#/()-]+$`), description ≤500. Create/Update accept an **optional multipart `icon` upload** → push through the existing Phase-2 `UploadService` (Supabase S3, `Uploader` interface) and store the returned URL in `icon_url`; on update with a new icon, delete the old object. **Reuse the review-fix #2 content-sniff** (`http.DetectContentType`) — do NOT trust the client MIME header. Skill CRUD endpoints + perms exactly as Python: `GET /api/v1/skills` (`PermSkillsRead`, paginated, ILIKE search by name, sort by name ASC), `POST` (`PermSkillsCreate`, multipart), `GET /:id` (`PermSkillsRead`), `PATCH /:id` (`PermSkillsUpdate`, multipart), `DELETE /:id` (`PermSkillsDelete`).
+
+3. **employee↔skill, NOT user↔skill.** Python's delete-guard counts employees via `User.skill_ids`. In the split schema this is an **`employee_skills`** join table: `employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE`, `skill_id UUID NOT NULL REFERENCES skills(id)`, 4 audit cols, `UNIQUE (employee_id, skill_id) WHERE is_deleted = FALSE`. Rename every `user_skill*` artifact (model `EmployeeSkill`, repo `EmployeeSkillRepository`, etc.). Assignment endpoints are nested under employees: `GET /api/v1/employees/:id/skills` (`PermEmployeesRead`), `PUT /api/v1/employees/:id/skills` (replace set — `PermEmployeesUpdate`), or `POST`/`DELETE /api/v1/employees/:id/skills/:skillID` (`PermEmployeesUpdate`) — pick PUT-replace for parity with the Python array-set semantics; document the choice. **Skill delete guard**: 409 conflict if any non-deleted `employee_skills` row references it (mirror the Phase-3 department/position guard).
+
+4. **Label is minimal & announcement-scoped** (Python `app/models/label.py`, collection `announcement_labels`; `app/routers/labels.py`): table `labels` — `name TEXT NOT NULL` + 4 audit cols + trigger + `is_deleted` index + `UNIQUE (LOWER(name)) WHERE is_deleted = FALSE`. Name not blank, ≤50 chars. **ONLY two endpoints** (Python has no update/delete): `GET /api/v1/announcement-labels` (list ALL, sorted by name ASC, **no pagination**) and `POST /api/v1/announcement-labels` (**get-or-create** by case-insensitive name — return existing if found, else create). Delete any label Update/Delete tasks/handlers/repo-methods/tests the draft below adds — out of scope, not in Python. No cross-entity delete-guard (announcements don't exist until Phase 7).
+
+5. **Label permission + seed gap.** Both label endpoints are gated by **`permissions.PermAnnounceManage`** (`"announcements:manage"` — already exists in `registry.go`). **AUDIT FOUND: `PermAnnounceManage` is NOT granted to any role in `seed_service.go`** (only Super Admin's `*` wildcard covers it). Add a task/step to grant `PermAnnounceManage` to the **Admin** role (and **HR Manager** if appropriate) in `seed_service.go`, idempotently, so non-superadmin admins can manage labels. No new permission constants are needed (skills + announce perms all exist).
+
+6. **Conventions (from Phases 1-3, verified):** repos = interface + lowercase impl + `New…() Interface` constructor (see `role_repo.go`); `models.NotDeleted` scope; soft-delete sets BOTH `is_deleted=true` + `deleted_at=NOW()`; services raise `*apperrors.AppError`; per-route `middleware.RequirePerms(authSvc, permissions.PermXxx)` (**first arg `authSvc`**); route group `authed := v1.Group(""); authed.Use(middleware.JWT(...))`; search via `utils.BuildILIKEPattern` (NOT `EscapeLike`); Swagger annotations incl `@Security BearerAuth` on every endpoint; `make swag` regenerated + committed; seeder uses `s.db` directly idempotently. Tests are `package services_test`, real Postgres test DB (`TEST_DATABASE_URL='postgres://ennam:ennam_dev_2026@localhost:5432/exnodes_hrm_test?sslmode=disable'`), extend `truncateAll` for `employee_skills, skills, labels` in FK-safe order.
+
+7. **DoD = real live verification** committed to `docs/superpowers/verification/phase-04.md`: server up; skill CRUD incl icon upload (valid image 200, content-spoofed rejected); assign skill to an employee; skill delete blocked (409 + SQL spot-check) while assigned then succeeds after unassign; label list + get-or-create idempotency (POST same name twice → same id); 401 (no token) / 403 (non-admin). Local DB: Postgres Docker user `ennam`/`ennam_dev_2026`, main `exnodes_hrm` (v5→v7 after this phase), test `exnodes_hrm_test`.
+
+Everything else in the task bodies (layering, commit-per-task, no placeholders, bite-sized steps) still applies.
+
+---
+
 **Source references (Python — port from):**
 - `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api/app/routers/skills.py`
 - `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api/app/services/skill.py`
