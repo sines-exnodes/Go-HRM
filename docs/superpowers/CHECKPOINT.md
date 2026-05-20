@@ -10,11 +10,20 @@
 
 Tell Claude: *"Resume the Go migration — start Phase 6 per docs/superpowers/CHECKPOINT.md"*.
 
-Plan: [`docs/superpowers/plans/2026-05-15-phase-06-attendance.md`](plans/2026-05-15-phase-06-attendance.md). **Audit the plan against the codebase before executing**: each prior phase has found at least one REVISION-NOTES-worthy correction (Phase 4 = `PermAnnounceManage` seed gap; Phase 5 = wrong FK target in plan + wrong quota source-of-truth + Employee role seed gap). Expect Phase 6 to need the same treatment — read the plan with skepticism, cross-check against:
+Plan: [`docs/superpowers/plans/2026-05-15-phase-06-attendance.md`](plans/2026-05-15-phase-06-attendance.md). **The plan already has an authoritative `## ⚠️ REVISION NOTES (2026-05-20)` block at the top — execute per those notes, not the raw task bodies where they conflict.** Pre-audit findings encoded there:
 
-- the canonical migration design (`docs/superpowers/specs/2026-05-15-go-migration-design.md`),
-- the existing schema (`migrations/*.sql`), and
-- the existing service/repo patterns (Phases 1–5).
+- Migration is **`000009_create_attendance`** (NOT `000011` from the draft body). Final `make migrate-version` after Phase 6 = **9**.
+- `attendance.employee_id` and `attendance_sessions.attendance_id` follow the Phase 2+ schema split — `employee_id` references **`employees(id)`** (NOT `users(id)`). Rename column + indexes + repo/service/handler params from `user_id`/`userID` → `employee_id`/`employeeID` throughout.
+- All four attendance perms are **already seeded correctly** (Admin/HR/Manager have Read+Manage; Employee has Read). No seed gap predicted — but Phase 5 had a denied-but-real seed gap, so verify live anyway.
+- Reuse the Phase 5 patterns: `truncateToDate()` helper for Postgres DATE interop, `resolveCurrentEmployee()` for current-user→employee resolution, `hasXxxManageAll(c)` handler helper for `asAdmin bool`, two-layer access control (route `RequirePerms` + service ownership).
+- `is_late` computed once from the FIRST check-in vs threshold — do NOT recompute on subsequent sessions.
+- Defend the `uq_attendance_sessions_one_open` partial unique with a service-level `FindOpenSession()` check that returns a clean 409, not a 500 DB violation.
+
+### Resume entry points (any of these gets you oriented)
+
+1. **`docs/superpowers/CHECKPOINT.md`** (this file) — single resume source of truth.
+2. **`.serena/memories/project_overview.md`** — points back to (1) plus a code-map and a session-boot protocol. Serena MCP `list_memories()` surfaces these automatically. **Wired in this session — commit `800e16e`.**
+3. **`CLAUDE.md`** — auto-loaded into every Claude session; restates the boot protocol.
 
 ## Current state
 

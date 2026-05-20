@@ -10,6 +10,56 @@
 | Module path | `github.com/exnodes/hrm-api` |
 | Project root | `/Users/sines/Documents/Work/exn-hrm-be/exnodes-hrm-api-go-v2/` |
 
+---
+
+## ⚠️ REVISION NOTES (2026-05-20) — AUTHORITATIVE, read & apply before executing any task
+
+This plan was drafted pre-Phase-2-schema-split and pre-Phase-5-execution. The
+codebase audit performed at the close of Phase 5 supersedes the task bodies
+below wherever they conflict. **Execute per these notes, not the raw task
+bodies where they conflict.**
+
+1. **Migration number.** `000001`–`000008` are taken (latest = `000008_create_leave_requests` from Phase 5). Phase 6 migration is **`000009_create_attendance`** (NOT `000011` as written below). Final `make migrate-version` after this phase = **9**. Renumber every filename, `make migrate-*` reference, and DoD "version 11" / "000001–000010" expectation accordingly.
+
+2. **FK target = `employees(id)`, NOT `users(id)`.** Every cross-aggregate FK introduced from Phase 2 onward targets `employees(id)` (Go schema split — see Phase 2 + 5 REVISION NOTES). The attendance row therefore identifies an HR profile, not an auth account:
+   - `attendance.user_id UUID NOT NULL REFERENCES users(id)` is **wrong** — replace with **`employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE RESTRICT`** (use RESTRICT to mirror leave_requests; CASCADE would hide soft-deletes silently).
+   - Rename the column, the unique constraint (`attendance_user_date_unique` → `attendance_employee_date_unique`), the indexes (`idx_attendance_user_id` → `idx_attendance_employee_id`, `idx_attendance_user_date` → `idx_attendance_employee_date`), and the repo parameter `userID` → `employeeID` throughout repo / service / handler / tests.
+   - Service signature follows Phase 5: `(ctx, currentUserID, asAdmin bool, ...)`. The service calls `empRepo.FindByUserID(ctx, currentUserID)` to resolve the current employee before writing the attendance row (same `resolveCurrentEmployee` pattern as `LeaveService`).
+
+3. **No seed gap predicted (but verify live).** All four attendance perms are seeded correctly: `Admin`, `HR Manager`, `Manager` all carry `PermAttendanceRead + PermAttendanceManage`; `Employee` carries `PermAttendanceRead` only (sufficient — check-in/check-out/today/me routes are JWT-only, no perm gate). Phase 5 verification surfaced a seed gap that the REVISION NOTES had explicitly denied; do not skip the live `403` check just because the seed looks fine.
+
+4. **Date handling.** Postgres `DATE` ↔ Go `time.Time` interop needs the same `truncateToDate(t)` helper used by Phase 5 (see `internal/services/leave_service.go`): `time.Date(y, m, d, 0, 0, 0, 0, time.UTC)`. Store the day-component only. Comparisons (`WHERE date = ?`) must pass a midnight-UTC timestamp.
+
+5. **`is_late` is computed once, from the FIRST check-in.** The source-of-truth findings below say this; the implementation must not re-evaluate `is_late` on subsequent sessions (e.g. when a user returns from lunch). The pattern is: on `CheckIn`, if no attendance row exists for today, create one with `is_late = firstCheckIn.In(tz).After(threshold)`; if a row already exists, just append a session without touching `is_late`.
+
+6. **One open session at a time** — already encoded in the partial unique index `uq_attendance_sessions_one_open ON attendance_sessions(attendance_id) WHERE check_out IS NULL AND is_deleted = FALSE`. Service must surface this as a clean 409 (`apperrors.ErrConflict`), not let the DB raise a `unique violation` 500. Defend at service level by `FindOpenSession(employeeID, date)` before insert.
+
+7. **`mkdir -p migrations`** in T1 is unnecessary — the directory exists since Phase 0. Skip.
+
+8. **DoD typo** (line ~2719): "No edits to migration files of prior phases (`000001`–`000010`)" should read "(`000001`–`000008`)" since migrations `000009`/`000010` are this phase and the next.
+
+9. **Conventions (from Phases 1–5, verified):** repo = `interface + lowercase impl + New…() Interface` constructor; `models.NotDeleted` scope; soft-delete sets `is_deleted=true + deleted_at=NOW()`; services return `*apperrors.AppError`; per-route `middleware.RequirePerms(authSvc, permissions.PermXxx)` (**first arg `authSvc`**); JWT-preloaded `user.Roles` walked by a handler helper (`hasAttendanceManageAll(c)` — same shape as `hasLeaveManageAll` from Phase 5) to compute `asAdmin bool`; Swagger `@Security BearerAuth` on every endpoint; `make swag` regenerated + committed; tests are `package services_test`, real Postgres test DB, extend `truncateAll` in FK-safe order for **`attendance_sessions, attendance` BEFORE `employees`** (child sessions cascade-delete from attendance, but explicit order documents intent).
+
+10. **Two-table design** (`attendance` + `attendance_sessions`) is intentional and differs from Phase 5's single-table — preserve. The `ON DELETE CASCADE` from sessions → attendance is the right call here because a soft-deleted attendance row's sessions also become inaccessible; hard-delete (admin path) cleans up.
+
+11. **DoD = real live verification** committed to `docs/superpowers/verification/phase-06.md`. Minimum flow (REVISION NOTES #10 of Phase 5 style):
+    - Boot server, `migrate-version=9`.
+    - Login as alice → `POST /attendance/check-in {lat, lng}` → 201 (or 200) with `is_late` reflecting time-of-day.
+    - Re-check-in same day → 409 ("already checked in") OR new session if previous was checked-out.
+    - `POST /attendance/check-out` → 200, session closed.
+    - Double check-out → 409 ("no open session").
+    - `GET /attendance/today` → 200, sessions list, monthly_count >= 1.
+    - `GET /attendance/me?month=...` → 200, paginated.
+    - Employee `GET /attendance` (manager-only matrix) → 403 (or 200 with only own row, per Python contract — confirm in source before implementing).
+    - Admin `POST /attendance` (manual create on behalf of employee) → 201.
+    - Admin `PATCH /attendance/:id` → 200.
+    - Admin `DELETE /attendance/:id` → 200; psql shows `is_deleted=t, deleted_at IS NOT NULL`.
+    - 401 (no token).
+
+Everything else in the task bodies (layering, commit-per-task, no placeholders, bite-sized steps) still applies. **Execute per these REVISION NOTES, not the raw task bodies where they conflict.**
+
+---
+
 ## Source-of-truth findings (read before tasks)
 
 **Python attendance shape** (`exnodes-hrm-api/app/models/attendance.py`):
