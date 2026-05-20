@@ -72,6 +72,11 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveApprove, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermLeaveQuotaManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
+				// Phase 4: announcement-label endpoints are gated by
+				// PermAnnounceManage. Without this line, only Super Admin's
+				// wildcard would reach the labels API — labels are admin-
+				// managed, so Admin must hold the perm directly.
+				permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
 			},
 		},
@@ -89,6 +94,9 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveApprove, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermLeaveQuotaManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
+				// Phase 4: HR managers publish announcements in the Python
+				// system and therefore also manage announcement labels.
+				permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
 			},
 		},

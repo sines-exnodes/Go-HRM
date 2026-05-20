@@ -56,6 +56,9 @@ func main() {
 	settingsRepo := repositories.NewNotificationSettingsRepository(db)
 	departmentRepo := repositories.NewDepartmentRepository(db)
 	positionRepo := repositories.NewPositionRepository(db)
+	skillRepo := repositories.NewSkillRepository(db)
+	employeeSkillRepo := repositories.NewEmployeeSkillRepository(db)
+	labelRepo := repositories.NewLabelRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -78,6 +81,8 @@ func main() {
 	userSvc := services.NewUserService(userRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
 	departmentSvc := services.NewDepartmentService(departmentRepo, positionRepo)
 	positionSvc := services.NewPositionService(positionRepo, departmentRepo)
+	skillSvc := services.NewSkillService(skillRepo, employeeSkillRepo, employeeRepo, uploadSvc)
+	labelSvc := services.NewLabelService(labelRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -92,6 +97,8 @@ func main() {
 	userH := handlers.NewUserHandler(userSvc)
 	departmentH := handlers.NewDepartmentHandler(departmentSvc)
 	positionH := handlers.NewPositionHandler(positionSvc)
+	skillH := handlers.NewSkillHandler(skillSvc)
+	labelH := handlers.NewLabelHandler(labelSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -188,6 +195,29 @@ func main() {
 		positions.GET(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsRead), positionH.Get)
 		positions.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsUpdate), positionH.Update)
 		positions.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermPositionsDelete), positionH.Delete)
+
+		// ---- /skills (catalog) ----
+		skills := authed.Group("/skills")
+		skills.GET("", middleware.RequirePerms(authSvc, permissions.PermSkillsRead), skillH.List)
+		skills.POST("", middleware.RequirePerms(authSvc, permissions.PermSkillsCreate), skillH.Create)
+		skills.GET(":id", middleware.RequirePerms(authSvc, permissions.PermSkillsRead), skillH.Get)
+		skills.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermSkillsUpdate), skillH.Update)
+		skills.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermSkillsDelete), skillH.Delete)
+
+		// ---- /employees/:id/skills (assignment, nested) ----
+		// Read uses PermEmployeesRead, write uses PermEmployeesUpdate — the
+		// employee is the aggregate root for the skill list, so this matches
+		// the existing employees-perms model.
+		authed.GET("/employees/:id/skills", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), skillH.ListForEmployee)
+		authed.PUT("/employees/:id/skills", middleware.RequirePerms(authSvc, permissions.PermEmployeesUpdate), skillH.ReplaceForEmployee)
+
+		// ---- /announcement-labels (announcement label catalog) ----
+		// Only two endpoints per REVISION NOTES item #4. Both gated by
+		// PermAnnounceManage (the Admin + HR Manager roles received this
+		// permission in seed_service.go as part of Phase 4).
+		labels := authed.Group("/announcement-labels")
+		labels.GET("", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), labelH.List)
+		labels.POST("", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), labelH.GetOrCreate)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
