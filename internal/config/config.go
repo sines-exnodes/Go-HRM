@@ -41,6 +41,23 @@ type Config struct {
 	SuperAdminName     string
 
 	Storage StorageConfig
+
+	// Attendance / office-presence settings (Phase 6). Read by the attendance
+	// service to evaluate is_late, GPS proximity, and half-day flagging.
+	// Defaults match the Python source (Asia/Ho_Chi_Minh, 09:00 lateness,
+	// 18:00 early-leave cutoff, GPS disabled). When OFFICE_GPS_ENABLED=true,
+	// OFFICE_LATITUDE / OFFICE_LONGITUDE / OFFICE_RADIUS_METERS define the
+	// allowed check-in zone.
+	CompanyTimezone         string
+	LateThresholdHour       int
+	LateThresholdMinute     int
+	CheckoutThresholdHour   int
+	CheckoutThresholdMinute int
+	OfficeGPSEnabled        bool
+	OfficeLatitude          float64
+	OfficeLongitude         float64
+	OfficeRadiusMeters      float64
+	HalfDayHoursThreshold   float64
 }
 
 // Load reads the .env file (if present) and returns the populated Config.
@@ -75,6 +92,17 @@ func Load() *Config {
 		SuperAdminEmail:    getEnv("SUPER_ADMIN_EMAIL", ""),
 		SuperAdminPassword: getEnv("SUPER_ADMIN_PASSWORD", ""),
 		SuperAdminName:     getEnv("SUPER_ADMIN_NAME", "Super Admin"),
+
+		CompanyTimezone:         getEnv("COMPANY_TIMEZONE", "Asia/Ho_Chi_Minh"),
+		LateThresholdHour:       getEnvInt("LATE_THRESHOLD_HOUR", 9),
+		LateThresholdMinute:     getEnvInt("LATE_THRESHOLD_MINUTE", 0),
+		CheckoutThresholdHour:   getEnvInt("CHECKOUT_THRESHOLD_HOUR", 18),
+		CheckoutThresholdMinute: getEnvInt("CHECKOUT_THRESHOLD_MINUTE", 0),
+		OfficeGPSEnabled:        getEnvBool("OFFICE_GPS_ENABLED", false),
+		OfficeLatitude:          getEnvFloat("OFFICE_LATITUDE", 0.0),
+		OfficeLongitude:         getEnvFloat("OFFICE_LONGITUDE", 0.0),
+		OfficeRadiusMeters:      getEnvFloat("OFFICE_RADIUS_METERS", 50.0),
+		HalfDayHoursThreshold:   getEnvFloat("HALF_DAY_HOURS_THRESHOLD", 4.0),
 	}
 
 	if strings.TrimSpace(cfg.JWTSecret) == "" {
@@ -122,6 +150,15 @@ func getEnvInt(key string, fallback int) int {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
+		}
+	}
+	return fallback
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
 		}
 	}
 	return fallback
