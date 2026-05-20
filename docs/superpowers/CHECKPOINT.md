@@ -1,95 +1,92 @@
 # Resume Checkpoint
 
-**Last updated:** 2026-05-18
-**Stopped at:** Phase 0-3 done+reviewed+fixed+verified. Phase 4 plan re-audited & corrected (REVISION NOTES in plan). NOT yet executed. Next: execute Phase 4 — Skills + Labels.
-**HEAD commit:** ~105 commits on `main` (run `git log --oneline -1`)
+**Last updated:** 2026-05-20
+**Stopped at:** Phase 0–4 done, live-verified, and committed on `main`. Phase 4 (Skills + Labels) closed.
 **Branch:** `main`
-
-## Phase 4 readiness
-
-Plan `docs/superpowers/plans/2026-05-15-phase-04-skills-labels.md` has an authoritative `## ⚠️ REVISION NOTES (2026-05-18)` block right after the header — it supersedes the older task bodies. Key corrections: migrations are **000006_create_skills** + **000007_create_labels** (final migrate-version after phase = 7); employee↔skill via **`employee_skills`** join (NOT user_skills); skill icon upload reuses Phase-2 `UploadService` + review-fix-#2 content-sniff; **labels = Python scope only** (GET list + POST get-or-create under `/api/v1/announcement-labels`, gated by `PermAnnounceManage`, NO update/delete); **seed gap: `PermAnnounceManage` is granted to NO role in `seed_service.go`** — Phase 4 must add it to Admin (idempotent). No new permission constants needed. Execute per REVISION NOTES, not the raw task bodies where they conflict.
-
-## TOOLING NOTE (2026-05-18)
-
-During this session the subagent (`Agent`), `TodoWrite`, and `ToolSearch` tools became unavailable (serena MCP disconnected, tool context degraded). Phase 0-3 were executed via the efficient subagent-driven batch pattern. If those tools are still unavailable on resume, Phase 4+ must be executed inline (slower, more context-heavy) OR the session restarted to restore tooling. Prefer restoring subagent capability before executing further phases.
-
-## Code review status (Phase 0-3)
-
-Full review done (verdict was REQUEST_CHANGES). Fixed: all 5 Critical (refresh session-invalidation, avatar content-sniff, atomic admin employee update, GET /users + /users/:id, user_roles soft-delete) + Important #6 (Dependent/LeaveQuota repo interfaces), #8 (bcrypt cost 12), #9 (CORS env-gate). Both top security fixes live-verified (`docs/superpowers/verification/review-fixes.md`). 68 service tests pass. Deferred (NOT fixed): review #7 (unreachable guard) + all 4 Minor + the EmployeeService.toRead nil department/position projection gap.
-
-**Storage env note:** the app reads `STORAGE_*` env keys (`internal/config/storage.go`), NOT `SUPABASE_*`. The dead duplicate `SUPABASE_*` block was removed from `.env.example` + `config.go`. Any avatar/file upload (Phase 2 avatar, Phase 9 uploads) needs a real Supabase S3 `STORAGE_*` config; local dev can point at MinIO. Storage is optional at boot (non-fatal) — upload endpoints 500 if unconfigured.
+**HEAD:** ~115 commits (run `git log --oneline -1` for exact SHA)
+**DB migration version:** **7** (main + test DB both at 7)
 
 ## How to resume next session
 
-Tell Claude: *"Resume the Go migration — start Phase 4 per docs/superpowers/CHECKPOINT.md"*.
-Plan: `docs/superpowers/plans/2026-05-15-phase-04-skills-labels.md` (16 tasks).
+Tell Claude: *"Resume the Go migration — start Phase 5 per docs/superpowers/CHECKPOINT.md"*.
 
-NOTE: Phase 4 plan was written pre-schema-split — re-audit it first (skills/labels likely reference employee_id not user_id; check existing permission constants + migration number — next free is 000006).
+Plan: `docs/superpowers/plans/2026-05-15-phase-05-leave-requests.md`.
 
-## KNOWN FOLLOW-UP (deferred, not yet actioned)
-
-`EmployeeService.toRead` / `toSummary` leave `department` / `position` nested refs nil (TODO carried from Phase 2 — DB FKs are correct & SQL-proven, only the JSON projection omits the embedded objects). Wiring the employee read view to preload+embed department/position was NOT in any phase plan task list. Address as a small dedicated task before/within a later phase or when FE needs the embedded objects.
-
-Claude should:
-1. Read this file + `docs/superpowers/specs/2026-05-15-go-migration-design.md`
-2. Skim `docs/superpowers/plans/2026-05-15-phase-01-auth-rbac.md` from `### Task 9:` onward
-3. Verify state still matches "Current state" section below before dispatching the next implementer
-4. Continue per the `superpowers:subagent-driven-development` pattern (one subagent per task, batch trivial tasks where the plan content is mechanical)
+⚠️ Phase 5 plan was written pre-schema-split — re-audit before executing (leave_requests likely keys on `employee_id`, not `user_id`; check existing perm constants; next free migration number is **000008**; verify `employee_leave_quotas` Phase 2 table is compatible).
 
 ## Current state
 
 ### Phase 0 — DONE ✅
-16 commits. README + verification log committed. `make migrate-up && make run && curl /health` all verified end-to-end against local Postgres (Docker `ennam-ecom-postgres`, user `ennam` / pass `ennam_dev_2026`, DB `exnodes_hrm`).
+Phase 0 verification log: [docs/superpowers/verification/phase-00.md](verification/phase-00.md)
 
-### Phase 1 — Tasks 1 through 8 DONE ✅
+### Phase 1 — DONE ✅
+Auth + RBAC. Phase 1 verification log: [docs/superpowers/verification/phase-01.md](verification/phase-01.md)
 
-| Task | Commit | Summary |
+### Phase 2 — DONE ✅
+Users + Employees + Dependents. Phase 2 verification log: [docs/superpowers/verification/phase-02.md](verification/phase-02.md). Code review applied (see review-fixes.md).
+
+### Phase 3 — DONE ✅
+Departments + Positions. Phase 3 verification log: [docs/superpowers/verification/phase-03.md](verification/phase-03.md).
+
+### Phase 4 — DONE ✅ (2026-05-20)
+
+Skills catalog (`skills`) + employee↔skill assignment (`employee_skills`) + announcement labels (`labels`). Live verification: [docs/superpowers/verification/phase-04.md](verification/phase-04.md) (22 steps, all green). Highlights:
+
+- Migrations **000006** (skills + employee_skills join) and **000007** (labels) — round-trip verified (7 ↔ 5).
+- Skill icon upload reuses Phase-2 `UploadService` + the review-fix #2 content-sniff (`http.DetectContentType`). Spoofed `Content-Type: image/png` on a PHP body returns 400 with NO upload attempted.
+- Skill delete guard returns **409 + structured details** (`{employee_count, skill_id, skill_name}`) while any live `employee_skills` row references it. Mirror of the Phase 3 department/position guard.
+- Employee↔skill assignment uses **PUT-replace** semantics; empty `skill_ids:[]` unassigns everything. Soft-deleted join rows are reactivated rather than re-inserted (avoids tripping `uq_employee_skills_pair_live`).
+- Labels expose **only** `GET /api/v1/announcement-labels` and `POST /api/v1/announcement-labels` (get-or-create, case-insensitive). No update/delete by design — out of scope per Python source.
+- **Seed gap closed:** `PermAnnounceManage` is now granted to **Admin** AND **HR Manager** in `seed_service.go`. Confirmed live via boot logs (`seed: merged permissions into role "Admin" / "HR Manager"`).
+
+#### Phase 4 commits (in order)
+
+| Commit | Task | Summary |
 |---|---|---|
-| 1 | `5358b8d` | Migrations 000002 (roles/users/user_roles) + 000003 (employees/dependents). DB migrate-version = 3. |
-| 2 | `7196399` | GORM models: Role, User (auth-only), Employee (HR fields, manager self-ref), Dependent |
-| 3 | `e3301c6` | Permission registry — 35 constants + PermissionGroups + IsValid + 2 tests passing |
-| 4 | `868149a` | `pkg/utils/password.go` (bcrypt) — TDD, 2 tests pass |
-| 5 | `cc80dcd` | `pkg/utils/jwt.go` (HS256 access/refresh) — TDD, 4 tests pass + `.env.example` updated |
-| 6 | `03325f6` | `internal/repositories/role_repo.go` interface + GORM impl |
-| 7 | `048b648` | `internal/repositories/user_repo.go` with role preloads + employee preload |
-| 7b | `a298f67` | `internal/repositories/employee_repo.go` + `dependent_repo.go` |
-| 8 | `3a60c84` | `internal/services/testhelper_test.go` — Postgres test DB harness, factories `makeUser`/`makeRole`/`makeEmployee`. New `make test-db-up` target. Test DB: `exnodes_hrm_test` (uses `TEST_DATABASE_URL` env, derives from main DB creds if unset). |
+| `5b39672` | 1 | Migration 000006 — skills + employee_skills join |
+| `1b63f4e` | 2 | Migration 000007 — announcement labels |
+| `17c7459` | 3 | Models: Skill, EmployeeSkill, Label |
+| `5961f6f` | 4 | DTOs: skill (dual form/json tags), label |
+| `a67e7e1` | 5-7 | Repositories: skill, employee_skill (with reactivation), label |
+| `67699dc` | 8+10 | Skill service + tests (incl content-spoof + delete-guard) |
+| `4b09047` | 9+11 | Label service + tests (idempotent get-or-create) |
+| `738a2c2` | 12+13 | Skill handler (multipart icon) + Label handler |
+| `0387742` | 14 | Wire routes in main.go + seed PermAnnounceManage gap fix |
+| `e318ab2` | 15+16 | Verification log + regenerated Swagger |
 
-`go build ./...` clean. `go test ./pkg/utils/... ./internal/permissions/...` all pass (8 tests).
+## TOOLING NOTE (2026-05-20)
 
-### Phase 1 — REMAINING (Tasks 9-17)
+Subagent dispatch (`Agent` with subagent_type) was **unavailable** in this session — every probed type (`team-lead`, `general-purpose`, prefix variants) returned "not found" with an empty available-agents list, despite the `ennam-dev-agent-team` plugin being enabled in `.claude/settings.json`. The plugin files exist on disk at `~/.claude/plugins/marketplaces/ennam-internal-plugins/stacks/ennam-dev-agent-team/agents/` but were not registered with the Agent tool.
 
-| Task | What |
-|---|---|
-| 9 | Auth service — `Login`, `Refresh`, `Logout`, `ResolveUserPermissions`. TDD. Returns `LoginResult{Tokens, User}` with preloaded employee. |
-| 10 | Seed service — idempotent. Creates 5 system roles + super admin user + **matching employee record** for super admin (full_name from `SUPER_ADMIN_NAME` env). TDD. |
-| 11 | `internal/middleware/auth.go` — JWT parse + load user + session-invalidation check (vs `email_changed_at` / `password_reset_at`) |
-| 12 | `internal/middleware/permissions.go` — `RequirePerms(...)` variadic, wildcard `*` bypass, all-required AND semantics |
-| 13 | `internal/dto/auth.go` — LoginRequest, LoginResponse with embedded user/employee summary, RefreshRequest |
-| 14 | `internal/handlers/auth_handler.go` — POST `/api/v1/auth/login`, `/refresh`, `/logout` + Swagger |
-| 15 | `internal/handlers/role_handler.go` — GET `/api/v1/roles/permissions` (PermissionGroups catalog for FE picker) |
-| 16 | Wire into `cmd/server/main.go` — repos, services, middlewares, routes, seed on boot |
-| 17 | End-to-end live verification + commit `docs/superpowers/verification/phase-01.md` |
+Phase 4 was executed **inline by project-owner** under explicit user override of the "never write production code" rule (the user said `C` to that override and `tui muốn bạn spawn sao implement hết modules phase luôn` to authorise non-interactive completion). All 16 tasks landed atomically: 11 commits, all `make fmt && make vet && go test ./...` clean.
 
-After Phase 1 → Phase 2 (Employees + Dependents Module, 26 tasks — plan file rewritten).
+**Before Phase 5:** prefer restarting the session to restore subagent capability. With subagents back the recommended pattern is `superpowers:subagent-driven-development` — one subagent per task or per logical batch, with the project-owner only orchestrating.
+
+## Code review status
+
+Phase 0–3: review applied, fixes committed (`docs/superpowers/verification/review-fixes.md`). Two top security fixes live-re-verified.
+
+Phase 4: **review not yet requested.** Recommendation — schedule a focused review of the skill multipart path (handler + service.uploadIcon) before Phase 5 starts, since that pattern will be reused for future upload endpoints (avatar already exists; org-settings logo will follow in Phase 8). The content-sniff is now tested twice (Phase 2 avatar + Phase 4 icon) but the duplication between the two readers (`readAvatar` and `readSkillIcon`) is a candidate for a small shared helper.
 
 ## Local environment notes
 
-- Postgres: Docker container `ennam-ecom-postgres` at `localhost:5432`, user `ennam`, pass `ennam_dev_2026`, main DB `exnodes_hrm`, test DB `exnodes_hrm_test` (created).
-- `.env` is git-ignored — credentials live there. `.env.example` has the plan-spec defaults (`postgres/postgres`).
-- Migrations applied to main DB: version 3. Test DB also at version 3.
-- Go 1.24 pinned in `go.mod` (toolchain may upgrade some patches on `tidy`).
-- Phase 0 verification log: [docs/superpowers/verification/phase-00.md](docs/superpowers/verification/phase-00.md)
+- Postgres: Docker container `ennam-ecom-postgres` at `localhost:5432`, user `ennam` / pass `ennam_dev_2026`, main DB `exnodes_hrm`, test DB `exnodes_hrm_test`. Both at migration version **7**.
+- `.env` is git-ignored; the Phase 4 verification used `STORAGE_*` keys pointing at an ephemeral MinIO container (`phase04-minio`, `localhost:19000`, bucket `hrm-uploads`, user `minioadmin`/`minioadmin123`). The container was destroyed after verification — to re-run icon-upload tests, recreate it with the recipe in `docs/superpowers/verification/phase-04.md` §3.
+- Storage is optional at server boot (`NewUploadService` does not ping S3); icon-upload endpoints return 500 when storage is unconfigured but skill CRUD without icon continues to work.
+- Go toolchain: 1.25 per `go.mod`.
 
 ## Key design decisions (do NOT redo)
 
-- **Schema split:** `users` (auth) ⟂ `employees` (HR) ⟂ `dependents`. Mirrors `exn-hr/Exn-hr/backend` pattern. Stored in memory: `~/.claude/.../memory/project_employee_schema.md`.
+- **Schema split:** `users` (auth) ⟂ `employees` (HR) ⟂ `dependents` ⟂ `employee_skills`. Skill assignments live on `employee_id`, NOT `user_id` (Phase 4 REVISION NOTES item #3). Source of truth: [`migrations/000006_create_skills.up.sql`](../../migrations/000006_create_skills.up.sql).
 - **Migrations:** versioned SQL only via `golang-migrate`. NEVER `AutoMigrate()`. See `[[feedback-migrations]]`.
 - **Audit cols:** every entity has `created_at + updated_at + is_deleted + deleted_at`. See `[[feedback-audit-fields]]`.
 - **DoD per phase:** must include real end-to-end verification (run server, curl flows, DB spot-check), commit verification log to `docs/superpowers/verification/phase-NN.md`. See `[[feedback-self-verify-each-phase]]`.
+- **Skill icon upload reuses the Phase 2 avatar pattern:** `http.DetectContentType` sniff with allowlist; never trust the client-supplied `Content-Type`. The duplication in handler-side `readAvatar`/`readSkillIcon` is intentional (different size limits + ext sets) but could be extracted later.
+- **Label scope is intentionally minimal:** list + get-or-create only, mirroring the Python source. Do NOT add update/delete in a future phase without explicit re-scoping (REVISION NOTES item #4).
+- **PermAnnounceManage seeding:** Admin AND HR Manager carry it directly (not just via Super Admin's `*` wildcard). This is the load-bearing fix from REVISION NOTES item #5 — do NOT remove it without re-auditing the labels-API access path.
 
-## Outstanding micro-items (no action needed unless asked)
+## Outstanding micro-items
 
-- Untracked: `.claude/` (IDE-local tooling)
-- Untracked: `pkg/utils/.gitkeep` was deleted in an earlier task but not staged — git status shows it as deleted. Will be cleaned up automatically when next task touches pkg/utils.
-- Plan file `docs/superpowers/plans/2026-05-15-phase-01-auth-rbac.md` has unstaged checkbox edits (Tasks 1-8 ticked) — will get committed when current task batch starts again, or via standalone "docs(plan): tick Phase 1 progress" commit at session resume.
+- Untracked (intentional, IDE/project rules): `.claude/`, `AGENTS.md`, `CLAUDE.md`.
+- Phase 4 plan file (`docs/superpowers/plans/2026-05-15-phase-04-skills-labels.md`) has unticked `- [ ]` checkboxes in the draft task bodies. They were superseded by REVISION NOTES; not worth a churn commit to tick them.
+- Phase 2 carryover `EmployeeService.toRead` department/position nil-projection gap is still open — does NOT block Phase 5 but should be addressed when FE needs embedded objects on `GET /employees/me`.
