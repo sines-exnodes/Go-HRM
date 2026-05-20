@@ -97,9 +97,9 @@ type AttendanceSessionRead struct {
 // projection on AttendanceRead. Department/Position are inflated when
 // the employee row carries those FKs and the referenced rows are live.
 type AttendanceEmployeeBrief struct {
-	ID         uuid.UUID `json:"id"`
-	FullName   string    `json:"full_name"`
-	AvatarURL  *string   `json:"avatar_url,omitempty"`
+	ID         uuid.UUID          `json:"id"`
+	FullName   string             `json:"full_name"`
+	AvatarURL  *string            `json:"avatar_url,omitempty"`
 	Department *AttendanceRefRead `json:"department,omitempty"`
 	Position   *AttendanceRefRead `json:"position,omitempty"`
 }

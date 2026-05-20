@@ -5,6 +5,81 @@ definitions:
       is_active:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.AttendanceAdminCreateReq:
+    properties:
+      check_in:
+        type: string
+      check_out:
+        type: string
+      date:
+        example: "2026-05-15"
+        type: string
+      employee_id:
+        type: string
+      is_half_day:
+        type: boolean
+      is_late:
+        type: boolean
+      notes:
+        type: string
+      work_location:
+        enum:
+        - office
+        - remote
+        - hybrid
+        - field
+        type: string
+    required:
+    - date
+    - employee_id
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.AttendanceAdminUpdateReq:
+    properties:
+      check_in:
+        type: string
+      check_out:
+        type: string
+      is_half_day:
+        type: boolean
+      is_late:
+        type: boolean
+      notes:
+        type: string
+      work_location:
+        enum:
+        - office
+        - remote
+        - hybrid
+        - field
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.AttendanceCheckInReq:
+    properties:
+      accuracy:
+        type: number
+      check_in:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      notes:
+        type: string
+      work_location:
+        enum:
+        - office
+        - remote
+        - hybrid
+        - field
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.AttendanceCheckOutReq:
+    properties:
+      check_out:
+        type: string
+      notes:
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest:
     properties:
       current_password:
@@ -698,6 +773,283 @@ paths:
       summary: Get-or-create an announcement label by name
       tags:
       - labels
+  /api/v1/attendance:
+    get:
+      description: Managers (with attendance:manage_data) see all rows; non-managers
+        see only their own.
+      parameters:
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: filter by employee
+        in: query
+        name: employee_id
+        type: string
+      - description: filter by department
+        in: query
+        name: department_id
+        type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: start_date
+        type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: end_date
+        type: string
+      - description: on_time|late
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List attendance rows
+      tags:
+      - attendance
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceAdminCreateReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Admin manual create of an attendance row
+      tags:
+      - attendance
+  /api/v1/attendance/{id}:
+    delete:
+      parameters:
+      - description: attendance uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Admin soft-delete of an attendance row
+      tags:
+      - attendance
+    get:
+      parameters:
+      - description: attendance uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get an attendance row by ID (owner or admin)
+      tags:
+      - attendance
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: attendance uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceAdminUpdateReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Admin update of an attendance row
+      tags:
+      - attendance
+  /api/v1/attendance/check-in:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: check-in payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceCheckInReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Record a check-in for the authenticated user
+      tags:
+      - attendance
+  /api/v1/attendance/check-out:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: check-out payload
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceCheckOutReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Record a check-out for the authenticated user
+      tags:
+      - attendance
+  /api/v1/attendance/matrix:
+    get:
+      description: Managers see all employees; non-managers see only their own row.
+      parameters:
+      - description: 1-12
+        in: query
+        name: month
+        type: integer
+      - description: YYYY
+        in: query
+        name: year
+        type: integer
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: name filter (managers only)
+        in: query
+        name: search
+        type: string
+      - description: department UUID (managers only)
+        in: query
+        name: department_id
+        type: string
+      - description: 'CSV: on_time,late,absent,weekend,no_data'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Monthly attendance matrix
+      tags:
+      - attendance
+  /api/v1/attendance/me:
+    get:
+      parameters:
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: YYYY-MM-DD
+        in: query
+        name: start_date
+        type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List my own attendance rows
+      tags:
+      - attendance
+  /api/v1/attendance/today:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get today's attendance status for the authenticated user
+      tags:
+      - attendance
   /api/v1/auth/login:
     post:
       consumes:
