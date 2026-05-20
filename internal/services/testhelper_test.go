@@ -101,8 +101,10 @@ func truncateAll(t *testing.T) {
 		return
 	}
 	// Order matters because of FK constraints; CASCADE covers the rest.
-	// employee_skills must precede employees + skills (FK both ways), labels is FK-free.
-	if err := testDB.Exec(`TRUNCATE TABLE labels, employee_skills, skills, device_tokens, user_notification_settings, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+	// employee_skills must precede employees + skills (FK both ways),
+	// leave_requests must precede employees (FK leave_requests.employee_id
+	// → employees.id, REVISION NOTES #10), labels is FK-free.
+	if err := testDB.Exec(`TRUNCATE TABLE labels, employee_skills, skills, device_tokens, user_notification_settings, leave_requests, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }
