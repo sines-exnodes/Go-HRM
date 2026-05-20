@@ -2,6 +2,72 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## ⚠️ REVISION NOTES (2026-05-20) — AUTHORITATIVE, read & apply before executing any task
+
+This plan was drafted pre-Phase-5/6 (before the Go schema split and before
+migrations 000008/000009 landed). The codebase audit at the close of
+Phase 6 supersedes the task bodies below wherever they conflict.
+**Execute per these notes, not the raw task bodies where they conflict.**
+
+1. **Migration number.** `000001`–`000009` are taken (latest = `000009_create_attendance` from Phase 6). Phase 7 migration is **`000010_create_announcements`** (NOT `000009`). Final `make migrate-version` after this phase = **10**. Rename every filename, `make migrate-*` reference, and DoD "version 9" / "migration 000009" expectation accordingly.
+
+2. **`announcements.author_id` FK target = `employees(id)`**, NOT `users(id)`. Mirrors `leave_requests.employee_id`/`created_by` (Phase 5) and `attendance.employee_id` (Phase 6). Use `ON DELETE RESTRICT` so audit trails survive a hard-delete of the employee. Author display reads `Employee.FullName` (the column the FE actually renders), not `User.Email`. The seeded super admin already has an employee row (Phase 1 seed), so this never blocks admin authoring.
+
+3. **`announcement_views.user_id` FK target = `users(id)`** (correct as drafted). Views are auth-level — "this logged-in session marked this announcement as read." A user without an employee profile shouldn't even be able to log in, but the read tracker is keyed on the auth identity per the Python source. `ON DELETE CASCADE` is fine (delete a user → its view rows go too).
+
+4. **`target_audience` enum scope reduction.** The draft CHECK says `('all','department','custom')`. There is **no `announcement_target_users` table** in the migration — `custom` would have no backing. For Phase 7, **drop `'custom'`** from the enum (`CHECK (target_audience IN ('all','department'))`). If/when BA confirms custom targeting is needed, Phase 7.5 adds the table.
+
+5. **Handler helpers already exist — reuse, don't redeclare.** [`internal/handlers/employee_handler.go`](../../internal/handlers/employee_handler.go) line 38 defines `currentUser(c *gin.Context) (*models.User, bool)` and line 52 defines `parseIDParam(c *gin.Context, key string) (uuid.UUID, error)`. The plan's Task 13 redeclares `currentUser(c) *models.User` (different signature) and adds a new `parseUUID(c, name)` — both would collide at compile. **Use the existing helpers verbatim.**
+
+6. **`apperrs.Write(c, err)` does NOT exist.** Our error model uses `_ = c.Error(err); return` and the `ErrorHandler` middleware renders the envelope (see `internal/middleware/error.go` + `internal/errors/errors.go`). Replace every `apperrs.Write(c, err)` in Task 13 with the `_ = c.Error(err); return` pattern (see `leave_handler.go` / `attendance_handler.go` for examples).
+
+7. **`middleware.RequirePerms` takes `authSvc *AuthService` as first arg.** Existing signature: `RequirePerms(authSvc *services.AuthService, required ...permissions.Permission)`. Task 14 omits `authSvc` — fix every call site.
+
+8. **JWT middleware variant — extract `parseAndLoadUser`.** Existing `middleware.JWT(users repositories.UserRepository, jwtSecret string)` carries the parse+load logic inline. The plan's `ParseAndLoadUser` does not exist yet. **Refactor:** extract the existing JWT's parse+load body into a package-private `parseAndLoadUser(ctx, token, jwtSecret string, users repositories.UserRepository) (*models.User, error)` and call it from BOTH `JWT()` and the new `JWTFromQueryOrHeader(users, jwtSecret string)`. Use `string` for the secret (matches existing), not `[]byte`. Don't break existing callers.
+
+9. **Context keys are `auth_user` / `auth_user_id` / `auth_claims`** (constants `middleware.ContextKeyUser/UserID/Claims` in [`internal/middleware/auth.go`](../../internal/middleware/auth.go)). The plan's `c.Get("current_user")` / `c.Set("current_user", user)` is **wrong** — use the existing constants. Both middlewares set the same keys so `currentUser(c)` helper works for both.
+
+10. **Many-to-many with audit columns ⇒ explicit join model.** GORM's `gorm:"many2many:..."` tag implicitly creates a join row WITHOUT the four audit columns. The migration's `announcement_labels` table has `created_at/updated_at/is_deleted/deleted_at` — we must declare an explicit `AnnouncementLabel` Go model and write composition manually (mirrors Phase 4's `EmployeeSkill` pattern). Don't use the `gorm:"many2many:..."` tag on `Announcement.Labels`.
+
+11. **Repo joins MUST qualify `is_deleted`.** Phase 6 fix surfaced this: `models.NotDeleted` adds an unqualified `WHERE is_deleted = ?` which becomes ambiguous after a JOIN to any table that also carries `is_deleted` (announcement_labels, labels, announcement_target_departments, etc.). In every announcement repo method that joins, replace `r.base(ctx)` / `Scopes(models.NotDeleted)` with `r.db.WithContext(ctx).Where("announcements.is_deleted = ?", false)`.
+
+12. **`make swag` output path = `docs/swagger`** (NOT `docs/`). Phase 0 configured it. Task 15 paths must use `docs/swagger/swagger.json` / `docs/swagger/docs.go` / `docs/swagger/swagger.yaml`.
+
+13. **`truncateAll` test helper order**: announcement child tables must precede employees + labels + departments. Insertion point in [`internal/services/testhelper_test.go`](../../internal/services/testhelper_test.go):
+
+    ```text
+    announcement_views, announcement_attachments, announcement_target_departments,
+    announcement_labels, announcements,
+    ... (existing entries)
+    employees, ... labels ..., departments, ...
+    ```
+
+14. **Visibility predicate (List + Get).** A non-admin caller can see an announcement when:
+    - `status = 'published'` AND `is_deleted = false`, AND
+    - One of: `author_id = current_employee.id` OR `target_audience = 'all'` OR (`target_audience = 'department'` AND `announcement_target_departments.department_id = current_employee.department_id`)
+    OR the caller holds `PermAnnounceManage` (Admin / HR Manager) → sees everything regardless of status/target.
+
+15. **Service signature** follows Phase 5/6: `(ctx context.Context, currentUserID uuid.UUID, asAdmin bool, ...)`. The handler precomputes `asAdmin = hasAnnounceManageAll(c)` from `user.Roles` (same shape as `hasLeaveManageAll`/`hasAttendanceManageAll`). The service internally calls `resolveCurrentEmployee()` to get the employee row when visibility filtering needs department.
+
+16. **`sseHubAdapter`** lives in `cmd/server/sse_adapter.go` (small, separate file). The service depends on a thin interface (`HubBroadcaster`) so it stays mock-able in tests.
+
+17. **`PermAnnounceManage` seed coverage**: already complete (Super Admin via `*`, Admin + HR Manager hold the permission directly per Phase 4 seed fix). Manager + Employee don't have it — that's correct (they can only read). REVISION NOTES from Phase 4 documented this; no seed change needed in Phase 7. Verify live anyway (Phase 5 + 6 verification surfaced load-bearing gaps the REVISION NOTES had denied).
+
+18. **`announcement_attachments` table** kept as separate table per BA expectation (multiple files per announcement). Multipart upload uses the same `http.DetectContentType` + MIME allowlist pattern as Phase 5 leave_attachment / Phase 4 skill icon / Phase 2 avatar. Allowlist: image/* + application/pdf. Each attachment row is independently soft-deletable.
+
+19. **DoD = real live verification** committed to `docs/superpowers/verification/phase-07.md`. Minimum flow:
+    - Boot server, `migrate-version=10`.
+    - Login admin → create label → create draft announcement (200, status="draft") → publish → SSE consumer receives `announcement_published` event within ~1s.
+    - Login non-admin (Employee role) → list announcements → only published, target-applicable rows visible.
+    - Mark-viewed endpoint → `announcement_views` row exists; second call is idempotent.
+    - Update / Delete / unauthorized non-admin write → 403.
+    - SSE without token → 401.
+    - psql spot-check: row counts + soft-delete state.
+
+Everything else in the task bodies (TDD-first, commit-per-task, no placeholders) still applies. **Execute per these REVISION NOTES, not the raw task bodies where they conflict.**
+
+---
+
 **Goal:** Port Python `announcements.py` + `mobile_announcements.py` to Go (Postgres-backed) and add an in-memory SSE hub so admins can publish announcements that fan out to connected web/mobile clients in real-time.
 
 **Architecture:** Postgres tables under `announcements` (plus join tables for labels / target departments, plus a read-tracking + attachments table). GORM models embed `BaseModel` for soft-delete. Three-layer flow: handler -> service -> repo. Service handles visibility logic (published + targeted/all OR author OR `PermAnnounceManage`) and broadcasts to the in-memory `sse.Hub` on publish. SSE handler is a single Gin route streaming `text/event-stream` with a 30s keep-alive ticker and per-client buffered channel. JWT is accepted via `?token=` query param (EventSource cannot set headers) — documented limitation.
