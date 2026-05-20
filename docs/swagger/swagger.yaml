@@ -5,6 +5,87 @@ definitions:
       is_active:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.AnnouncementCreate:
+    properties:
+      body:
+        minLength: 1
+        type: string
+      cover_image_url:
+        type: string
+      department_ids:
+        items:
+          type: string
+        type: array
+      label_ids:
+        items:
+          type: string
+        type: array
+      pinned:
+        type: boolean
+      scheduled_at:
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementStatus'
+        enum:
+        - draft
+        - scheduled
+        - published
+        - archived
+      summary:
+        type: string
+      target_audience:
+        allOf:
+        - $ref: '#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementTargetAudience'
+        enum:
+        - all
+        - department
+      title:
+        minLength: 1
+        type: string
+    required:
+    - body
+    - title
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.AnnouncementUpdate:
+    properties:
+      body:
+        minLength: 1
+        type: string
+      cover_image_url:
+        type: string
+      department_ids:
+        items:
+          type: string
+        type: array
+      label_ids:
+        items:
+          type: string
+        type: array
+      pinned:
+        type: boolean
+      scheduled_at:
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementStatus'
+        enum:
+        - draft
+        - scheduled
+        - published
+        - archived
+      summary:
+        type: string
+      target_audience:
+        allOf:
+        - $ref: '#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementTargetAudience'
+        enum:
+        - all
+        - department
+      title:
+        minLength: 1
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.AttendanceAdminCreateReq:
     properties:
       check_in:
@@ -607,6 +688,26 @@ definitions:
           $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleSummary'
         type: array
     type: object
+  github_com_exnodes_hrm-api_internal_models.AnnouncementStatus:
+    enum:
+    - draft
+    - scheduled
+    - published
+    - archived
+    type: string
+    x-enum-varnames:
+    - AnnouncementStatusDraft
+    - AnnouncementStatusScheduled
+    - AnnouncementStatusPublished
+    - AnnouncementStatusArchived
+  github_com_exnodes_hrm-api_internal_models.AnnouncementTargetAudience:
+    enum:
+    - all
+    - department
+    type: string
+    x-enum-varnames:
+    - AnnouncementAudienceAll
+    - AnnouncementAudienceDepartment
   github_com_exnodes_hrm-api_internal_permissions.Permission:
     enum:
     - '*'
@@ -773,6 +874,207 @@ paths:
       summary: Get-or-create an announcement label by name
       tags:
       - labels
+  /api/v1/announcements:
+    get:
+      description: Non-admins see only rows that satisfy the visibility predicate
+        (published + audience match OR author). Admins see all.
+      parameters:
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: title/body search
+        in: query
+        name: search
+        type: string
+      - description: draft|scheduled|published|archived
+        in: query
+        name: status
+        type: string
+      - description: label UUID
+        in: query
+        name: label_id
+        type: string
+      - description: filter by pinned
+        in: query
+        name: pinned
+        type: boolean
+      - description: all|mine|targeted-at-me
+        in: query
+        name: scope
+        type: string
+      - description: department UUID (admin)
+        in: query
+        name: department_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List announcements (web)
+      tags:
+      - announcements
+    post:
+      consumes:
+      - application/json
+      description: Saved as draft by default. Pass status=published in the body to
+        publish immediately (broadcasts via SSE).
+      parameters:
+      - description: create payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AnnouncementCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create an announcement
+      tags:
+      - announcements
+  /api/v1/announcements/{id}:
+    delete:
+      parameters:
+      - description: announcement uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Soft-delete an announcement (owner or admin)
+      tags:
+      - announcements
+    get:
+      description: Returns 403 when the caller cannot see this row per the visibility
+        predicate.
+      parameters:
+      - description: announcement uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get an announcement by ID
+      tags:
+      - announcements
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: announcement uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: patch payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AnnouncementUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update an announcement (owner or admin)
+      tags:
+      - announcements
+  /api/v1/announcements/{id}/publish:
+    post:
+      description: Stamps published_at + broadcasts via SSE. No-op if already published.
+      parameters:
+      - description: announcement uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Publish an announcement
+      tags:
+      - announcements
+  /api/v1/announcements/{id}/view:
+    post:
+      description: Records a per-user read marker. Second call is a no-op (preserves
+        the first view time).
+      parameters:
+      - description: announcement uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark an announcement as viewed (idempotent)
+      tags:
+      - announcements
   /api/v1/attendance:
     get:
       description: Managers (with attendance:manage_data) see all rows; non-managers
@@ -1982,6 +2284,53 @@ paths:
       summary: List the current user's leave history (paginated)
       tags:
       - leave-requests
+  /api/v1/mobile/announcements:
+    get:
+      description: Always visibility-filtered to published + audience match. Body
+        field omitted from each item; fetch detail via MobileGet.
+      parameters:
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List announcements (mobile)
+      tags:
+      - announcements
+  /api/v1/mobile/announcements/{id}:
+    get:
+      parameters:
+      - description: announcement uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get an announcement (mobile)
+      tags:
+      - announcements
   /api/v1/positions:
     get:
       parameters:
@@ -2273,6 +2622,35 @@ paths:
       summary: Update skill (admin)
       tags:
       - skills
+  /api/v1/sse/announcements:
+    get:
+      description: 'Long-lived SSE stream. Emits an `announcement_published` event
+        whenever a new announcement is published. Clients should reconnect on disconnect.
+        Auth token may be passed as `Authorization: Bearer ...` OR `?token=` query
+        param (EventSource cannot set headers — REVISION NOTES #9). Sends a `: keepalive`
+        comment every 30s to keep proxies from closing idle connections.'
+      parameters:
+      - description: JWT access token (alternative to Authorization header)
+        in: query
+        name: token
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: event stream
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Subscribe to announcement events via Server-Sent Events
+      tags:
+      - sse
   /api/v1/users:
     get:
       description: Paginated list with optional email search and is_active filter.

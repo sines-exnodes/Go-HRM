@@ -15,16 +15,16 @@ import (
 // rows in the labels catalog. department_ids is meaningful only when
 // target_audience == "department".
 type AnnouncementCreate struct {
-	Title          string                            `json:"title"           binding:"required,min=1"`
-	Body           string                            `json:"body"            binding:"required,min=1"`
-	Summary        *string                           `json:"summary,omitempty"`
-	Status         *models.AnnouncementStatus        `json:"status,omitempty"          binding:"omitempty,oneof=draft scheduled published archived"`
-	ScheduledAt    *time.Time                        `json:"scheduled_at,omitempty"`
+	Title          string                             `json:"title"           binding:"required,min=1"`
+	Body           string                             `json:"body"            binding:"required,min=1"`
+	Summary        *string                            `json:"summary,omitempty"`
+	Status         *models.AnnouncementStatus         `json:"status,omitempty"          binding:"omitempty,oneof=draft scheduled published archived"`
+	ScheduledAt    *time.Time                         `json:"scheduled_at,omitempty"`
 	TargetAudience *models.AnnouncementTargetAudience `json:"target_audience,omitempty" binding:"omitempty,oneof=all department"`
-	Pinned         *bool                             `json:"pinned,omitempty"`
-	CoverImageURL  *string                           `json:"cover_image_url,omitempty"`
-	LabelIDs       []uuid.UUID                       `json:"label_ids,omitempty"`
-	DepartmentIDs  []uuid.UUID                       `json:"department_ids,omitempty"`
+	Pinned         *bool                              `json:"pinned,omitempty"`
+	CoverImageURL  *string                            `json:"cover_image_url,omitempty"`
+	LabelIDs       []uuid.UUID                        `json:"label_ids,omitempty"`
+	DepartmentIDs  []uuid.UUID                        `json:"department_ids,omitempty"`
 }
 
 // AnnouncementUpdate is the PATCH body. Pointer types preserve "not
@@ -80,23 +80,23 @@ type AnnouncementAttachmentRead struct {
 // announcement endpoint. Labels/TargetDepartments/Attachments are
 // inflated by the service when their FKs are live.
 type AnnouncementRead struct {
-	ID                uuid.UUID                          `json:"id"`
-	Title             string                             `json:"title"`
-	Body              string                             `json:"body"`
-	Summary           *string                            `json:"summary,omitempty"`
-	Status            models.AnnouncementStatus          `json:"status"`
-	ScheduledAt       *time.Time                         `json:"scheduled_at,omitempty"`
-	PublishedAt       *time.Time                         `json:"published_at,omitempty"`
-	TargetAudience    models.AnnouncementTargetAudience  `json:"target_audience"`
-	Pinned            bool                               `json:"pinned"`
-	CoverImageURL     *string                            `json:"cover_image_url,omitempty"`
-	Author            *AnnouncementAuthorBrief           `json:"author,omitempty"`
-	Labels            []AnnouncementLabelBrief           `json:"labels"`
-	TargetDepartments []AnnouncementDepartmentBrief      `json:"target_departments"`
-	Attachments       []AnnouncementAttachmentRead       `json:"attachments"`
-	HasViewed         bool                               `json:"has_viewed"`
-	CreatedAt         time.Time                          `json:"created_at"`
-	UpdatedAt         time.Time                          `json:"updated_at"`
+	ID                uuid.UUID                         `json:"id"`
+	Title             string                            `json:"title"`
+	Body              string                            `json:"body"`
+	Summary           *string                           `json:"summary,omitempty"`
+	Status            models.AnnouncementStatus         `json:"status"`
+	ScheduledAt       *time.Time                        `json:"scheduled_at,omitempty"`
+	PublishedAt       *time.Time                        `json:"published_at,omitempty"`
+	TargetAudience    models.AnnouncementTargetAudience `json:"target_audience"`
+	Pinned            bool                              `json:"pinned"`
+	CoverImageURL     *string                           `json:"cover_image_url,omitempty"`
+	Author            *AnnouncementAuthorBrief          `json:"author,omitempty"`
+	Labels            []AnnouncementLabelBrief          `json:"labels"`
+	TargetDepartments []AnnouncementDepartmentBrief     `json:"target_departments"`
+	Attachments       []AnnouncementAttachmentRead      `json:"attachments"`
+	HasViewed         bool                              `json:"has_viewed"`
+	CreatedAt         time.Time                         `json:"created_at"`
+	UpdatedAt         time.Time                         `json:"updated_at"`
 }
 
 // ---- List queries ----
@@ -123,15 +123,15 @@ type AnnouncementListQuery struct {
 // fields needed to render the top-N cards. Excludes Body (rendered only
 // on detail) to keep the payload small.
 type MobileAnnouncementBrief struct {
-	ID            uuid.UUID                         `json:"id"`
-	Title         string                            `json:"title"`
-	Summary       *string                           `json:"summary,omitempty"`
-	CoverImageURL *string                           `json:"cover_image_url,omitempty"`
-	Status        models.AnnouncementStatus         `json:"status"`
-	Pinned        bool                              `json:"pinned"`
-	PublishedAt   *time.Time                        `json:"published_at,omitempty"`
-	Labels        []AnnouncementLabelBrief          `json:"labels"`
-	HasViewed     bool                              `json:"has_viewed"`
+	ID            uuid.UUID                 `json:"id"`
+	Title         string                    `json:"title"`
+	Summary       *string                   `json:"summary,omitempty"`
+	CoverImageURL *string                   `json:"cover_image_url,omitempty"`
+	Status        models.AnnouncementStatus `json:"status"`
+	Pinned        bool                      `json:"pinned"`
+	PublishedAt   *time.Time                `json:"published_at,omitempty"`
+	Labels        []AnnouncementLabelBrief  `json:"labels"`
+	HasViewed     bool                      `json:"has_viewed"`
 }
 
 // MobileAnnouncementListQuery binds the querystring for GET
@@ -149,11 +149,11 @@ type MobileAnnouncementListQuery struct {
 // Includes only the fields the FE needs to render a toast or refresh
 // its list — Body is omitted to keep frames small.
 type SSEAnnouncementPublishedEvent struct {
-	ID             uuid.UUID                          `json:"id"`
-	Title          string                             `json:"title"`
-	Summary        *string                            `json:"summary,omitempty"`
-	TargetAudience models.AnnouncementTargetAudience  `json:"target_audience"`
-	DepartmentIDs  []uuid.UUID                        `json:"department_ids,omitempty"`
-	Pinned         bool                               `json:"pinned"`
-	PublishedAt    time.Time                          `json:"published_at"`
+	ID             uuid.UUID                         `json:"id"`
+	Title          string                            `json:"title"`
+	Summary        *string                           `json:"summary,omitempty"`
+	TargetAudience models.AnnouncementTargetAudience `json:"target_audience"`
+	DepartmentIDs  []uuid.UUID                       `json:"department_ids,omitempty"`
+	Pinned         bool                              `json:"pinned"`
+	PublishedAt    time.Time                         `json:"published_at"`
 }

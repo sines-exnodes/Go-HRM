@@ -660,4 +660,3 @@ func (s *AnnouncementService) toMobileBrief(a *models.Announcement, viewed bool)
 	}
 	return out
 }
-

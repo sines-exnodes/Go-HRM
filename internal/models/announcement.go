@@ -49,10 +49,10 @@ type Announcement struct {
 	// explicit join model with audit cols (REVISION NOTES #10), NOT a
 	// gorm:"many2many" tag. Labels is a derived projection populated by
 	// the repo's preload for FE convenience.
-	Author            *Employee                       `gorm:"foreignKey:AuthorID;references:ID"          json:"author,omitempty"`
-	AnnouncementLabels []AnnouncementLabel             `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
-	TargetDepartments []AnnouncementTargetDepartment  `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"target_departments,omitempty"`
-	Attachments       []AnnouncementAttachment        `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"attachments,omitempty"`
+	Author             *Employee                      `gorm:"foreignKey:AuthorID;references:ID"          json:"author,omitempty"`
+	AnnouncementLabels []AnnouncementLabel            `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
+	TargetDepartments  []AnnouncementTargetDepartment `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"target_departments,omitempty"`
+	Attachments        []AnnouncementAttachment       `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"attachments,omitempty"`
 }
 
 // TableName pins to "announcements" — GORM would pluralize to

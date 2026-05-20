@@ -79,6 +79,315 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/announcements": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Non-admins see only rows that satisfy the visibility predicate (published + audience match OR author). Admins see all.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "List announcements (web)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "title/body search",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "draft|scheduled|published|archived",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "label UUID",
+                        "name": "label_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "filter by pinned",
+                        "name": "pinned",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "all|mine|targeted-at-me",
+                        "name": "scope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "department UUID (admin)",
+                        "name": "department_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Saved as draft by default. Pass status=published in the body to publish immediately (broadcasts via SSE).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Create an announcement",
+                "parameters": [
+                    {
+                        "description": "create payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.AnnouncementCreate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/announcements/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns 403 when the caller cannot see this row per the visibility predicate.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Get an announcement by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "announcement uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Soft-delete an announcement (owner or admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "announcement uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Update an announcement (owner or admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "announcement uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "patch payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.AnnouncementUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/announcements/{id}/publish": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stamps published_at + broadcasts via SSE. No-op if already published.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Publish an announcement",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "announcement uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/announcements/{id}/view": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Records a per-user read marker. Second call is a no-op (preserves the first view time).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Mark an announcement as viewed (idempotent)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "announcement uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/attendance": {
             "get": {
                 "security": [
@@ -1977,6 +2286,80 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/mobile/announcements": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Always visibility-filtered to published + audience match. Body field omitted from each item; fetch detail via MobileGet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "List announcements (mobile)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mobile/announcements/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "Get an announcement (mobile)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "announcement uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/positions": {
             "get": {
                 "security": [
@@ -2417,6 +2800,46 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/sse/announcements": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Long-lived SSE stream. Emits an ` + "`" + `announcement_published` + "`" + ` event whenever a new announcement is published. Clients should reconnect on disconnect. Auth token may be passed as ` + "`" + `Authorization: Bearer ...` + "`" + ` OR ` + "`" + `?token=` + "`" + ` query param (EventSource cannot set headers — REVISION NOTES #9). Sends a ` + "`" + `: keepalive` + "`" + ` comment every 30s to keep proxies from closing idle connections.",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "sse"
+                ],
+                "summary": "Subscribe to announcement events via Server-Sent Events",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "JWT access token (alternative to Authorization header)",
+                        "name": "token",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "event stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -2936,6 +3359,132 @@ const docTemplate = `{
             "properties": {
                 "is_active": {
                     "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.AnnouncementCreate": {
+            "type": "object",
+            "required": [
+                "body",
+                "title"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "department_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "label_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "pinned": {
+                    "type": "boolean"
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "enum": [
+                        "draft",
+                        "scheduled",
+                        "published",
+                        "archived"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementStatus"
+                        }
+                    ]
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "target_audience": {
+                    "enum": [
+                        "all",
+                        "department"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementTargetAudience"
+                        }
+                    ]
+                },
+                "title": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.AnnouncementUpdate": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "department_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "label_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "pinned": {
+                    "type": "boolean"
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "enum": [
+                        "draft",
+                        "scheduled",
+                        "published",
+                        "archived"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementStatus"
+                        }
+                    ]
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "target_audience": {
+                    "enum": [
+                        "all",
+                        "department"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_models.AnnouncementTargetAudience"
+                        }
+                    ]
+                },
+                "title": {
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },
@@ -3813,6 +4362,32 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "github_com_exnodes_hrm-api_internal_models.AnnouncementStatus": {
+            "type": "string",
+            "enum": [
+                "draft",
+                "scheduled",
+                "published",
+                "archived"
+            ],
+            "x-enum-varnames": [
+                "AnnouncementStatusDraft",
+                "AnnouncementStatusScheduled",
+                "AnnouncementStatusPublished",
+                "AnnouncementStatusArchived"
+            ]
+        },
+        "github_com_exnodes_hrm-api_internal_models.AnnouncementTargetAudience": {
+            "type": "string",
+            "enum": [
+                "all",
+                "department"
+            ],
+            "x-enum-varnames": [
+                "AnnouncementAudienceAll",
+                "AnnouncementAudienceDepartment"
+            ]
         },
         "github_com_exnodes_hrm-api_internal_permissions.Permission": {
             "type": "string",
