@@ -119,7 +119,16 @@ func defaultRoles() []roleSeed {
 			Description: "Basic employee access (own profile only)",
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
+				// Self-service on own leave requests: Read+Create were already
+				// here; Update/Cancel/Delete are the load-bearing fix surfaced
+				// by Phase 5 live verification (REVISION NOTES #4 had claimed
+				// "no seed gap" but the Employee role was missing the perms an
+				// owner needs to act on their own pending request). The
+				// service enforces ownership in every branch, so granting
+				// these to Employee cannot leak cross-employee writes.
 				permissions.PermLeaveRead, permissions.PermLeaveCreate,
+				permissions.PermLeaveUpdate, permissions.PermLeaveCancel,
+				permissions.PermLeaveDelete,
 				permissions.PermAttendanceRead,
 			},
 		},
