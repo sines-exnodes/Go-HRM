@@ -24,3 +24,7 @@ coverage.html
 
 # Swagger generated artifacts kept under docs/swagger only; ignore other generated dirs
 /docs/swagger/swagger.json.bak
+
+# Serena MCP — commit project.yml + memories/ (reproducible config + pointer
+# memories); ignore the LSP cache which is machine-local and regenerated.
+.serena/cache/

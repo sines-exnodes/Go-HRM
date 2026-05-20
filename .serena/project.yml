@@ -1,0 +1,56 @@
+# Serena project config for exnodes-hrm-api (Go rewrite of the HRM backend).
+#
+# This file is committed so every developer/agent that activates the
+# project gets identical LSP wiring. The cache (`.serena/cache/`) is
+# gitignored — it's machine-local index data, regenerated on first use.
+#
+# For the canonical project state (current phase, what's verified, what's
+# next), agents should read .serena/memories/project_overview.md FIRST
+# (it points to docs/superpowers/CHECKPOINT.md as the single source of
+# truth). Do NOT duplicate CHECKPOINT.md content into Serena memories —
+# the memories are pointers/maps, not snapshots.
+
+project_name: "exnodes-hrm-api"
+
+# Go-only project. Go 1.25 per go.mod.
+languages:
+  - go
+
+encoding: "utf-8"
+line_ending:
+
+# Respect .gitignore so Serena doesn't index vendor/, coverage.out, etc.
+ignore_all_files_in_gitignore: true
+
+ls_specific_settings: {}
+
+# Additional ignores beyond .gitignore. Generated Swagger lives under
+# docs/swagger/ — agents should never hand-edit it (see CLAUDE.md), but
+# we still index it so symbol search across the API surface works.
+ignored_paths:
+  - "**/*.bak"
+
+read_only: false
+
+excluded_tools: []
+included_optional_tools: []
+fixed_tools: []
+
+base_modes:
+default_modes:
+
+# Initial prompt loaded on activation. Keep terse — the bootstrap memory
+# (.serena/memories/project_overview.md) carries the real content.
+initial_prompt: |
+  This is the Go rewrite of Exnodes HRM. Resume from docs/superpowers/CHECKPOINT.md
+  before reading code. Layering is one-directional: handler -> service -> repository
+  -> GORM. Migrations are versioned SQL only (golang-migrate); AutoMigrate is
+  prohibited. Every entity carries created_at/updated_at/is_deleted/deleted_at
+  + set_updated_at trigger; soft-delete uses the custom NotDeleted scope, NOT
+  gorm.DeletedAt.
+
+symbol_info_budget:
+read_only_memory_patterns: []
+ignored_memory_patterns: []
+added_modes:
+additional_workspace_folders: []
