@@ -59,6 +59,7 @@ func main() {
 	skillRepo := repositories.NewSkillRepository(db)
 	employeeSkillRepo := repositories.NewEmployeeSkillRepository(db)
 	labelRepo := repositories.NewLabelRepository(db)
+	leaveRepo := repositories.NewLeaveRequestRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -83,6 +84,7 @@ func main() {
 	positionSvc := services.NewPositionService(positionRepo, departmentRepo)
 	skillSvc := services.NewSkillService(skillRepo, employeeSkillRepo, employeeRepo, uploadSvc)
 	labelSvc := services.NewLabelService(labelRepo)
+	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -99,6 +101,7 @@ func main() {
 	positionH := handlers.NewPositionHandler(positionSvc)
 	skillH := handlers.NewSkillHandler(skillSvc)
 	labelH := handlers.NewLabelHandler(labelSvc)
+	leaveH := handlers.NewLeaveHandler(leaveSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -218,6 +221,26 @@ func main() {
 		labels := authed.Group("/announcement-labels")
 		labels.GET("", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), labelH.List)
 		labels.POST("", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), labelH.GetOrCreate)
+
+		// ---- /leave-requests (Phase 5) ----
+		// Self-service routes (auth only) come first so the static
+		// /dashboard/me and /history/me segments aren't swallowed by the
+		// /:id route below. /balance/:employee_id is also gated by
+		// PermLeaveRead (anyone with read can look up anyone's balance —
+		// matches the Python contract).
+		leaves := authed.Group("/leave-requests")
+		leaves.GET("/dashboard/me", leaveH.GetMyDashboard)
+		leaves.GET("/history/me", leaveH.ListMyHistory)
+		leaves.GET("/balance/:employee_id", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.GetBalance)
+		leaves.GET("", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.List)
+		leaves.POST("", middleware.RequirePerms(authSvc, permissions.PermLeaveCreate), leaveH.Create)
+		leaves.GET(":id", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.Get)
+		leaves.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermLeaveUpdate), leaveH.Update)
+		leaves.POST(":id/approve", middleware.RequirePerms(authSvc, permissions.PermLeaveApprove), leaveH.Approve)
+		leaves.POST(":id/reject", middleware.RequirePerms(authSvc, permissions.PermLeaveApprove), leaveH.Reject)
+		leaves.POST(":id/cancel", middleware.RequirePerms(authSvc, permissions.PermLeaveCancel), leaveH.Cancel)
+		// POST (not DELETE) per Python source — REVISION NOTES item #5.
+		leaves.POST(":id/delete", middleware.RequirePerms(authSvc, permissions.PermLeaveDelete), leaveH.Delete)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

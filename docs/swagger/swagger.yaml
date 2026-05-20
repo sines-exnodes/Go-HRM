@@ -1337,6 +1337,299 @@ paths:
       summary: Replace current employee avatar
       tags:
       - employees
+  /api/v1/leave-requests:
+    get:
+      parameters:
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 10, max 100)
+        in: query
+        name: page_size
+        type: integer
+      - description: free-text search on employee name/email
+        in: query
+        name: search
+        type: string
+      - collectionFormat: multi
+        description: 'filter by status (repeat param: ?status=pending&status=approved)'
+        in: query
+        items:
+          type: string
+        name: status
+        type: array
+      - description: department uuid
+        in: query
+        name: department_id
+        type: string
+      - description: position uuid
+        in: query
+        name: position_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List leave requests (admin / manager)
+      tags:
+      - leave-requests
+    post:
+      consumes:
+      - application/json
+      - multipart/form-data
+      description: Accepts either application/json (body is the request DTO) or multipart/form-data
+        with a `data` JSON field plus an optional `attachment` file.
+      parameters:
+      - description: JSON-encoded LeaveRequestCreate (multipart only)
+        in: formData
+        name: data
+        type: string
+      - description: Optional attachment (PDF/PNG/JPG/GIF/WEBP, <=10MB)
+        in: formData
+        name: attachment
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create a leave request (optionally with an attachment)
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/{id}:
+    get:
+      parameters:
+      - description: leave request uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a leave request by ID (owner or admin)
+      tags:
+      - leave-requests
+    patch:
+      consumes:
+      - application/json
+      - multipart/form-data
+      description: Multipart or JSON. Pointer fields in the body distinguish "not
+        provided" from explicit values. If currently approved, an admin patch reverts
+        status to pending (Python contract).
+      parameters:
+      - description: leave request uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: JSON-encoded LeaveRequestUpdate (multipart only)
+        in: formData
+        name: data
+        type: string
+      - description: Replacement attachment (PDF/PNG/JPG/GIF/WEBP, <=10MB)
+        in: formData
+        name: attachment
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update a leave request (owner-of-pending or admin)
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/{id}/approve:
+    post:
+      parameters:
+      - description: leave request uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Approve a pending leave request
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/{id}/cancel:
+    post:
+      description: Cancel transitions pending or approved -> cancelled. Owner can
+        cancel their own; admin can cancel anyone's.
+      parameters:
+      - description: leave request uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel a leave request (owner or admin)
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/{id}/delete:
+    post:
+      description: POST /leave-requests/{id}/delete (not DELETE) — matches the Python
+        source. Admin may delete any status; non-admin owner only `pending`.
+      parameters:
+      - description: leave request uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Soft-delete a leave request (owner-of-pending or admin)
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/{id}/reject:
+    post:
+      parameters:
+      - description: leave request uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reject a pending leave request
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/balance/{employee_id}:
+    get:
+      parameters:
+      - description: employee uuid
+        in: path
+        name: employee_id
+        required: true
+        type: string
+      - description: calendar year (defaults to current UTC year)
+        in: query
+        name: year
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get leave balance for an employee
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/dashboard/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get the current user's leave dashboard (balance + upcoming + history)
+      tags:
+      - leave-requests
+  /api/v1/leave-requests/history/me:
+    get:
+      parameters:
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 10, max 100)
+        in: query
+        name: page_size
+        type: integer
+      - collectionFormat: multi
+        description: filter by status
+        in: query
+        items:
+          type: string
+        name: status
+        type: array
+      - description: lower bound on from_date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: upper bound on to_date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List the current user's leave history (paginated)
+      tags:
+      - leave-requests
   /api/v1/positions:
     get:
       parameters:

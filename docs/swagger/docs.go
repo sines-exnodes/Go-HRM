@@ -1081,6 +1081,462 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/leave-requests": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "List leave requests (admin / manager)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 10, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "free-text search on employee name/email",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "filter by status (repeat param: ?status=pending\u0026status=approved)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "department uuid",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "position uuid",
+                        "name": "position_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Accepts either application/json (body is the request DTO) or multipart/form-data with a ` + "`" + `data` + "`" + ` JSON field plus an optional ` + "`" + `attachment` + "`" + ` file.",
+                "consumes": [
+                    "application/json",
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Create a leave request (optionally with an attachment)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "JSON-encoded LeaveRequestCreate (multipart only)",
+                        "name": "data",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Optional attachment (PDF/PNG/JPG/GIF/WEBP, \u003c=10MB)",
+                        "name": "attachment",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/balance/{employee_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Get leave balance for an employee",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "employee uuid",
+                        "name": "employee_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "calendar year (defaults to current UTC year)",
+                        "name": "year",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/dashboard/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Get the current user's leave dashboard (balance + upcoming + history)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/history/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "List the current user's leave history (paginated)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 10, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "filter by status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "lower bound on from_date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "upper bound on to_date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Get a leave request by ID (owner or admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "leave request uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Multipart or JSON. Pointer fields in the body distinguish \"not provided\" from explicit values. If currently approved, an admin patch reverts status to pending (Python contract).",
+                "consumes": [
+                    "application/json",
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Update a leave request (owner-of-pending or admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "leave request uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JSON-encoded LeaveRequestUpdate (multipart only)",
+                        "name": "data",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Replacement attachment (PDF/PNG/JPG/GIF/WEBP, \u003c=10MB)",
+                        "name": "attachment",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Approve a pending leave request",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "leave request uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancel transitions pending or approved -\u003e cancelled. Owner can cancel their own; admin can cancel anyone's.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Cancel a leave request (owner or admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "leave request uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/{id}/delete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "POST /leave-requests/{id}/delete (not DELETE) — matches the Python source. Admin may delete any status; non-admin owner only ` + "`" + `pending` + "`" + `.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Soft-delete a leave request (owner-of-pending or admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "leave request uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Reject a pending leave request",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "leave request uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/positions": {
             "get": {
                 "security": [
