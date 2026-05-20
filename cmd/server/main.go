@@ -60,6 +60,7 @@ func main() {
 	employeeSkillRepo := repositories.NewEmployeeSkillRepository(db)
 	labelRepo := repositories.NewLabelRepository(db)
 	leaveRepo := repositories.NewLeaveRequestRepository(db)
+	attendanceRepo := repositories.NewAttendanceRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -85,6 +86,7 @@ func main() {
 	skillSvc := services.NewSkillService(skillRepo, employeeSkillRepo, employeeRepo, uploadSvc)
 	labelSvc := services.NewLabelService(labelRepo)
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
+	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -102,6 +104,7 @@ func main() {
 	skillH := handlers.NewSkillHandler(skillSvc)
 	labelH := handlers.NewLabelHandler(labelSvc)
 	leaveH := handlers.NewLeaveHandler(leaveSvc)
+	attendanceH := handlers.NewAttendanceHandler(attendanceSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -241,6 +244,27 @@ func main() {
 		leaves.POST(":id/cancel", middleware.RequirePerms(authSvc, permissions.PermLeaveCancel), leaveH.Cancel)
 		// POST (not DELETE) per Python source — REVISION NOTES item #5.
 		leaves.POST(":id/delete", middleware.RequirePerms(authSvc, permissions.PermLeaveDelete), leaveH.Delete)
+
+		// ---- /attendance (Phase 6) ----
+		// Gin route precedence: literal segments (today/me/matrix) must be
+		// registered BEFORE the :id wildcard, otherwise the literal text
+		// is routed through Get(id="today"). Within a Group(), gin
+		// evaluates in registration order — keep this ordering intact.
+		attendance := authed.Group("/attendance")
+		// Self-service (JWT-only — no perm gate).
+		attendance.POST("/check-in", attendanceH.CheckIn)
+		attendance.POST("/check-out", attendanceH.CheckOut)
+		attendance.GET("/today", attendanceH.Today)
+		attendance.GET("/me", attendanceH.Me)
+		// Permissioned reads. Non-managers are silently scoped to own
+		// rows by the service (matches Python contract).
+		attendance.GET("/matrix", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Matrix)
+		attendance.GET("", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.List)
+		attendance.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Get)
+		// Admin manage.
+		attendance.POST("", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminCreate)
+		attendance.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminUpdate)
+		attendance.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminDelete)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
