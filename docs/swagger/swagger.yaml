@@ -232,6 +232,15 @@ definitions:
       phone:
         type: string
     type: object
+  github_com_exnodes_hrm-api_internal_dto.EmployeeSkillsReplace:
+    properties:
+      skill_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - skill_ids
+    type: object
   github_com_exnodes_hrm-api_internal_dto.EmployeeSummary:
     properties:
       avatar_url:
@@ -348,6 +357,15 @@ definitions:
     required:
     - device_id
     - token
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.LabelCreate:
+    properties:
+      name:
+        maxLength: 50
+        minLength: 1
+        type: string
+    required:
+    - name
     type: object
   github_com_exnodes_hrm-api_internal_dto.LeaveQuotaUpdateRequest:
     properties:
@@ -637,6 +655,49 @@ info:
   title: Exnodes HRM API
   version: 0.1.0
 paths:
+  /api/v1/announcement-labels:
+    get:
+      description: Returns every live label sorted by name ASC (no pagination).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List announcement labels
+      tags:
+      - labels
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Idempotent. Case-insensitive lookup: returns the existing
+        label with HTTP 200 if one matches, otherwise inserts and
+        returns the new row with HTTP 201.
+      parameters:
+      - description: Label name
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.LabelCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get-or-create an announcement label by name
+      tags:
+      - labels
   /api/v1/auth/login:
     post:
       consumes:
@@ -1163,6 +1224,58 @@ paths:
       summary: Update employee leave quota (admin)
       tags:
       - employees
+  /api/v1/employees/{id}/skills:
+    get:
+      parameters:
+      - description: Employee UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List skills assigned to an employee
+      tags:
+      - skills
+    put:
+      consumes:
+      - application/json
+      description: |-
+        The whole skill_ids set is replaced atomically — passing
+        an empty list unassigns everything.
+      parameters:
+      - description: Employee UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Desired skill_ids
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeSkillsReplace'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Replace an employee's skill set (PUT semantics)
+      tags:
+      - skills
   /api/v1/employees/me:
     get:
       produces:
@@ -1372,6 +1485,149 @@ paths:
       summary: List grouped permissions (for the role-creation picker)
       tags:
       - Roles
+  /api/v1/skills:
+    get:
+      description: Paginated, sorted by name ASC. Optional ILIKE search by name.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Substring match on name (ILIKE)
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List skills
+      tags:
+      - skills
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Skill name (1..100, regex [a-zA-Z0-9 &.+#/()-])
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Skill description (<=500)
+        in: formData
+        name: description
+        type: string
+      - description: Optional icon (image, <=5MB)
+        in: formData
+        name: icon
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create skill (admin)
+      tags:
+      - skills
+  /api/v1/skills/{id}:
+    delete:
+      description: |-
+        Soft-deletes a skill. Returns 409 with employee_count
+        in details if any live employee is still assigned.
+      parameters:
+      - description: Skill UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete skill (admin)
+      tags:
+      - skills
+    get:
+      parameters:
+      - description: Skill UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get skill by ID
+      tags:
+      - skills
+    patch:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Multipart PATCH. Omitted text fields are left alone; an
+        uploaded `icon` replaces the previous icon and the old
+        object is best-effort deleted from storage.
+      parameters:
+      - description: Skill UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New name
+        in: formData
+        name: name
+        type: string
+      - description: New description
+        in: formData
+        name: description
+        type: string
+      - description: New icon (image, <=5MB)
+        in: formData
+        name: icon
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update skill (admin)
+      tags:
+      - skills
   /api/v1/users:
     get:
       description: Paginated list with optional email search and is_active filter.
