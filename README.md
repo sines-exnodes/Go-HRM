@@ -215,3 +215,29 @@ Each position belongs to exactly one department. Delete is blocked (409)
 while employees are assigned. The `employees.department_id` /
 `employees.position_id` FK constraints (deferred from migration 000003) are
 added in migration 000005.
+
+## Phase 6 — Attendance module endpoints
+
+### Attendance
+
+| Method | Path                          | Permission                                | Description                                       |
+|--------|-------------------------------|-------------------------------------------|---------------------------------------------------|
+| POST   | /api/v1/attendance/check-in   | authenticated                             | Record a check-in (creates the day row if absent) |
+| POST   | /api/v1/attendance/check-out  | authenticated                             | Close the open session                            |
+| GET    | /api/v1/attendance/today      | authenticated                             | Today's status + monthly count + streak           |
+| GET    | /api/v1/attendance/me         | authenticated                             | List my own attendance rows                       |
+| GET    | /api/v1/attendance            | attendance:read (manage_data sees all)    | List rows (admin: all, employee: own only)        |
+| GET    | /api/v1/attendance/matrix     | attendance:read (manage_data sees all)    | Monthly attendance matrix                         |
+| GET    | /api/v1/attendance/{id}       | attendance:read (owner or admin)          | Get a specific row                                |
+| POST   | /api/v1/attendance            | attendance:manage_data                    | Admin manual create                               |
+| PATCH  | /api/v1/attendance/{id}       | attendance:manage_data                    | Admin update                                      |
+| DELETE | /api/v1/attendance/{id}       | attendance:manage_data                    | Admin soft-delete                                 |
+
+Two-table design: `attendance` (one row per `(employee_id, date)`) + N
+child `attendance_sessions`. `is_late` is computed once from the FIRST
+check-in vs `LATE_THRESHOLD_HOUR:LATE_THRESHOLD_MINUTE` in
+`COMPANY_TIMEZONE`; subsequent sessions don't recompute it. The partial
+unique index `uq_attendance_sessions_one_open` and a service-level
+`FindOpenSession()` guard prevent overlapping open sessions. Non-admin
+callers of `GET /attendance` are silently scoped to own rows (Python
+contract — managers see all, non-managers see only their own row).
