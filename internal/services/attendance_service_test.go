@@ -390,6 +390,79 @@ func TestAttendance_Get_OwnershipEnforced(t *testing.T) {
 	assert.Contains(t, err.Error(), "do not own")
 }
 
+// ---- Today + DepartmentID filter (regression coverage from end-to-end walk) ----
+
+// TestAttendance_Today_AfterCheckOut exercises the Today endpoint after a
+// full check-in/check-out cycle. Caught a Postgres "ambiguous column
+// reference" 500 during the Phase-6 e2e walk: the joins in
+// MonthlyCheckInCount / DatesWithCheckIn collided with the
+// unqualified NotDeleted scope. Test fixes the regression.
+func TestAttendance_Today_AfterCheckOut(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc := newAttendanceSvc(t)
+	u, _ := makeEmpUser(t, "today@example.com", "Today")
+
+	ci := hcmTime(t, 2026, 5, 15, 8, 30)
+	_, err := svc.CheckIn(ctx, u.ID, dto.AttendanceCheckInReq{CheckIn: &ci})
+	require.NoError(t, err)
+	co := hcmTime(t, 2026, 5, 15, 17, 30)
+	_, err = svc.CheckOut(ctx, u.ID, dto.AttendanceCheckOutReq{CheckOut: &co})
+	require.NoError(t, err)
+
+	// Today reads from a different perspective ("today in company TZ"),
+	// so the in-month attendance row may not be visible — the call must
+	// still succeed without a 500.
+	out, err := svc.Today(ctx, u.ID)
+	require.NoError(t, err)
+	// Status is either checked_out (if the test day matches "today" in
+	// the TZ) or not_checked_in (otherwise). Either way, monthly_count
+	// and streak must surface as integers without erroring.
+	assert.Contains(t, []string{"checked_out", "not_checked_in"}, out.Status)
+	assert.GreaterOrEqual(t, out.MonthlyCount, 0)
+	assert.GreaterOrEqual(t, out.Streak, 0)
+}
+
+// TestAttendance_List_DepartmentFilter regression-tests the optional
+// employees-join branch in List() that prompted the same column-
+// ambiguity 500 surfaced by the e2e walk.
+func TestAttendance_List_DepartmentFilter(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc := newAttendanceSvc(t)
+	mgr, _ := makeEmpUser(t, "mgr5@example.com", "Mgr")
+
+	// One employee in a real department; one with no department.
+	dept := &models.Department{Name: "Phase6Dept"}
+	require.NoError(t, testDB.Create(dept).Error)
+	u1 := makeUser(t, "withdept@example.com", "pw-Aa123456")
+	e1 := &models.Employee{
+		UserID: u1.ID, FullName: "WithDept",
+		ContractType: "official", ContractRenewal: 1, PaymentMethod: "bank_transfer",
+		DepartmentID: &dept.ID,
+	}
+	require.NoError(t, testDB.Create(e1).Error)
+	u2, _ := makeEmpUser(t, "nodept@example.com", "NoDept")
+
+	_, err := svc.AdminCreate(ctx, dto.AttendanceAdminCreateReq{EmployeeID: e1.ID, Date: "2026-05-15"})
+	require.NoError(t, err)
+	ci := hcmTime(t, 2026, 5, 15, 8, 30)
+	_, err = svc.CheckIn(ctx, u2.ID, dto.AttendanceCheckInReq{CheckIn: &ci})
+	require.NoError(t, err)
+
+	out, err := svc.List(ctx, mgr.ID, true, dto.AttendanceListQuery{
+		Page: 1, PageSize: 50,
+		DepartmentID: dept.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, out.Items, 1, "only the with-dept row should match")
+	assert.Equal(t, e1.ID, out.Items[0].EmployeeID)
+}
+
 // ---- T15: matrix ----
 
 func TestAttendance_Matrix_ManagerSeesAllEmployees(t *testing.T) {

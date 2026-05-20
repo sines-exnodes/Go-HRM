@@ -110,7 +110,11 @@ func (r *attendanceRepo) FindByEmployeeAndDate(ctx context.Context, employeeID u
 }
 
 func (r *attendanceRepo) List(ctx context.Context, f AttendanceListFilter) ([]models.Attendance, int64, error) {
-	q := r.base(ctx).Model(&models.Attendance{})
+	// Qualify the soft-delete predicate to attendance.is_deleted — the
+	// optional employees join below introduces a second is_deleted column
+	// that would otherwise make the unqualified NotDeleted scope
+	// ambiguous in Postgres.
+	q := r.db.WithContext(ctx).Model(&models.Attendance{}).Where("attendance.is_deleted = ?", false)
 	if f.EmployeeID != nil {
 		q = q.Where("attendance.employee_id = ?", *f.EmployeeID)
 	}
@@ -160,11 +164,14 @@ func (r *attendanceRepo) MonthlyCheckInCount(ctx context.Context, employeeID uui
 	from := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 1, -1)
 	var n int64
-	err := r.base(ctx).
+	// Qualify is_deleted with the attendance table — joining
+	// attendance_sessions introduces a second is_deleted column and the
+	// unqualified NotDeleted scope would raise "ambiguous column reference".
+	err := r.db.WithContext(ctx).
 		Model(&models.Attendance{}).
 		Joins("JOIN attendance_sessions s ON s.attendance_id = attendance.id AND s.is_deleted = false").
-		Where("attendance.employee_id = ? AND attendance.date BETWEEN ? AND ?",
-			employeeID, from.Format("2006-01-02"), to.Format("2006-01-02")).
+		Where("attendance.is_deleted = ? AND attendance.employee_id = ? AND attendance.date BETWEEN ? AND ?",
+			false, employeeID, from.Format("2006-01-02"), to.Format("2006-01-02")).
 		Distinct("attendance.id").
 		Count(&n).Error
 	return n, err
@@ -172,11 +179,12 @@ func (r *attendanceRepo) MonthlyCheckInCount(ctx context.Context, employeeID uui
 
 func (r *attendanceRepo) DatesWithCheckIn(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]time.Time, error) {
 	var dates []time.Time
-	err := r.base(ctx).
+	// Same qualification as MonthlyCheckInCount — see comment there.
+	err := r.db.WithContext(ctx).
 		Model(&models.Attendance{}).
 		Joins("JOIN attendance_sessions s ON s.attendance_id = attendance.id AND s.is_deleted = false").
-		Where("attendance.employee_id = ? AND attendance.date BETWEEN ? AND ?",
-			employeeID, from.Format("2006-01-02"), to.Format("2006-01-02")).
+		Where("attendance.is_deleted = ? AND attendance.employee_id = ? AND attendance.date BETWEEN ? AND ?",
+			false, employeeID, from.Format("2006-01-02"), to.Format("2006-01-02")).
 		Distinct("attendance.date").
 		Order("attendance.date").
 		Pluck("attendance.date", &dates).Error
