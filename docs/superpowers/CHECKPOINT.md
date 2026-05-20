@@ -10,9 +10,19 @@
 
 Tell Claude: *"Resume the Go migration — start Phase 5 per docs/superpowers/CHECKPOINT.md"*.
 
-Plan: `docs/superpowers/plans/2026-05-15-phase-05-leave-requests.md`.
+Plan: [`docs/superpowers/plans/2026-05-15-phase-05-leave-requests.md`](plans/2026-05-15-phase-05-leave-requests.md).
 
-⚠️ Phase 5 plan was written pre-schema-split — re-audit before executing (leave_requests likely keys on `employee_id`, not `user_id`; check existing perm constants; next free migration number is **000008**; verify `employee_leave_quotas` Phase 2 table is compatible).
+**The plan has an authoritative `## ⚠️ REVISION NOTES (2026-05-20)` block at the top — execute per those notes, not the raw task bodies where they conflict.** Key corrections already encoded there:
+
+- Migration is **`000008_create_leave_requests`** (NOT `000011` from the draft body). Final migrate-version after Phase 5 = **8**.
+- `leave_requests.employee_id` and `leave_requests.created_by` BOTH reference **`employees(id)`** (NOT `users(id)`) — the Go schema split puts the HR profile on `employees`.
+- `employee_leave_quotas` table + `EmployeeLeaveQuota` model + `LeaveQuotaRepository` **already exist** from Phase 2 (migration `000004_phase2_extras`). Do NOT recreate. The balance endpoint reads from there and SUMs live approved `leave_requests.total_days`.
+- All leave permission constants already exist in `internal/permissions/registry.go` and are seeded for Admin/HR Manager/Manager/Employee. **No seed gap** to close (unlike Phase 4's `PermAnnounceManage`).
+- Endpoint `POST /:id/delete` is **POST not DELETE** (matches Python source `routers/leave_requests.py` line 246).
+- Insufficient quota + date overlap are **non-blocking warnings**, NOT errors — the request is still created/updated with warnings attached.
+- Half-day arithmetic: `total_days = (to_date - from_date).days + 1` × `0.5` when leave_period is half. Half-day requires `from_date == to_date`.
+- Attachment upload reuses Phase-2/Phase-4 pattern: `Uploader` interface + mandatory `http.DetectContentType` sniff (review-fix #2).
+- `truncateAll` in `services/testhelper_test.go` must add `leave_requests` BEFORE `employees` in FK-safe order (already includes labels/employee_skills/skills from Phase 4).
 
 ## Current state
 

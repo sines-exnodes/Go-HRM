@@ -13,6 +13,70 @@
 
 ---
 
+## ⚠️ REVISION NOTES (2026-05-20) — AUTHORITATIVE, read & apply before executing any task
+
+This plan was drafted pre-schema-split AND pre-Phase-2-extras (when leave quotas got their own table). The codebase audit performed at the start of Phase 5 supersedes the task bodies below wherever they conflict. Apply these corrections:
+
+1. **Migration number.** `000001`–`000007` are taken (latest = `000007_create_labels` from Phase 4). The Phase-5 migration is **`000008_create_leave_requests`** (NOT `000011` as written below). Final `make migrate-version` after this phase = **8**. Renumber every filename, `make migrate-*` reference, and `migrate-version` expectation accordingly.
+
+2. **FK target = `employees(id)`, NOT `users(id)`.** The Python source's `LeaveRequest.employee_id` actually references the User document, but in the Go schema split (Phase 1) the HR profile lives on `employees`, and every cross-aggregate FK introduced from Phase 2 onward targets `employees(id)`. The leave-request `employee_id` and `created_by` columns must therefore be:
+   - `employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE RESTRICT`
+   - `created_by  UUID NOT NULL REFERENCES employees(id) ON DELETE RESTRICT`
+   Anywhere the task bodies write `REFERENCES users(id)` is wrong — replace with `employees(id)`. The service-layer ownership check (`request.employee_id == currentEmployee.ID` or admin perm) is unchanged in spirit, but it compares **employee IDs**, not user IDs.
+
+3. **Leave quota table ALREADY EXISTS.** Migration `000004_phase2_extras` created `employee_leave_quotas` (one row per employee, columns `annual_leave_quota NUMERIC(6,2)` + `sick_leave_quota NUMERIC(6,2)`) with the standard 4 audit cols + trigger. The Go model is `models.EmployeeLeaveQuota` and the repo `repositories.LeaveQuotaRepository` (already wired into `cmd/server/main.go` as `quotaRepo`). The plan's Goal-section sentence "Per-user quotas live on the `users` table … there is no separate `leave_quotas` table" is **wrong** — ignore it. The balance endpoint must call `LeaveQuotaRepository.GetByEmployee` for the quota figures and SUM live (`is_deleted=false`) approved `leave_requests.total_days` per (employee_id, leave_type, year) to compute usage. Do NOT create a new quota table or add quota columns to any other table.
+
+4. **Permission constants + seeds are complete.** `PermLeaveRead/Create/Update/Delete/Approve/Cancel/Manage` + `PermLeaveQuotaManage` already exist in `internal/permissions/registry.go` and are granted to the appropriate system roles in `seed_service.go` (Admin, HR Manager, Manager, Employee per their domain). **No seed gap to close** in this phase (contrast Phase 4's `PermAnnounceManage` gap).
+
+5. **Endpoint inventory (matches Python — keep the POST-for-actions form).** Final routes under `/api/v1/leave-requests`:
+   - `GET    /`                    — list (paginated, status[] filter, dept/position filter, search, sort)   `PermLeaveRead`
+   - `POST   /`                    — create (multipart for optional `attachment` file + JSON `data` part) `PermLeaveCreate`
+   - `GET    /balance/:employee_id` — `PermLeaveRead` (uses **employee** UUID, not user UUID)
+   - `GET    /dashboard/me`        — auth-only (current employee derived from token)
+   - `GET    /history/me`          — auth-only (paginated)
+   - `GET    /:id`                  — `PermLeaveRead` (with ownership fallback for owner-without-perm: not strictly the Python behavior — verify in source before implementing; if Python requires perm, do the same)
+   - `PATCH  /:id`                  — `PermLeaveUpdate` (admin) or owner-of-pending (ownership branch enforced in service)
+   - `POST   /:id/approve`         — `PermLeaveApprove`
+   - `POST   /:id/reject`          — `PermLeaveApprove` (Python uses the same permission for both — keep it)
+   - `POST   /:id/cancel`          — `PermLeaveCancel` (admin) or owner (service branch)
+   - `POST   /:id/delete`          — **POST, not DELETE** (Python: line 246 of `routers/leave_requests.py`). `PermLeaveDelete`. Admin (`PermLeaveApprove` OR wildcard) can delete any status; non-admin only `pending` and only their own.
+
+6. **`created_by` semantics.** Python tracks who submitted the request — defaults to the current user, but when an admin (`PermLeaveManage`) creates on behalf of another employee, `employee_id` is the subject and `created_by` is the admin. The Go model must mirror this: nullable IS WRONG; both columns are NOT NULL with `created_by` defaulting to the same value as `employee_id` when no admin override.
+
+7. **Half-day arithmetic.** `total_days = (to_date - from_date).days + 1` (inclusive, all calendar days — NO business-day skip), multiplied by `0.5` when `leave_period ∈ {morning_half, afternoon_half}`. A half-day range must satisfy `from_date == to_date` — reject otherwise (`apperrors.ErrBadRequest`).
+
+8. **Warnings vs errors.** Insufficient quota and date overlap with the same employee's existing live (non-rejected, non-cancelled) requests are **non-blocking warnings**, NOT errors. The Create/Update responses include a `warnings: []string` array; the request is still created/updated with the warnings attached. This is the load-bearing behavior shift from a "validate strictly" mindset — preserve it.
+
+9. **Status state machine.**
+   - `pending → approved | rejected | cancelled`
+   - `approved → cancelled` (balance "restored" automatically because the balance query only sums status='approved' AND is_deleted=false)
+   - `rejected | cancelled` are terminal — Update/Approve/Reject/Cancel on these states all return 409.
+   - On `PATCH` of an `approved` request by admin: revert status to `pending` (Python contract — preserve).
+
+10. **Conventions (from Phases 1-4, verified):** repo = interface + lowercase impl + `New…() Interface` constructor; `models.NotDeleted` scope; soft-delete sets `is_deleted=true` + `deleted_at=NOW()`; services return `*apperrors.AppError`; per-route `middleware.RequirePerms(authSvc, permissions.PermXxx)` (**first arg `authSvc`**); attachment upload reuses Phase-2 `UploadService` (`Uploader` interface) + **mandatory `http.DetectContentType` content-sniff** (review-fix #2 pattern, also applied in Phase 4 skill icons); search via `utils.BuildILIKEPattern`; Swagger `@Security BearerAuth` on every endpoint; `make swag` regenerated + committed; tests are `package services_test`, real Postgres test DB, extend `truncateAll` in FK-safe order for `leave_requests` BEFORE `employee_leave_quotas, dependents, employees` etc. (leave_requests references employees; truncate leave_requests first).
+
+11. **DoD = real live verification** committed to `docs/superpowers/verification/phase-05.md`. Suggested minimum flow:
+    - Boot server, migrate-version=8.
+    - Login as admin → create leave request for self (full_day, annual) → 201 with `total_days=1`, no warnings.
+    - Create overlapping request → 201 with warnings (overlap message).
+    - Create with `to_date < from_date` → 400.
+    - Create morning_half with `from_date != to_date` → 400.
+    - Approve → 200, status=approved.
+    - GET balance → annual_used reflects the approved days; sick_used=0.
+    - Cancel approved → 200, status=cancelled; balance restored on next GET balance.
+    - Edit cancelled → 409.
+    - Admin creates request on behalf of another employee (`employee_id != current`) → 201, `created_by` = admin's employee_id.
+    - Non-admin tries to PATCH someone else's pending request → 403.
+    - Non-admin tries `POST /:id/delete` on someone else's request → 403.
+    - Non-admin tries `POST /:id/delete` on their own approved → 403 (only pending allowed for non-admin).
+    - Attachment upload (valid PDF/PNG) → stored, URL returned. Content-spoof (text bytes with `.pdf` ext + `Content-Type: application/pdf`) → 400.
+    - Soft-delete row spot-check via psql.
+    - 401 (no token), 403 (Employee role lacks Approve on POST /approve).
+
+Everything else in the task bodies (layering, commit-per-task, no placeholders, bite-sized steps) still applies. **Execute per these REVISION NOTES, not the raw task bodies where they conflict.**
+
+---
+
 ## 0. Goals
 
 Port the Python leave-request module 1:1 to Go + Postgres. Single `leave_requests` table with **enum string columns** for `leave_type`, `leave_period`, and `status` (Python uses `StrEnum`, not a separate types table). **Per-user quotas live on the `users` table** (`annual_leave_quota`, `sick_leave_quota`) added in Phase 2 — there is no separate `leave_quotas` table. The "balance" endpoint is a derived aggregate (sum of approved `total_days` per type within a year, subtracted from the user's stored quota).
