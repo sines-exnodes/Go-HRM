@@ -53,11 +53,11 @@ type AnnouncementAuthorBrief struct {
 	AvatarURL *string   `json:"avatar_url,omitempty"`
 }
 
-// AnnouncementLabelBrief is the minimal {id, name, color} projection.
+// AnnouncementLabelBrief is the minimal {id, name} projection. Labels in
+// this codebase have no color field (see internal/models/label.go).
 type AnnouncementLabelBrief struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Color *string   `json:"color,omitempty"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 // AnnouncementDepartmentBrief is the minimal {id, name} projection.
