@@ -82,13 +82,22 @@ Cross-employee writes are still rejected by the service's ownership branch — g
 | `6bfa6de` | 16–19 | 22 integration tests + truncateAll order fix |
 | _next_ | 20–21 | Verification log + Employee seed-merge fix + this checkpoint update |
 
-## TOOLING NOTE (2026-05-20)
+## TOOLING NOTE (updated 2026-05-20 post-restart-investigation)
 
-Subagent dispatch (`Agent` with `subagent_type`) was **unavailable** in this session — same failure mode as the prior Phase 4 session. Every probed type (`ennam-dev-agent-team-team-lead`, `team-lead`, `general-purpose`, plus bare variants) returns "not found" with an empty available-agents list, despite the plugin files existing on disk at `~/.claude/plugins/marketplaces/ennam-internal-plugins/stacks/ennam-dev-agent-team/agents/` and the plugin being enabled in `.claude/settings.json`.
+Subagent dispatch (`Agent` with `subagent_type`) is **structurally unavailable** in the Claude Agent SDK / VSCode-extension runtime that hosts these sessions. Investigation log:
 
-Phase 5 was executed **inline by project-owner** under explicit user override of the "never write production code" rule (the user selected option **A** at resume time, replicating the Phase 4 inline pattern).
+- **Phase 4 session:** every probed `subagent_type` returned "not found" with an empty available-agents list. Worked around by inline execution.
+- **Phase 5 session:** same. Worked around by inline execution.
+- **Restart probe (2026-05-20):** even `code-simplifier` from the **working** `claude-plugins-official` marketplace (proven dispatchable from the standalone Claude Code CLI in terminal) returns "not found" in this SDK runtime. Plugin files, manifests, frontmatter, and `enabledPlugins` config are all OK — verified by file inspection.
 
-**Before Phase 6:** restart the session to test whether plugin registration recovers. With subagents back the recommended pattern is `superpowers:subagent-driven-development` — one subagent per task or per logical batch, with project-owner only orchestrating.
+**Conclusion:** The Agent tool's `subagent_type` registry is populated by the host environment, and the VSCode-extension SDK runtime intentionally exposes an **empty** registry. Plugin agents in `~/.claude/plugins/marketplaces/.../agents/*.md` are only dispatchable when running `claude` from terminal. This is not a fixable misconfiguration — it's a runtime capability gap.
+
+**Implication for Phase 6:** Do NOT re-probe subagent dispatch in the next IDE session — you will get the same "not found" + empty list. Two viable paths:
+
+1. **Inline by project-owner (recommended, proven across Phases 4 + 5).** Continue the same cadence: commit-per-task, batch logical tasks, end with a live verification log and CHECKPOINT update. ~18 tasks in Phase 6, comparable to Phase 5's 21.
+2. **Run Phase 6 from terminal `claude` CLI** if the user prefers the proper `subagent-driven-development` pattern. Loses IDE integration; requires copy/paste of output. Use only if Phase 6 size becomes painful.
+
+Phase 6 default is path (1) — user explicitly chose this at session close.
 
 ## Code review status
 
