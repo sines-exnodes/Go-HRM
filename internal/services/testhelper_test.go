@@ -108,7 +108,10 @@ func truncateAll(t *testing.T) {
 	// documents the dependency), attendance must precede employees (FK
 	// attendance.employee_id → employees.id, Phase-6 REVISION NOTES #2).
 	// labels is FK-free.
-	if err := testDB.Exec(`TRUNCATE TABLE labels, employee_skills, skills, device_tokens, user_notification_settings, attendance_sessions, attendance, leave_requests, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+	// Phase-7 entries (announcement_views, announcement_attachments,
+	// announcement_target_departments, announcement_labels, announcements)
+	// precede employees + labels + departments — see REVISION NOTES #13.
+	if err := testDB.Exec(`TRUNCATE TABLE announcement_views, announcement_attachments, announcement_target_departments, announcement_labels, announcements, labels, employee_skills, skills, device_tokens, user_notification_settings, attendance_sessions, attendance, leave_requests, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }

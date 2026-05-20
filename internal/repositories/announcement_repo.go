@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/exnodes/hrm-api/internal/models"
 	"github.com/exnodes/hrm-api/pkg/utils"
@@ -245,58 +246,132 @@ func applyAudienceFilter(q *gorm.DB, empID uuid.UUID, deptID *uuid.UUID, include
 	)
 }
 
-// ReplaceLabels writes the desired set in a transaction. Existing live
-// rows for the announcement are soft-deleted first (audit trail), then
-// the new set is inserted. Mirrors the Phase-4 employee-skills replace
-// pattern.
+// ReplaceLabels writes the desired set in a transaction. The composite
+// PK (announcement_id, label_id) means we cannot soft-delete then insert
+// a fresh row — the second insert would trip the PK. Instead we
+// snapshot existing rows, soft-delete the ones that should be removed,
+// and reactivate (or insert) the desired ones. Mirrors Phase-4
+// EmployeeSkill.ReplaceForEmployee — adapted for composite-PK joins.
 func (r *announcementRepo) ReplaceLabels(ctx context.Context, announcementID uuid.UUID, labelIDs []uuid.UUID) error {
+	// Dedup the request set.
+	want := make(map[uuid.UUID]struct{}, len(labelIDs))
+	for _, id := range labelIDs {
+		if id == uuid.Nil {
+			continue
+		}
+		want[id] = struct{}{}
+	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		now := time.Now().UTC()
-		if err := tx.Model(&models.AnnouncementLabel{}).
-			Where("announcement_id = ? AND is_deleted = ?", announcementID, false).
-			Updates(map[string]any{"is_deleted": true, "deleted_at": &now}).Error; err != nil {
+		// Snapshot — include soft-deleted so we can reactivate instead of
+		// inserting (composite PK forbids parallel rows).
+		var existing []models.AnnouncementLabel
+		if err := tx.Where("announcement_id = ?", announcementID).Find(&existing).Error; err != nil {
 			return err
 		}
-		if len(labelIDs) == 0 {
-			return nil
+		have := make(map[uuid.UUID]models.AnnouncementLabel, len(existing))
+		for _, row := range existing {
+			have[row.LabelID] = row
 		}
-		rows := make([]models.AnnouncementLabel, 0, len(labelIDs))
-		seen := make(map[uuid.UUID]struct{}, len(labelIDs))
-		for _, id := range labelIDs {
-			if _, dup := seen[id]; dup {
+
+		// 1) Soft-delete rows for label_ids that should no longer be assigned.
+		var toRemove []uuid.UUID
+		for lid, row := range have {
+			if row.IsDeleted {
 				continue
 			}
-			seen[id] = struct{}{}
-			rows = append(rows, models.AnnouncementLabel{AnnouncementID: announcementID, LabelID: id})
+			if _, keep := want[lid]; !keep {
+				toRemove = append(toRemove, lid)
+			}
 		}
-		return tx.Create(&rows).Error
+		if len(toRemove) > 0 {
+			if err := tx.Model(&models.AnnouncementLabel{}).
+				Where("announcement_id = ? AND label_id IN ?", announcementID, toRemove).
+				Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error; err != nil {
+				return err
+			}
+		}
+
+		// 2) For each desired label: insert if missing; reactivate if soft-deleted.
+		for lid := range want {
+			row, ok := have[lid]
+			switch {
+			case !ok:
+				newRow := models.AnnouncementLabel{AnnouncementID: announcementID, LabelID: lid}
+				if err := tx.Create(&newRow).Error; err != nil {
+					return err
+				}
+			case row.IsDeleted:
+				if err := tx.Model(&models.AnnouncementLabel{}).
+					Where("announcement_id = ? AND label_id = ?", announcementID, lid).
+					Updates(map[string]any{"is_deleted": false, "deleted_at": gorm.Expr("NULL")}).Error; err != nil {
+					return err
+				}
+			}
+			// else: already live and desired — no-op.
+		}
+		return nil
 	})
 }
 
-// ReplaceTargetDepartments mirrors ReplaceLabels.
+// ReplaceTargetDepartments mirrors ReplaceLabels (composite-PK aware).
 func (r *announcementRepo) ReplaceTargetDepartments(ctx context.Context, announcementID uuid.UUID, departmentIDs []uuid.UUID) error {
+	want := make(map[uuid.UUID]struct{}, len(departmentIDs))
+	for _, id := range departmentIDs {
+		if id == uuid.Nil {
+			continue
+		}
+		want[id] = struct{}{}
+	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		now := time.Now().UTC()
-		if err := tx.Model(&models.AnnouncementTargetDepartment{}).
-			Where("announcement_id = ? AND is_deleted = ?", announcementID, false).
-			Updates(map[string]any{"is_deleted": true, "deleted_at": &now}).Error; err != nil {
+		var existing []models.AnnouncementTargetDepartment
+		if err := tx.Where("announcement_id = ?", announcementID).Find(&existing).Error; err != nil {
 			return err
 		}
-		if len(departmentIDs) == 0 {
-			return nil
+		have := make(map[uuid.UUID]models.AnnouncementTargetDepartment, len(existing))
+		for _, row := range existing {
+			have[row.DepartmentID] = row
 		}
-		rows := make([]models.AnnouncementTargetDepartment, 0, len(departmentIDs))
-		seen := make(map[uuid.UUID]struct{}, len(departmentIDs))
-		for _, id := range departmentIDs {
-			if _, dup := seen[id]; dup {
+
+		var toRemove []uuid.UUID
+		for did, row := range have {
+			if row.IsDeleted {
 				continue
 			}
-			seen[id] = struct{}{}
-			rows = append(rows, models.AnnouncementTargetDepartment{AnnouncementID: announcementID, DepartmentID: id})
+			if _, keep := want[did]; !keep {
+				toRemove = append(toRemove, did)
+			}
 		}
-		return tx.Create(&rows).Error
+		if len(toRemove) > 0 {
+			if err := tx.Model(&models.AnnouncementTargetDepartment{}).
+				Where("announcement_id = ? AND department_id IN ?", announcementID, toRemove).
+				Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error; err != nil {
+				return err
+			}
+		}
+
+		for did := range want {
+			row, ok := have[did]
+			switch {
+			case !ok:
+				newRow := models.AnnouncementTargetDepartment{AnnouncementID: announcementID, DepartmentID: did}
+				if err := tx.Create(&newRow).Error; err != nil {
+					return err
+				}
+			case row.IsDeleted:
+				if err := tx.Model(&models.AnnouncementTargetDepartment{}).
+					Where("announcement_id = ? AND department_id = ?", announcementID, did).
+					Updates(map[string]any{"is_deleted": false, "deleted_at": gorm.Expr("NULL")}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 }
+
+// suppress unused-import warning on time when the helpers above no
+// longer reference it.
+var _ = time.Now
 
 func (r *announcementRepo) CreateAttachment(ctx context.Context, att *models.AnnouncementAttachment) error {
 	return r.db.WithContext(ctx).Create(att).Error
@@ -323,17 +398,31 @@ func (r *announcementRepo) FindAttachmentByID(ctx context.Context, id uuid.UUID)
 
 // UpsertView is idempotent — second call from the same user is a no-op
 // (the row already exists with the original viewed_at). The Python
-// source preserves the FIRST view time, so we do the same: ON CONFLICT
-// DO NOTHING.
+// source preserves the FIRST view time, so we do the same:
+// ON CONFLICT (announcement_id, user_id) DO NOTHING. If a previously
+// soft-deleted view exists, we also reactivate it so HasViewed() returns
+// true again — covers the "user un-marked then re-marked" admin path
+// (rare, but cheap to handle).
 func (r *announcementRepo) UpsertView(ctx context.Context, announcementID, userID uuid.UUID) error {
 	view := &models.AnnouncementView{
 		AnnouncementID: announcementID,
 		UserID:         userID,
 		ViewedAt:       time.Now().UTC(),
 	}
+	if err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "announcement_id"}, {Name: "user_id"}},
+			DoNothing: true,
+		}).
+		Create(view).Error; err != nil {
+		return err
+	}
+	// Re-activate if a soft-deleted row exists. No-op when the row is
+	// already live (UPDATE returns 0 rows affected, no error).
 	return r.db.WithContext(ctx).
-		Set("gorm:insert_option", "ON CONFLICT (announcement_id, user_id) DO NOTHING").
-		Create(view).Error
+		Model(&models.AnnouncementView{}).
+		Where("announcement_id = ? AND user_id = ? AND is_deleted = ?", announcementID, userID, true).
+		Updates(map[string]any{"is_deleted": false, "deleted_at": gorm.Expr("NULL")}).Error
 }
 
 // HasViewed returns true when the (announcement, user) pair has a live
