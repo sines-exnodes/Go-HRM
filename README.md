@@ -241,3 +241,48 @@ unique index `uq_attendance_sessions_one_open` and a service-level
 `FindOpenSession()` guard prevent overlapping open sessions. Non-admin
 callers of `GET /attendance` are silently scoped to own rows (Python
 contract — managers see all, non-managers see only their own row).
+
+## Phase 7 — Announcements + Mobile + SSE realtime
+
+### Announcements (web)
+
+| Method | Path                                  | Permission              | Description                                     |
+|--------|---------------------------------------|-------------------------|-------------------------------------------------|
+| GET    | /api/v1/announcements                 | authenticated           | List rows (admin: all; non-admin: visible only) |
+| GET    | /api/v1/announcements/{id}            | authenticated           | Get one (403 if not visible)                    |
+| POST   | /api/v1/announcements/{id}/view       | authenticated           | Mark as viewed (idempotent — preserves 1st time)|
+| POST   | /api/v1/announcements                 | announcements:manage    | Create (optional `status=published` publishes)  |
+| PATCH  | /api/v1/announcements/{id}            | announcements:manage    | Update (owner or admin)                         |
+| DELETE | /api/v1/announcements/{id}            | announcements:manage    | Soft-delete                                     |
+| POST   | /api/v1/announcements/{id}/publish    | announcements:manage    | Publish (no-op if already; broadcasts via SSE)  |
+
+### Mobile
+
+| Method | Path                                       | Permission    | Description                                  |
+|--------|--------------------------------------------|---------------|----------------------------------------------|
+| GET    | /api/v1/mobile/announcements               | authenticated | Visibility-filtered list (Body omitted)      |
+| GET    | /api/v1/mobile/announcements/{id}          | authenticated | Detail (with Body + attachments)             |
+
+### SSE
+
+| Method | Path                                  | Permission    | Description                                            |
+|--------|---------------------------------------|---------------|--------------------------------------------------------|
+| GET    | /api/v1/sse/announcements             | authenticated | Long-lived event stream; emits `announcement_published`|
+
+The SSE endpoint accepts the JWT via `Authorization: Bearer …` OR
+`?token=…` because EventSource cannot set headers. Token-in-query may
+appear in proxy logs — scrub at the reverse proxy and use short-lived
+access tokens. Single-process in-memory hub: scaling beyond 1 replica
+requires a Redis pub/sub backplane (see `internal/sse/hub.go`).
+
+Visibility predicate (non-admin):
+
+- `status='published'` AND `is_deleted=false` AND
+- One of: `author_id == current_employee.id` OR `target_audience='all'`
+  OR (`target_audience='department'` AND the announcement targets the
+  user's department).
+
+Admins (`announcements:manage`) see everything regardless of status /
+audience. Author display reads from `employees.full_name` because
+`author_id` references `employees(id)` per the schema split (REVISION
+NOTES item #2).
