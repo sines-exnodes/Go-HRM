@@ -64,6 +64,7 @@ func main() {
 	attendanceRepo := repositories.NewAttendanceRepository(db)
 	announcementRepo := repositories.NewAnnouncementRepository(db)
 	systemConfigRepo := repositories.NewSystemConfigRepository(db)
+	inviteRepo := repositories.NewInviteRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -103,6 +104,18 @@ func main() {
 	)
 	orgSettingsSvc := services.NewOrganizationSettingsService(systemConfigRepo, employeeRepo)
 
+	// Phase 9 — Email + Invite + Push.
+	// All three degrade gracefully when their respective env keys are
+	// empty: EmailService logs + records last_email_error; PushClient
+	// becomes a no-op logger. Boot never fails on misconfig.
+	emailSvc, err := services.NewEmailService(cfg)
+	if err != nil {
+		log.Fatalf("email service: %v", err)
+	}
+	pushClient := services.NewPushClient(cfg)
+	pushSvc := services.NewPushNotificationService(pushClient, tokenRepo)
+	inviteSvc := services.NewInviteService(cfg, inviteRepo, employeeRepo, userRepo, roleRepo, empSvc, emailSvc, db)
+
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
 		log.Fatalf("seed: %v", err)
@@ -123,6 +136,8 @@ func main() {
 	announcementH := handlers.NewAnnouncementHandler(announcementSvc)
 	sseH := handlers.NewSSEHandler(sseHub)
 	orgSettingsH := handlers.NewOrganizationSettingsHandler(orgSettingsSvc)
+	inviteH := handlers.NewInviteHandler(inviteSvc)
+	notifH := handlers.NewNotificationHandler(pushSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -155,6 +170,11 @@ func main() {
 		auth := v1.Group("/auth")
 		auth.POST("/login", authH.Login)
 		auth.POST("/refresh", authH.Refresh)
+
+		// ---- /invites/accept (Phase 9 — PUBLIC) ----
+		// The token in the body is the credential. Lives outside the
+		// JWT-protected group because the invitee has no account yet.
+		v1.POST("/invites/accept", inviteH.Accept)
 
 		// Protected endpoints
 		authed := v1.Group("")
@@ -312,6 +332,21 @@ func main() {
 		org.PATCH("/attendance", middleware.RequirePerms(authSvc, permissions.PermOrgSettings), orgSettingsH.UpdateAttendance)
 		org.GET("/company-profile", orgSettingsH.GetCompanyProfile)
 		org.PATCH("/company-profile", middleware.RequirePerms(authSvc, permissions.PermOrgSettings), orgSettingsH.UpdateCompanyProfile)
+
+		// ---- /invites (Phase 9 — admin endpoints) ----
+		// Public accept is registered above (outside the authed group).
+		invites := authed.Group("/invites")
+		invites.GET("", middleware.RequirePerms(authSvc, permissions.PermInviteManage), inviteH.List)
+		invites.POST("", middleware.RequirePerms(authSvc, permissions.PermInviteManage), inviteH.Create)
+		invites.GET(":id", middleware.RequirePerms(authSvc, permissions.PermInviteManage), inviteH.Get)
+		invites.POST(":id/resend", middleware.RequirePerms(authSvc, permissions.PermInviteManage), inviteH.Resend)
+		invites.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermInviteManage), inviteH.Revoke)
+
+		// ---- /notifications/test (Phase 9 — admin debug push) ----
+		// Gated by PermUsersManageRoles per REVISION NOTES #19 — closest
+		// fit for a privileged debug surface. Pushes only to the calling
+		// user's own device tokens (self-test).
+		authed.POST("/notifications/test", middleware.RequirePerms(authSvc, permissions.PermUsersManageRoles), notifH.SendTest)
 
 		// ---- /sse (Phase 7 — Server-Sent Events) ----
 		// Uses a separate JWT middleware that also accepts ?token= because
