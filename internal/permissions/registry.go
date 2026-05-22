@@ -73,6 +73,9 @@ const (
 
 	// Announcements
 	PermAnnounceManage Permission = "announcements:manage"
+
+	// Invites (Phase 9)
+	PermInviteManage Permission = "invites:manage"
 )
 
 // AllPermissions returns the flat registry (for validation).
@@ -93,6 +96,7 @@ func AllPermissions() []Permission {
 		PermAttendanceRead, PermAttendanceManage,
 		PermOrgSettings,
 		PermAnnounceManage,
+		PermInviteManage,
 	}
 }
 
@@ -229,6 +233,12 @@ var PermissionGroups = []PermissionGroup{
 		Resource: "announcements", Label: "Announcements",
 		Permissions: []PermissionItem{
 			{PermAnnounceManage, "Manage Announcements", "Create, edit, send, and delete announcements"},
+		},
+	},
+	{
+		Resource: "invites", Label: "Invites",
+		Permissions: []PermissionItem{
+			{PermInviteManage, "Manage Invites", "Issue, resend, and revoke email invitations"},
 		},
 	},
 }
