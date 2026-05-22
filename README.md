@@ -286,3 +286,25 @@ Admins (`announcements:manage`) see everything regardless of status /
 audience. Author display reads from `employees.full_name` because
 `author_id` references `employees(id)` per the schema split (REVISION
 NOTES item #2).
+
+## Phase 8 — Organization Settings (system_config singleton)
+
+### Organization settings
+
+| Method | Path                                                | Permission                  | Description                              |
+|--------|-----------------------------------------------------|-----------------------------|------------------------------------------|
+| GET    | /api/v1/organization-settings/attendance            | organization_settings:manage | Read attendance thresholds              |
+| PATCH  | /api/v1/organization-settings/attendance            | organization_settings:manage | Partial update (pointer fields)         |
+| GET    | /api/v1/organization-settings/company-profile       | authenticated               | Read company address + lat/lng          |
+| PATCH  | /api/v1/organization-settings/company-profile       | organization_settings:manage | Update address + stamps updated_by/at   |
+
+Backed by a single-row `system_config` table whose PK is the sentinel
+UUID `00000000-0000-0000-0000-000000000001`. A `CHECK (id = '…0001')`
+constraint at the DB level enforces the singleton invariant; the seed
+service runs `INSERT … ON CONFLICT DO NOTHING` on boot. Soft-delete
+columns exist for schema parity but are never written.
+
+`company_address_updated_by` references `employees(id) ON DELETE SET
+NULL` per the Go schema split. The GET projection resolves
+`updated_by_name` from `Employee.FullName` (best-effort — falls back
+to nil when the employee row is gone).
