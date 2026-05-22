@@ -63,6 +63,7 @@ func main() {
 	leaveRepo := repositories.NewLeaveRequestRepository(db)
 	attendanceRepo := repositories.NewAttendanceRepository(db)
 	announcementRepo := repositories.NewAnnouncementRepository(db)
+	systemConfigRepo := repositories.NewSystemConfigRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -70,7 +71,7 @@ func main() {
 		AccessTTL:  time.Duration(cfg.JWTAccessTTLMinutes) * time.Minute,
 		RefreshTTL: time.Duration(cfg.JWTRefreshTTLDays) * 24 * time.Hour,
 	})
-	seedSvc := services.NewSeedService(db, userRepo, roleRepo, employeeRepo, services.SeedConfig{
+	seedSvc := services.NewSeedService(db, userRepo, roleRepo, employeeRepo, systemConfigRepo, services.SeedConfig{
 		SuperAdminEmail:    cfg.SuperAdminEmail,
 		SuperAdminPassword: cfg.SuperAdminPassword,
 		SuperAdminName:     cfg.SuperAdminName,
@@ -100,6 +101,7 @@ func main() {
 		announcementRepo, employeeRepo, departmentRepo, labelRepo,
 		sseHubAdapter{hub: sseHub},
 	)
+	orgSettingsSvc := services.NewOrganizationSettingsService(systemConfigRepo, employeeRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -120,6 +122,7 @@ func main() {
 	attendanceH := handlers.NewAttendanceHandler(attendanceSvc)
 	announcementH := handlers.NewAnnouncementHandler(announcementSvc)
 	sseH := handlers.NewSSEHandler(sseHub)
+	orgSettingsH := handlers.NewOrganizationSettingsHandler(orgSettingsSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -299,6 +302,16 @@ func main() {
 		attendance.POST("", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminCreate)
 		attendance.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminUpdate)
 		attendance.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminDelete)
+
+		// ---- /organization-settings (Phase 8) ----
+		// Attendance subtree is admin-only (RequirePerms). Company-profile
+		// GET is JWT-only so the mobile map-preview can render for any
+		// signed-in user; PATCH stays admin-only.
+		org := authed.Group("/organization-settings")
+		org.GET("/attendance", middleware.RequirePerms(authSvc, permissions.PermOrgSettings), orgSettingsH.GetAttendance)
+		org.PATCH("/attendance", middleware.RequirePerms(authSvc, permissions.PermOrgSettings), orgSettingsH.UpdateAttendance)
+		org.GET("/company-profile", orgSettingsH.GetCompanyProfile)
+		org.PATCH("/company-profile", middleware.RequirePerms(authSvc, permissions.PermOrgSettings), orgSettingsH.UpdateCompanyProfile)
 
 		// ---- /sse (Phase 7 — Server-Sent Events) ----
 		// Uses a separate JWT middleware that also accepts ?token= because

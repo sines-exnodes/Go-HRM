@@ -5,15 +5,20 @@ import (
 	"testing"
 
 	"github.com/exnodes/hrm-api/internal/permissions"
+	"github.com/exnodes/hrm-api/internal/repositories"
 	"github.com/exnodes/hrm-api/internal/services"
 )
 
 func newSeedSvc() *services.SeedService {
-	return services.NewSeedService(testDB, testUserRepo, testRoleRepo, testEmployeeRepo, services.SeedConfig{
-		SuperAdminEmail:    "admin@test.com",
-		SuperAdminPassword: "ChangeMe!2026",
-		SuperAdminName:     "Super Admin",
-	})
+	return services.NewSeedService(
+		testDB, testUserRepo, testRoleRepo, testEmployeeRepo,
+		repositories.NewSystemConfigRepository(testDB),
+		services.SeedConfig{
+			SuperAdminEmail:    "admin@test.com",
+			SuperAdminPassword: "ChangeMe!2026",
+			SuperAdminName:     "Super Admin",
+		},
+	)
 }
 
 func TestSeedService_FreshDatabase_CreatesSystemRolesAndAdmin(t *testing.T) {

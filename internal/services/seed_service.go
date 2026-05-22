@@ -26,11 +26,12 @@ type SeedConfig struct {
 // matching employee row on boot. Safe to run repeatedly — operations are
 // merge/upsert and never overwrite manually-edited records.
 type SeedService struct {
-	db        *gorm.DB
-	users     repositories.UserRepository
-	roles     repositories.RoleRepository
-	employees repositories.EmployeeRepository
-	cfg       SeedConfig
+	db           *gorm.DB
+	users        repositories.UserRepository
+	roles        repositories.RoleRepository
+	employees    repositories.EmployeeRepository
+	systemConfig repositories.SystemConfigRepository
+	cfg          SeedConfig
 }
 
 // NewSeedService constructs a SeedService.
@@ -39,9 +40,10 @@ func NewSeedService(
 	users repositories.UserRepository,
 	roles repositories.RoleRepository,
 	employees repositories.EmployeeRepository,
+	systemConfig repositories.SystemConfigRepository,
 	cfg SeedConfig,
 ) *SeedService {
-	return &SeedService{db: db, users: users, roles: roles, employees: employees, cfg: cfg}
+	return &SeedService{db: db, users: users, roles: roles, employees: employees, systemConfig: systemConfig, cfg: cfg}
 }
 
 type roleSeed struct {
@@ -144,6 +146,21 @@ func (s *SeedService) Seed(ctx context.Context) error {
 		return err
 	}
 	if err := s.seedOrgDefaults(ctx); err != nil {
+		return err
+	}
+	if err := s.seedSystemConfig(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// seedSystemConfig is the Phase-8 idempotent INSERT of the system_config
+// singleton row. Safe to call on every boot — uses ON CONFLICT DO NOTHING.
+func (s *SeedService) seedSystemConfig(ctx context.Context) error {
+	if s.systemConfig == nil {
+		return nil
+	}
+	if err := s.systemConfig.EnsureExists(ctx); err != nil {
 		return err
 	}
 	return nil
