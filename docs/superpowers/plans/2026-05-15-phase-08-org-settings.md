@@ -2,6 +2,41 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## ⚠️ REVISION NOTES (2026-05-20) — AUTHORITATIVE, read & apply before executing any task
+
+This plan was drafted assuming Phase 7 would consume migration `000009`. Phase 6 actually took `000009` (attendance) and Phase 7 took `000010` (announcements). The codebase audit at the close of Phase 7 supersedes the task bodies below wherever they conflict. **Execute per these notes, not the raw task bodies where they conflict.**
+
+1. **Migration number = `000011`** (NOT `000010`). Final `make migrate-version` after Phase 8 = **11**. Rename every filename and reference accordingly.
+
+2. **`company_address_updated_by` FK target = `employees(id)`** (NOT `users(id)`). Mirrors `leave_requests.created_by` + `announcements.author_id` per the Go schema split. Keep `ON DELETE SET NULL` — the column is an audit trail and the row must survive an HR-profile delete. Author display reads `Employee.FullName`.
+
+3. **Router wiring lives in `cmd/server/main.go`** (NOT `internal/handlers/router.go`). [`internal/handlers/router.go`](../../internal/handlers/router.go) is mostly health-only since Phase 0; every other phase wires its routes inside the `v1 := r.Group("/api/v1")` block in `main.go`. Task 7 + Task 9 collapse into one main.go edit (build repo + service + handler, then register routes).
+
+4. **Seed service signature is `(s *SeedService) Seed(ctx context.Context) error`** — the DB is held inside the `SeedService` struct, not passed as an arg. Task 8 adds a new method `seedSystemConfig(ctx)` (mirroring the existing `seedRoles` / `seedSuperAdmin` / `seedOrgDefaults`) and calls it from `Seed()`. The system_config repo is injected via the constructor (`NewSeedService(..., systemConfigRepo)`), NOT constructed inline.
+
+5. **Existing handler helpers** — `currentUser(c) (*models.User, bool)` lives in [`internal/handlers/employee_handler.go`](../../internal/handlers/employee_handler.go) line 38; `parseIDParam` at line 52. The Phase 8 handler reuses them (don't redeclare).
+
+6. **`RequirePerms` takes `authSvc *AuthService` as first arg** — `middleware.RequirePerms(authSvc, perm.PermOrgSettings)`. Task 7's route block must include `authSvc` in every call.
+
+7. **`apperrors.Write(c, err)` does NOT exist.** Use `_ = c.Error(err); return` per the established pattern.
+
+8. **`make swag` output path = `docs/swagger`** (already correct in Task 9, just noted for consistency with prior phases).
+
+9. **Singleton ID is hardcoded — never expose mutation.** The repository must NEVER accept an arbitrary ID for upsert. Every read goes through `Get()` which queries `WHERE id = SystemConfigSingletonID`; every write goes through `Update()` which scopes to the same ID. Trying to insert a second row would hit the DB-level CHECK constraint but the repo defensively prevents the attempt.
+
+10. **`NotDeleted` scope is NOT applied** — singleton has no soft-delete semantics. The repo does not chain `Scopes(models.NotDeleted)` (consistent with the model not embedding `BaseModel`).
+
+11. **Plan task 1 Step 6 commit message: `feat(migrations): 000011 …`** (was `000010`).
+
+12. **Spec §6.3 vs registry**: `PermOrgSettings = "organization_settings:manage"` is already in [`internal/permissions/registry.go`](../../internal/permissions/registry.go) (Phase 1 seeded it to Admin + HR Manager). No registry change in Phase 8.
+
+13. **Test helper `truncateAll`**: add `system_config` to the TRUNCATE list (between announcements children and the rest). Tests assert on a fresh row after each run; the singleton check constraint means we must INSERT the sentinel back manually OR rely on the seed step run via the test fixture. Simplest: in the test helper's setup, after truncate, INSERT the sentinel row directly.
+
+Everything else in the task bodies (TDD-first, commit-per-task, no placeholders, bite-sized steps) still applies. **Execute per these REVISION NOTES, not the raw task bodies where they conflict.**
+
+---
+
+
 **Goal:** Port the Python `organization_settings` module to Go. Provide a **singleton** `system_config` row (one fixed UUID, no soft delete) that backs two logical sub-resources:
 
 - `GET /api/v1/organization-settings/attendance` (read with `PermOrgSettings`) + `PATCH` to update late-arrival threshold
