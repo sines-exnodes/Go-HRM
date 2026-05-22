@@ -67,6 +67,13 @@ func defaultRoles() []roleSeed {
 				permissions.PermUsersRead, permissions.PermUsersCreate, permissions.PermUsersUpdate, permissions.PermUsersDelete,
 				permissions.PermUsersManageRoles, permissions.PermUsersChangePwd,
 				permissions.PermRolesRead, permissions.PermRolesCreate, permissions.PermRolesUpdate,
+				// Employee HR profile management — added in the full-verify fix
+				// (full-verify.md). Pre-existing seed gap: Admin could not GET /
+				// employees, POST /employees, etc. because PermEmployees* was
+				// only available to Super Admin's wildcard. Adding here matches
+				// the role name's intent (Admin manages the HR aggregate too).
+				permissions.PermEmployeesRead, permissions.PermEmployeesCreate, permissions.PermEmployeesUpdate, permissions.PermEmployeesDelete,
+				permissions.PermDependentsManage,
 				permissions.PermDepartmentsRead, permissions.PermDepartmentsCreate, permissions.PermDepartmentsUpdate, permissions.PermDepartmentsDelete,
 				permissions.PermPositionsRead, permissions.PermPositionsCreate, permissions.PermPositionsUpdate, permissions.PermPositionsDelete,
 				permissions.PermSkillsRead, permissions.PermSkillsCreate, permissions.PermSkillsUpdate, permissions.PermSkillsDelete,
@@ -90,6 +97,11 @@ func defaultRoles() []roleSeed {
 				permissions.PermAuthLogin,
 				permissions.PermUsersRead, permissions.PermUsersCreate, permissions.PermUsersUpdate, permissions.PermUsersChangePwd,
 				permissions.PermRolesRead,
+				// Employee HR profile management — same fix as Admin (above).
+				// HR mirrors the rest of HR's perm shape: Read/Create/Update but
+				// NOT Delete (Admin owns the destructive op on users/employees).
+				permissions.PermEmployeesRead, permissions.PermEmployeesCreate, permissions.PermEmployeesUpdate,
+				permissions.PermDependentsManage,
 				permissions.PermDepartmentsRead, permissions.PermDepartmentsCreate, permissions.PermDepartmentsUpdate,
 				permissions.PermPositionsRead, permissions.PermPositionsCreate, permissions.PermPositionsUpdate,
 				permissions.PermSkillsRead, permissions.PermSkillsCreate, permissions.PermSkillsUpdate,
