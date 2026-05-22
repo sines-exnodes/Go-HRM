@@ -546,6 +546,36 @@ definitions:
     - device_id
     - token
     type: object
+  github_com_exnodes_hrm-api_internal_dto.InviteAccept:
+    properties:
+      full_name:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      token:
+        type: string
+    required:
+    - password
+    - token
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.InviteCreate:
+    properties:
+      department_id:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      position_id:
+        type: string
+      role_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - email
+    type: object
   github_com_exnodes_hrm-api_internal_dto.LabelCreate:
     properties:
       name:
@@ -601,6 +631,19 @@ definitions:
     properties:
       notifications_enabled:
         type: boolean
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.NotificationTestRequest:
+    properties:
+      body:
+        type: string
+      data:
+        additionalProperties: {}
+        type: object
+      title:
+        type: string
+    required:
+    - body
+    - title
     type: object
   github_com_exnodes_hrm-api_internal_dto.PositionCreate:
     properties:
@@ -783,6 +826,7 @@ definitions:
     - attendance:manage_data
     - organization_settings:manage
     - announcements:manage
+    - invites:manage
     type: string
     x-enum-varnames:
     - PermAll
@@ -826,6 +870,7 @@ definitions:
     - PermAttendanceManage
     - PermOrgSettings
     - PermAnnounceManage
+    - PermInviteManage
   github_com_exnodes_hrm-api_internal_permissions.PermissionGroup:
     properties:
       label:
@@ -2023,6 +2068,170 @@ paths:
       summary: Replace current employee avatar
       tags:
       - employees
+  /api/v1/invites:
+    get:
+      parameters:
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: filter by email substring
+        in: query
+        name: email
+        type: string
+      - description: pending|accepted|expired
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List invites
+      tags:
+      - invites
+    post:
+      consumes:
+      - application/json
+      description: Generates a token, attempts to send the invite email, and returns
+        the invite. SMTP misconfiguration is non-fatal — check last_email_error on
+        the response to see if the email was actually sent.
+      parameters:
+      - description: invite payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.InviteCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Issue a new invite
+      tags:
+      - invites
+  /api/v1/invites/{id}:
+    delete:
+      parameters:
+      - description: invite uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke an invite (soft delete)
+      tags:
+      - invites
+    get:
+      parameters:
+      - description: invite uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get an invite by ID
+      tags:
+      - invites
+  /api/v1/invites/{id}/resend:
+    post:
+      parameters:
+      - description: invite uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Resend the invite email (same token)
+      tags:
+      - invites
+  /api/v1/invites/accept:
+    post:
+      consumes:
+      - application/json
+      description: Token comes from the email link. Public endpoint — no JWT required
+        (the token is the credential).
+      parameters:
+      - description: accept payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.InviteAccept'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Accept an invite — creates the user (public)
+      tags:
+      - invites
   /api/v1/leave-requests:
     get:
       parameters:
@@ -2363,6 +2572,33 @@ paths:
       summary: Get an announcement (mobile)
       tags:
       - announcements
+  /api/v1/notifications/test:
+    post:
+      consumes:
+      - application/json
+      description: Admin debug endpoint. Looks up the caller's registered device tokens
+        and dispatches the payload to each. When FCM is not configured, every token
+        counts as 'skipped'.
+      parameters:
+      - description: push payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.NotificationTestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send a test push notification to the caller's devices
+      tags:
+      - notifications
   /api/v1/organization-settings/attendance:
     get:
       description: Returns the four attendance threshold fields (late/checkout, hour/minute).

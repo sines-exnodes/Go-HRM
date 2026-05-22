@@ -48,30 +48,30 @@ type InviteInviterBrief struct {
 // InviteRead is the canonical wire shape. Status is derived (pending /
 // accepted / expired / revoked).
 type InviteRead struct {
-	ID             uuid.UUID            `json:"id"`
-	Email          string               `json:"email"`
-	FullName       *string              `json:"full_name,omitempty"`
-	RoleIDs        []uuid.UUID          `json:"role_ids"`
-	DepartmentID   *uuid.UUID           `json:"department_id,omitempty"`
-	PositionID     *uuid.UUID           `json:"position_id,omitempty"`
-	ExpiresAt      time.Time            `json:"expires_at"`
-	AcceptedAt     *time.Time           `json:"accepted_at,omitempty"`
-	AcceptedUserID *uuid.UUID           `json:"accepted_user_id,omitempty"`
-	Status         string               `json:"status"`
-	InvitedBy      uuid.UUID            `json:"invited_by"`
-	Inviter        *InviteInviterBrief  `json:"inviter,omitempty"`
-	LastEmailError *string              `json:"last_email_error,omitempty"`
-	CreatedAt      time.Time            `json:"created_at"`
-	UpdatedAt      time.Time            `json:"updated_at"`
+	ID             uuid.UUID           `json:"id"`
+	Email          string              `json:"email"`
+	FullName       *string             `json:"full_name,omitempty"`
+	RoleIDs        []uuid.UUID         `json:"role_ids"`
+	DepartmentID   *uuid.UUID          `json:"department_id,omitempty"`
+	PositionID     *uuid.UUID          `json:"position_id,omitempty"`
+	ExpiresAt      time.Time           `json:"expires_at"`
+	AcceptedAt     *time.Time          `json:"accepted_at,omitempty"`
+	AcceptedUserID *uuid.UUID          `json:"accepted_user_id,omitempty"`
+	Status         string              `json:"status"`
+	InvitedBy      uuid.UUID           `json:"invited_by"`
+	Inviter        *InviteInviterBrief `json:"inviter,omitempty"`
+	LastEmailError *string             `json:"last_email_error,omitempty"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
 }
 
 // InviteAcceptResult is the payload returned by POST /invites/accept —
 // the public endpoint that creates the user row.
 type InviteAcceptResult struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Email     string    `json:"email"`
-	FullName  string    `json:"full_name"`
-	Message   string    `json:"message"`
+	UserID   uuid.UUID `json:"user_id"`
+	Email    string    `json:"email"`
+	FullName string    `json:"full_name"`
+	Message  string    `json:"message"`
 }
 
 // ---- Notification test ----

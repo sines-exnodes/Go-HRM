@@ -25,14 +25,14 @@ import (
 // public Accept endpoint is unauthenticated by design — the token is
 // the credential.
 type InviteService struct {
-	cfg     *config.Config
-	repo    repositories.InviteRepository
-	emps    repositories.EmployeeRepository
-	users   repositories.UserRepository
-	roles   repositories.RoleRepository
-	empSvc  *EmployeeService
-	email   *EmailService
-	db      *gorm.DB
+	cfg    *config.Config
+	repo   repositories.InviteRepository
+	emps   repositories.EmployeeRepository
+	users  repositories.UserRepository
+	roles  repositories.RoleRepository
+	empSvc *EmployeeService
+	email  *EmailService
+	db     *gorm.DB
 }
 
 // NewInviteService constructs the service. emailSvc may be nil in

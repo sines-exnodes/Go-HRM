@@ -20,7 +20,7 @@ import (
 
 // PushMessage is the provider-neutral push payload.
 type PushMessage struct {
-	Token string         // FCM device token
+	Token string // FCM device token
 	Title string
 	Body  string
 	Data  map[string]any

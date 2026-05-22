@@ -64,18 +64,18 @@ type Config struct {
 	// onto the invite row — invite creation still succeeds. Same shape
 	// for FIREBASE_*: empty credentials path = PushClient is a no-op
 	// logger (parity with Python's _get_firebase_app()).
-	AppName                string
-	FrontendURL            string
-	InviteTokenExpireHours int
-	SMTPHost               string
-	SMTPPort               int
-	SMTPUser               string
-	SMTPPassword           string
-	SMTPFromEmail          string
-	SMTPFromName           string
-	SMTPUseTLS             bool
+	AppName                 string
+	FrontendURL             string
+	InviteTokenExpireHours  int
+	SMTPHost                string
+	SMTPPort                int
+	SMTPUser                string
+	SMTPPassword            string
+	SMTPFromEmail           string
+	SMTPFromName            string
+	SMTPUseTLS              bool
 	FirebaseCredentialsPath string
-	FirebaseProjectID      string
+	FirebaseProjectID       string
 }
 
 // Load reads the .env file (if present) and returns the populated Config.
