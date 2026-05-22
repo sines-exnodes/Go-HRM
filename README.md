@@ -308,3 +308,48 @@ columns exist for schema parity but are never written.
 NULL` per the Go schema split. The GET projection resolves
 `updated_by_name` from `Employee.FullName` (best-effort — falls back
 to nil when the employee row is gone).
+
+## Phase 9 — Email + Invite + Push
+
+### Invites
+
+| Method | Path                                  | Permission        | Description                                                    |
+|--------|---------------------------------------|-------------------|----------------------------------------------------------------|
+| GET    | /api/v1/invites                       | invites:manage    | List invites (filterable by email substring, status enum)      |
+| POST   | /api/v1/invites                       | invites:manage    | Issue invite — generates token + ships email (degrades to `last_email_error` on SMTP misconfig) |
+| GET    | /api/v1/invites/{id}                  | invites:manage    | Get a specific invite                                          |
+| POST   | /api/v1/invites/{id}/resend           | invites:manage    | Resend the SAME token (no rotation; partial deliveries stay valid) |
+| DELETE | /api/v1/invites/{id}                  | invites:manage    | Revoke (soft delete)                                           |
+| POST   | /api/v1/invites/accept                | **public**        | Consume token + password → create user + employee + assign roles |
+
+`invited_by` references `employees(id) ON DELETE RESTRICT` per the
+schema split. `accepted_user_id` references `users(id) ON DELETE SET
+NULL` — the auth identity created on accept. The Accept endpoint is
+intentionally outside the JWT-protected group because the invitee has
+no account yet — the token IS the credential.
+
+Token shape: 32 random bytes encoded as URL-safe base64 (no padding,
+~43 chars). Stored with a partial unique index on `(token) WHERE
+is_deleted = FALSE` so revoked invites release their token slot.
+
+Email delivery uses SMTP via `gopkg.in/gomail.v2`. When `SMTP_HOST` is
+empty the EmailService writes the would-be email to the log and
+populates `invites.last_email_error` — invite creation still succeeds
+(the FE can re-trigger via `POST /invites/{id}/resend`). Local
+verification points SMTP at Mailpit:
+`docker run -d --rm -p 11025:1025 -p 18025:8025 --name mailpit axllent/mailpit`.
+
+### Push notifications
+
+| Method | Path                              | Permission         | Description                                              |
+|--------|-----------------------------------|--------------------|----------------------------------------------------------|
+| POST   | /api/v1/notifications/test        | users:manage_roles | Push a test message to the caller's own registered devices (admin debug) |
+
+Backed by a pluggable `PushClient` interface; default impl is FCM HTTP
+v1 (`https://fcm.googleapis.com/v1/projects/{projectID}/messages:send`)
+using a Google service-account access token via
+`golang.org/x/oauth2/google`. When `FIREBASE_CREDENTIALS_PATH` or
+`FIREBASE_PROJECT_ID` is empty the client is a no-op logger — the
+endpoint still returns 200 with `{sent: 0, skipped: N}` so the FE can
+poll the same shape in dev. Production rollout: set the two env vars
+and restart; no code change required.
