@@ -2357,6 +2357,133 @@
                 }
             }
         },
+        "/api/v1/organization-settings/attendance": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the four attendance threshold fields (late/checkout, hour/minute).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization-settings"
+                ],
+                "summary": "Get attendance thresholds",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization-settings"
+                ],
+                "summary": "Update attendance thresholds (partial)",
+                "parameters": [
+                    {
+                        "description": "patch payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceSettingsUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/organization-settings/company-profile": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Open to any authenticated user — the FE renders the map preview on shared screens.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization-settings"
+                ],
+                "summary": "Get company profile (address + lat/lng)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Stamps company_address_updated_at + updated_by whenever any of the three address fields are supplied.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "organization-settings"
+                ],
+                "summary": "Update company profile (admin only)",
+                "parameters": [
+                    {
+                        "description": "patch payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.CompanyProfileUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/positions": {
             "get": {
                 "security": [
@@ -3594,6 +3721,31 @@
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.AttendanceSettingsUpdate": {
+            "type": "object",
+            "properties": {
+                "checkout_threshold_hour": {
+                    "type": "integer",
+                    "maximum": 23,
+                    "minimum": 0
+                },
+                "checkout_threshold_minute": {
+                    "type": "integer",
+                    "maximum": 59,
+                    "minimum": 0
+                },
+                "late_threshold_hour": {
+                    "type": "integer",
+                    "maximum": 23,
+                    "minimum": 0
+                },
+                "late_threshold_minute": {
+                    "type": "integer",
+                    "maximum": 59,
+                    "minimum": 0
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest": {
             "type": "object",
             "required": [
@@ -3623,6 +3775,24 @@
                 "new_password": {
                     "type": "string",
                     "minLength": 8
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.CompanyProfileUpdate": {
+            "type": "object",
+            "properties": {
+                "company_address": {
+                    "type": "string"
+                },
+                "company_latitude": {
+                    "type": "number",
+                    "maximum": 90,
+                    "minimum": -90
+                },
+                "company_longitude": {
+                    "type": "number",
+                    "maximum": 180,
+                    "minimum": -180
                 }
             }
         },

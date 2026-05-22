@@ -32,11 +32,11 @@ type SystemConfig struct {
 	CheckoutThresholdMinute int16 `gorm:"not null;default:0"  json:"checkout_threshold_minute"`
 
 	// Company profile
-	CompanyAddress             *string    `gorm:"type:text"                 json:"company_address,omitempty"`
-	CompanyLatitude            *float64   `                                 json:"company_latitude,omitempty"`
-	CompanyLongitude           *float64   `                                 json:"company_longitude,omitempty"`
-	CompanyAddressUpdatedAt    *time.Time `                                 json:"company_address_updated_at,omitempty"`
-	CompanyAddressUpdatedBy    *uuid.UUID `gorm:"type:uuid"                 json:"company_address_updated_by,omitempty"`
+	CompanyAddress          *string    `gorm:"type:text"                 json:"company_address,omitempty"`
+	CompanyLatitude         *float64   `                                 json:"company_latitude,omitempty"`
+	CompanyLongitude        *float64   `                                 json:"company_longitude,omitempty"`
+	CompanyAddressUpdatedAt *time.Time `                                 json:"company_address_updated_at,omitempty"`
+	CompanyAddressUpdatedBy *uuid.UUID `gorm:"type:uuid"                 json:"company_address_updated_by,omitempty"`
 
 	// Audit columns — present for schema parity but not driven by
 	// soft-delete logic.

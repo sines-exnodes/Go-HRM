@@ -111,7 +111,12 @@ func truncateAll(t *testing.T) {
 	// Phase-7 entries (announcement_views, announcement_attachments,
 	// announcement_target_departments, announcement_labels, announcements)
 	// precede employees + labels + departments — see REVISION NOTES #13.
-	if err := testDB.Exec(`TRUNCATE TABLE announcement_views, announcement_attachments, announcement_target_departments, announcement_labels, announcements, labels, employee_skills, skills, device_tokens, user_notification_settings, attendance_sessions, attendance, leave_requests, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+	// Phase-8: include `system_config` in the truncate list so each test
+	// starts from a known state. After truncate, immediately re-INSERT
+	// the sentinel row (the DB-level CHECK enforces a single fixed UUID,
+	// so we cannot rely on auto-insert; tests that need the row call
+	// EnsureExists() themselves OR rely on this re-seed).
+	if err := testDB.Exec(`TRUNCATE TABLE system_config, announcement_views, announcement_attachments, announcement_target_departments, announcement_labels, announcements, labels, employee_skills, skills, device_tokens, user_notification_settings, attendance_sessions, attendance, leave_requests, employee_leave_quotas, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }

@@ -161,6 +161,25 @@ definitions:
       notes:
         type: string
     type: object
+  github_com_exnodes_hrm-api_internal_dto.AttendanceSettingsUpdate:
+    properties:
+      checkout_threshold_hour:
+        maximum: 23
+        minimum: 0
+        type: integer
+      checkout_threshold_minute:
+        maximum: 59
+        minimum: 0
+        type: integer
+      late_threshold_hour:
+        maximum: 23
+        minimum: 0
+        type: integer
+      late_threshold_minute:
+        maximum: 59
+        minimum: 0
+        type: integer
+    type: object
   github_com_exnodes_hrm-api_internal_dto.ChangeEmailRequest:
     properties:
       current_password:
@@ -182,6 +201,19 @@ definitions:
         type: string
     required:
     - new_password
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.CompanyProfileUpdate:
+    properties:
+      company_address:
+        type: string
+      company_latitude:
+        maximum: 90
+        minimum: -90
+        type: number
+      company_longitude:
+        maximum: 180
+        minimum: -180
+        type: number
     type: object
   github_com_exnodes_hrm-api_internal_dto.DeleteUserRequest:
     properties:
@@ -2331,6 +2363,87 @@ paths:
       summary: Get an announcement (mobile)
       tags:
       - announcements
+  /api/v1/organization-settings/attendance:
+    get:
+      description: Returns the four attendance threshold fields (late/checkout, hour/minute).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get attendance thresholds
+      tags:
+      - organization-settings
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: patch payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceSettingsUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update attendance thresholds (partial)
+      tags:
+      - organization-settings
+  /api/v1/organization-settings/company-profile:
+    get:
+      description: Open to any authenticated user — the FE renders the map preview
+        on shared screens.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get company profile (address + lat/lng)
+      tags:
+      - organization-settings
+    patch:
+      consumes:
+      - application/json
+      description: Stamps company_address_updated_at + updated_by whenever any of
+        the three address fields are supplied.
+      parameters:
+      - description: patch payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.CompanyProfileUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update company profile (admin only)
+      tags:
+      - organization-settings
   /api/v1/positions:
     get:
       parameters:
