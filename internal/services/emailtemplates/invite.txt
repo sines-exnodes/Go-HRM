@@ -1,0 +1,12 @@
+Welcome to {{.AppName}}
+
+Hi{{if .FullName}} {{.FullName}}{{end}},
+
+You've been invited to join {{.AppName}}. To set up your account, open
+this link in your browser:
+
+  {{.AcceptURL}}
+
+This invitation expires on {{.ExpiresAt}}.
+
+If you weren't expecting this invitation, you can safely ignore this email.
