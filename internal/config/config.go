@@ -58,6 +58,24 @@ type Config struct {
 	OfficeLongitude         float64
 	OfficeRadiusMeters      float64
 	HalfDayHoursThreshold   float64
+
+	// Email + Invite + Push (Phase 9). When SMTP_HOST is empty the
+	// EmailService logs the would-be email and writes last_email_error
+	// onto the invite row — invite creation still succeeds. Same shape
+	// for FIREBASE_*: empty credentials path = PushClient is a no-op
+	// logger (parity with Python's _get_firebase_app()).
+	AppName                string
+	FrontendURL            string
+	InviteTokenExpireHours int
+	SMTPHost               string
+	SMTPPort               int
+	SMTPUser               string
+	SMTPPassword           string
+	SMTPFromEmail          string
+	SMTPFromName           string
+	SMTPUseTLS             bool
+	FirebaseCredentialsPath string
+	FirebaseProjectID      string
 }
 
 // Load reads the .env file (if present) and returns the populated Config.
@@ -103,6 +121,19 @@ func Load() *Config {
 		OfficeLongitude:         getEnvFloat("OFFICE_LONGITUDE", 0.0),
 		OfficeRadiusMeters:      getEnvFloat("OFFICE_RADIUS_METERS", 50.0),
 		HalfDayHoursThreshold:   getEnvFloat("HALF_DAY_HOURS_THRESHOLD", 4.0),
+
+		AppName:                 getEnv("APP_NAME", "Exnodes HRM"),
+		FrontendURL:             getEnv("FRONTEND_URL", "http://localhost:3000"),
+		InviteTokenExpireHours:  getEnvInt("INVITE_TOKEN_EXPIRE_HOURS", 72),
+		SMTPHost:                getEnv("SMTP_HOST", ""),
+		SMTPPort:                getEnvInt("SMTP_PORT", 587),
+		SMTPUser:                getEnv("SMTP_USER", ""),
+		SMTPPassword:            getEnv("SMTP_PASSWORD", ""),
+		SMTPFromEmail:           getEnv("SMTP_FROM_EMAIL", ""),
+		SMTPFromName:            getEnv("SMTP_FROM_NAME", "Exnodes HRM"),
+		SMTPUseTLS:              getEnvBool("SMTP_USE_TLS", true),
+		FirebaseCredentialsPath: getEnv("FIREBASE_CREDENTIALS_PATH", ""),
+		FirebaseProjectID:       getEnv("FIREBASE_PROJECT_ID", ""),
 	}
 
 	if strings.TrimSpace(cfg.JWTSecret) == "" {
