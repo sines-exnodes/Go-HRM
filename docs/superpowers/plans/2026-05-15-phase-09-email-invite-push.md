@@ -2,6 +2,59 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## ⚠️ REVISION NOTES (2026-05-22) — AUTHORITATIVE, read & apply before executing any task
+
+This plan was drafted assuming Phase 8 would use migration `000010` (which the plan itself called `000010_seed_system_data` — never written). Actual sequence: Phase 6=`000009`, Phase 7=`000010`, Phase 8=`000011`. The codebase audit at the close of Phase 8 supersedes the task bodies below. **Execute per these notes, not the raw task bodies where they conflict.**
+
+1. **Migration number = `000012_create_invites`** (NOT `000011`). Phase 8 already took `000011_create_system_config`. Final `make migrate-version` after Phase 9 = **12**.
+
+2. **`invites.invited_by` FK target = `employees(id)`**, NOT `users(id)`. Mirrors `announcements.author_id` + `system_config.company_address_updated_by` per the Go schema split. Use `ON DELETE RESTRICT` to preserve the audit trail. The handler / service resolve the current user → employee via `s.emps.FindByUserID(currentUserID)` (same pattern as Phases 5/6/7/8).
+
+3. **`invites.accepted_user_id` FK target = `users(id)`** (correct as drafted). Accept flow creates a fresh `users` row + a paired `employees` row; the marker is the auth identity, mirroring `announcement_views.user_id`.
+
+4. **Config helpers**: `getEnvDefault` does NOT exist — use the existing `getEnv` helper. `getEnvInt` + `getEnvBool` + `getEnvFloat` already exist (added in Phase 6). No need to redeclare. Task 2 must use `getEnv` (not `getEnvDefault`).
+
+5. **`UserService.CreateInternal` does NOT exist.** Phase 2 exposes `EmployeeService.Create(ctx, dto.EmployeeCreate)` which atomically creates user + employee in a transaction (precisely what `/invites/accept` needs). The InviteService.Accept method calls `empSvc.Create(...)`, not a standalone user-create. Construct the `dto.EmployeeCreate` from the invite row's fields (email, full_name, role_ids, department_id, position_id) plus the accept-time password.
+
+6. **`pq.StringArray` won't work for UUID[] columns.** Use the `lib/pq` `pq.GenericArray{}` or the `gorm.io/datatypes` JSON array — but for cleanest typing, define a custom `UUIDArray` scanner/valuer that wraps `pq.Array(...)`. The plan's import of `"github.com/lib/pq"` is correct but `pq.StringArray` would cast UUIDs to strings; we need genuine UUID typing on the Go side.
+
+7. **Existing handler helpers** — `currentUser(c)` + `parseIDParam(c, key)` are in [`internal/handlers/employee_handler.go`](../../internal/handlers/employee_handler.go). Reuse, don't redeclare.
+
+8. **`apperrors.Write(c, err)` does NOT exist.** Use `_ = c.Error(err); return` per the established pattern.
+
+9. **`RequirePerms` signature includes `authSvc *AuthService` as first arg** — `middleware.RequirePerms(authSvc, perm.PermInviteManage)`. Task 13 must include `authSvc` in every call.
+
+10. **Routes wire in `cmd/server/main.go`**, NOT a `routes.Register(r, deps)` style file. Inline as in Phases 5/6/7/8.
+
+11. **External dependencies (SMTP / FCM) must degrade gracefully.** When `SMTP_HOST=""`, EmailService logs the would-be email but does not fail invite creation. When `FIREBASE_CREDENTIALS_PATH=""`, PushClient is a no-op (matches the plan's intent). The InviteService.Create / Resend MUST NOT return 500 just because SMTP is misconfigured — store the error on `invites.last_email_error` and return 201/200 (per non-negotiable #7 in the plan).
+
+12. **Permission constant — add `PermInviteManage = "invites:manage"`** to [`internal/permissions/registry.go`](../../internal/permissions/registry.go) (after `PermAnnounceManage`) AND seed it to Admin + HR Manager in [`internal/services/seed_service.go`](../../internal/services/seed_service.go). The spec §6.3 listing missed this constant. NOT using `PermUsersCreate` (which is for direct user CRUD) — invites are a separate surface with separate visibility (HR can invite without being able to admin-edit existing users).
+
+13. **`truncateAll` test helper**: add `invites` to the TRUNCATE list before `employees` (since `invited_by` → `employees(id) RESTRICT`).
+
+14. **External SMTP server for verification**: Mailpit. Run via `docker run -d --rm -p 11025:1025 -p 18025:8025 --name mailpit-phase09 axllent/mailpit` (use non-default host ports `11025/18025` to avoid colliding with other dev SMTP). Verification log inspects emails via `http://localhost:18025/api/v1/messages`. If Docker / Mailpit is unavailable in this environment, the e2e walk still verifies the invite-create-without-SMTP code path (200 + `last_email_error` populated).
+
+15. **`encoding/base64` URL-safe token**: 32 random bytes encoded with `base64.RawURLEncoding` (no padding, URL-safe). 43 chars. Stored as `TEXT`; the partial unique index on `(token) WHERE is_deleted = false` covers collisions (vanishingly unlikely at that entropy, but defensive).
+
+16. **Accept flow validation**:
+    - Reject when `accepted_at IS NOT NULL` (already used) → 409.
+    - Reject when `expires_at < NOW()` → 410 Gone (or 400; pick 400 for consistency with our error envelope which doesn't surface 410 as a code).
+    - Reject when token doesn't match (soft-deleted invites included) → 404.
+    - On success: create user+employee via `empSvc.Create`, then `UPDATE invites SET accepted_at = NOW(), accepted_user_id = new_user.id` in the same transaction.
+
+17. **`Resend` semantics**: shipping the same token (no rotation) keeps the resend idempotent and lets a partially-delivered email still be valid. Stamp `updated_at` (the trigger does this) and clear `last_email_error` on success.
+
+18. **`Revoke` is soft-delete**: `is_deleted=true, deleted_at=NOW()`. Subsequent `/invites/accept` with the same token must 404.
+
+19. **Push test endpoint** (`POST /api/v1/notifications/test`) is admin-only (`RequirePerms(authSvc, permissions.PermUsersManageRoles)` per spec §6.3 — closest fit, since there's no dedicated `PermNotificationsTest`). Body: `{title, body, data?}`. Pushes to the calling admin's own device tokens (so they can self-test). If FCM is disabled, returns 200 with `{sent: 0, skipped: <count>}`.
+
+20. **Phase 9 verification expects external services.** Set up Mailpit before T19. FCM stays disabled in dev (no FIREBASE_CREDENTIALS_PATH); the push-test endpoint returns the skipped-count payload. CHECKPOINT must document both.
+
+Everything else in the task bodies (TDD-first, commit-per-task, no placeholders) still applies. **Execute per these REVISION NOTES, not the raw task bodies where they conflict.**
+
+---
+
+
 **Goal:** Port the Python email/invite/push-notification stack into `exnodes-hrm-api-go-v2`:
 
 1. An SMTP-backed `EmailService` that renders the two HTML/plain-text templates (invite + password-reset) from the Python codebase and ships them via `gopkg.in/gomail.v2`.
