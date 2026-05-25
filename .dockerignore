@@ -1,0 +1,31 @@
+# VCS + IDE
+.git
+.github
+.gitignore
+.idea
+.vscode
+*.swp
+.DS_Store
+
+# Agent / tooling state (CLAUDE.md treats .claude/ as local-only)
+.claude
+.serena
+
+# Build outputs
+bin/
+tmp/
+.air-tmp/
+*.test
+*.out
+coverage.*
+
+# Env files — never bake secrets into the image
+.env
+.env.local
+.env.*.local
+
+# Specs / plans / verification logs aren't needed at runtime
+docs/superpowers/
+
+# Misc
+README.md.bak

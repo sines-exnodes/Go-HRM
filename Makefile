@@ -22,7 +22,9 @@ endif
 TEST_DB_NAME      ?= exnodes_hrm_test
 TEST_DATABASE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(TEST_DB_NAME)?sslmode=$(DB_SSLMODE)
 
-.PHONY: help run build test test-db-up tidy fmt vet swag migrate-new migrate-up migrate-down migrate-version migrate-force
+.PHONY: help run build test test-db-up tidy fmt vet swag \
+        migrate-new migrate-up migrate-down migrate-version migrate-force \
+        docker-build docker-up docker-down docker-dev docker-logs
 
 help:
 	@echo "Targets:"
@@ -39,6 +41,11 @@ help:
 	@echo "  migrate-down      Rollback one migration step"
 	@echo "  migrate-version   Print current applied migration version"
 	@echo "  migrate-force version=N  Force version (use only to fix dirty state)"
+	@echo "  docker-build      Build the prod Docker image"
+	@echo "  docker-up         Start prod stack (app + postgres) in background"
+	@echo "  docker-down       Stop the stack (keeps the postgres_data volume)"
+	@echo "  docker-dev        Start dev stack with Air hot-reload"
+	@echo "  docker-logs       Tail app logs from the running stack"
 
 run:
 	go run ./cmd/server
@@ -90,3 +97,22 @@ migrate-version:
 migrate-force:
 	@if [ -z "$(version)" ]; then echo "usage: make migrate-force version=<N>" && exit 1; fi
 	$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DATABASE_URL)" force $(version)
+
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-dev:
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+docker-logs:
+	docker compose logs -f app

@@ -94,6 +94,52 @@ appears under the `system` tag.
 | `make migrate-down` | Roll back one migration step |
 | `make migrate-version` | Print the currently applied migration version |
 | `make migrate-force version=N` | Force the version (only to fix a dirty state) |
+| `make docker-build` | Build the prod Docker image |
+| `make docker-up` | Start prod stack (app + postgres) in background |
+| `make docker-down` | Stop the stack (keeps the `postgres_data` volume) |
+| `make docker-dev` | Start dev stack with Air hot-reload |
+| `make docker-logs` | Tail app logs from the running stack |
+
+## Docker
+
+The repo ships a multi-stage `Dockerfile` (Alpine, non-root, ~100 MB final
+image — server binary ~42 MB + `migrate` CLI ~7 MB + Alpine runtime) and two
+compose files: `docker-compose.yml` (prod) and `docker-compose.dev.yml` (dev
+override with Air hot-reload).
+
+### Production stack
+
+```bash
+cp .env.docker.example .env
+# Edit .env: JWT_SECRET_KEY, SUPER_ADMIN_PASSWORD, DB_PASSWORD,
+# CORS_ALLOWED_ORIGINS, STORAGE_*, SMTP_*, etc.
+make docker-up
+curl -s http://localhost:8080/health | jq
+```
+
+The app container's entrypoint runs `migrate up` against postgres before
+starting the server, so a fresh `docker compose up` on an empty DB is a
+single command. Postgres data persists in the named volume `postgres_data`
+across `make docker-down`; use `docker compose down -v` to wipe it.
+
+### Dev stack (hot-reload)
+
+```bash
+make docker-dev
+```
+
+This layers `docker-compose.dev.yml` on top of the base file: target switches
+to `dev`, source code is bind-mounted at `/app`, and Air watches `.go` files
+to rebuild + restart. Air's `pre_cmd` (see `.air.toml`) re-applies migrations
+on every rebuild, so adding a new migration is automatic.
+
+### Image stages
+
+| Stage | Base | Used by |
+|---|---|---|
+| `builder` | `golang:1.25-alpine` | Internal — compiles the server binary + the `migrate` CLI |
+| `dev` | `golang:1.25-alpine` | `make docker-dev` — Air hot-reload |
+| `prod` | `alpine:3.20` (non-root user `app`) | `make docker-up` — runtime image |
 
 ## Project layout
 

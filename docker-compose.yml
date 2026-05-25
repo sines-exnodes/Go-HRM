@@ -1,0 +1,50 @@
+# Production stack: app (Dockerfile target=prod) + postgres.
+#
+# Usage:
+#   cp .env.docker.example .env   # then edit secrets
+#   docker compose up -d
+#   docker compose logs -f app
+#
+# For dev/hot-reload, layer the dev override:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: exnodes-hrm-postgres
+    environment:
+      POSTGRES_USER:     ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB:       ${DB_NAME:-exnodes_hrm}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-exnodes_hrm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+    container_name: exnodes-hrm-app
+    env_file: .env
+    environment:
+      # Override DB_HOST so the app reaches postgres over the compose network
+      # regardless of what the user has in .env (which often points at localhost).
+      DB_HOST: postgres
+      APP_ENV: ${APP_ENV:-production}
+    ports:
+      - "${PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

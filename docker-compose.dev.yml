@@ -1,0 +1,27 @@
+# Dev override — layer on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Differences vs prod:
+#   * App built with target=dev (golang base + Air)
+#   * Source code mounted at /app for hot-reload
+#   * Named volume for /go/pkg/mod so `go mod download` is cached across runs
+#   * APP_ENV=development, GIN_MODE=debug
+#   * The dev image's CMD (`air -c .air.toml`) replaces the prod ENTRYPOINT,
+#     so the prod migration-on-start hook is NOT used here. Air's `pre_cmd`
+#     runs migrations on each rebuild instead (see .air.toml).
+
+services:
+  app:
+    build:
+      target: dev
+    volumes:
+      - .:/app
+      - go_modules:/go/pkg/mod
+    environment:
+      APP_ENV: development
+      GIN_MODE: debug
+      SWAGGER_ENABLED: "true"
+    command: ["air", "-c", ".air.toml"]
+
+volumes:
+  go_modules:
