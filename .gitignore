@@ -28,3 +28,6 @@ coverage.html
 # Serena MCP — commit project.yml + memories/ (reproducible config + pointer
 # memories); ignore the LSP cache which is machine-local and regenerated.
 .serena/cache/
+
+# Claude Code local state — agent memory + per-machine settings.
+.claude/
