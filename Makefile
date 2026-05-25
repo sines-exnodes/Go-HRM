@@ -24,6 +24,7 @@ TEST_DATABASE_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/
 
 .PHONY: help run build test test-db-up tidy fmt vet swag \
         migrate-new migrate-up migrate-down migrate-version migrate-force \
+        seed-dev \
         docker-build docker-up docker-down docker-dev docker-logs
 
 help:
@@ -41,6 +42,7 @@ help:
 	@echo "  migrate-down      Rollback one migration step"
 	@echo "  migrate-version   Print current applied migration version"
 	@echo "  migrate-force version=N  Force version (use only to fix dirty state)"
+	@echo "  seed-dev          Load development sample data (idempotent; refuses if APP_ENV=production)"
 	@echo "  docker-build      Build the prod Docker image"
 	@echo "  docker-up         Start prod stack (app + postgres) in background"
 	@echo "  docker-down       Stop the stack (keeps the postgres_data volume)"
@@ -97,6 +99,21 @@ migrate-version:
 migrate-force:
 	@if [ -z "$(version)" ]; then echo "usage: make migrate-force version=<N>" && exit 1; fi
 	$(MIGRATE) -path $(MIGRATIONS_DIR) -database "$(DATABASE_URL)" force $(version)
+
+# ---------------------------------------------------------------------------
+# Dev seed
+# ---------------------------------------------------------------------------
+
+# Load dev/demo fixtures: 19 sample employees with skills, leave requests,
+# attendance, announcements. Idempotent — re-running is a no-op.
+# Refuses to run when APP_ENV=production (safety guard).
+seed-dev:
+	@if [ "$(APP_ENV)" = "production" ]; then \
+		echo "seed-dev: refusing to run (APP_ENV=production)"; \
+		exit 1; \
+	fi
+	@echo "seed-dev: target DB = $(DATABASE_URL)"
+	psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f migrations/seeds/dev_fixtures.sql
 
 # ---------------------------------------------------------------------------
 # Docker

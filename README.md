@@ -78,6 +78,21 @@ Expected:
 Then open `http://localhost:8080/swagger/index.html` and confirm `GET /health`
 appears under the `system` tag.
 
+### 8. (Optional) Seed dev fixtures
+
+For FE / Mobile development you usually want a populated DB. Load 19 sample
+employees (with skills, dependents, leave requests, attendance, announcements)
+in one shot:
+
+```bash
+make seed-dev
+```
+
+The script is idempotent — running it twice is a no-op. All sample users share
+the password `Exnodes@2026`; emails follow `<firstname>.<lastname>@exnodes.vn`
+(e.g. `nguyen.an@exnodes.vn`, or `tran.lan@exnodes.vn` for the Admin role).
+The target refuses to run when `APP_ENV=production`.
+
 ## Make targets
 
 | Target | What it does |
@@ -94,6 +109,7 @@ appears under the `system` tag.
 | `make migrate-down` | Roll back one migration step |
 | `make migrate-version` | Print the currently applied migration version |
 | `make migrate-force version=N` | Force the version (only to fix a dirty state) |
+| `make seed-dev` | Load dev/demo fixtures (idempotent; refuses if APP_ENV=production) |
 | `make docker-build` | Build the prod Docker image |
 | `make docker-up` | Start prod stack (app + postgres) in background |
 | `make docker-down` | Stop the stack (keeps the `postgres_data` volume) |
