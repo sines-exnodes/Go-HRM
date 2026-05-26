@@ -21,6 +21,7 @@
 vendor/
 coverage.out
 coverage.html
+.air-tmp/
 
 # Swagger generated artifacts kept under docs/swagger only; ignore other generated dirs
 /docs/swagger/swagger.json.bak
@@ -31,3 +32,10 @@ coverage.html
 
 # Claude Code local state — agent memory + per-machine settings.
 .claude/
+
+# MCP — per-developer MCP server config. May contain personal API tokens
+# (Figma, etc.); never commit. Share project-wide MCP defaults via README.
+.mcp.json
+
+# oh-my-claudecode — local session state + project-memory cache.
+.omc/
