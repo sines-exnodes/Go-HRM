@@ -12,10 +12,11 @@ import (
 )
 
 // makeDept is a small helper to create a department via the service so
-// positions have a valid FK target.
+// employee fixtures have a valid FK target. Positions themselves are no
+// longer associated with a department (post-000014).
 func makeDept(t *testing.T, name string) *dto.DepartmentRead {
 	t.Helper()
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	d, err := svc.Create(context.Background(), dto.DepartmentCreate{Name: name})
 	require.NoError(t, err)
 	return d
@@ -26,73 +27,49 @@ func TestPositionService_Create_OK(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	dept := makeDept(t, "Engineering")
-	svc, _, _ := newPosSvc(t)
-
+	svc, _ := newPosSvc(t)
 	p, err := svc.Create(ctx, dto.PositionCreate{
-		Name:         "Backend Engineer",
-		Description:  "  builds APIs  ",
-		DepartmentID: dept.ID,
+		Name:        "Backend Engineer",
+		Description: "  builds APIs  ",
 	})
 	require.NoError(t, err)
 	require.NotEqual(t, uuid.Nil, p.ID)
 	require.Equal(t, "Backend Engineer", p.Name)
 	require.Equal(t, "builds APIs", p.Description)
-	require.Equal(t, dept.ID, p.DepartmentID)
-	require.NotNil(t, p.Department)
-	require.Equal(t, "Engineering", p.Department.Name)
+	// Freshly created position has zero employees.
+	require.Equal(t, int64(0), p.EmployeeCount)
 }
 
-func TestPositionService_Create_MissingDept_BadRequest(t *testing.T) {
+// Post-000014: position names are globally unique (case-insensitive).
+// The previous "same name in different department is OK" behavior is gone.
+func TestPositionService_Create_DuplicateName_GlobalConflict(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newPosSvc(t)
-	_, err := svc.Create(ctx, dto.PositionCreate{
-		Name:         "Ghost",
-		DepartmentID: uuid.New(),
-	})
-	require.Error(t, err)
-	ae, ok := apperrors.As(err)
-	require.True(t, ok)
-	require.Equal(t, apperrors.CodeBadRequest, ae.Code)
-}
-
-func TestPositionService_Create_DuplicateNameInDept_Conflict(t *testing.T) {
-	skipIfNoDB(t)
-	truncateAll(t)
-	ctx := context.Background()
-
-	dept := makeDept(t, "HR")
-	svc, _, _ := newPosSvc(t)
-
-	_, err := svc.Create(ctx, dto.PositionCreate{Name: "Recruiter", DepartmentID: dept.ID})
+	svc, _ := newPosSvc(t)
+	_, err := svc.Create(ctx, dto.PositionCreate{Name: "Manager"})
 	require.NoError(t, err)
 
-	// Case-insensitive duplicate within the same department is rejected.
-	_, err = svc.Create(ctx, dto.PositionCreate{Name: "recruiter", DepartmentID: dept.ID})
+	// Case-insensitive duplicate anywhere in the table is rejected.
+	_, err = svc.Create(ctx, dto.PositionCreate{Name: "manager"})
 	require.Error(t, err)
 	ae, ok := apperrors.As(err)
 	require.True(t, ok)
 	require.Equal(t, apperrors.CodeConflict, ae.Code)
 }
 
-func TestPositionService_Create_DuplicateNameInDifferentDept_OK(t *testing.T) {
+func TestPositionService_Create_BlankName_BadRequest(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
 
-	deptA := makeDept(t, "Dept A")
-	deptB := makeDept(t, "Dept B")
-	svc, _, _ := newPosSvc(t)
-
-	_, err := svc.Create(ctx, dto.PositionCreate{Name: "Manager", DepartmentID: deptA.ID})
-	require.NoError(t, err)
-	// Same name in a different department is allowed.
-	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Manager", DepartmentID: deptB.ID})
-	require.NoError(t, err)
-	require.Equal(t, deptB.ID, p.DepartmentID)
+	svc, _ := newPosSvc(t)
+	_, err := svc.Create(ctx, dto.PositionCreate{Name: "   "})
+	require.Error(t, err)
+	ae, ok := apperrors.As(err)
+	require.True(t, ok)
+	require.Equal(t, apperrors.CodeBadRequest, ae.Code)
 }
 
 func TestPositionService_Get_OK(t *testing.T) {
@@ -100,15 +77,15 @@ func TestPositionService_Get_OK(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	dept := makeDept(t, "Support")
-	svc, _, _ := newPosSvc(t)
-	created, err := svc.Create(ctx, dto.PositionCreate{Name: "Agent", DepartmentID: dept.ID})
+	svc, _ := newPosSvc(t)
+	created, err := svc.Create(ctx, dto.PositionCreate{Name: "Agent"})
 	require.NoError(t, err)
 
 	got, err := svc.Get(ctx, created.ID)
 	require.NoError(t, err)
 	require.Equal(t, created.ID, got.ID)
 	require.Equal(t, "Agent", got.Name)
+	require.Equal(t, int64(0), got.EmployeeCount)
 
 	// Missing -> not found.
 	_, err = svc.Get(ctx, uuid.New())
@@ -118,34 +95,38 @@ func TestPositionService_Get_OK(t *testing.T) {
 	require.Equal(t, apperrors.CodeNotFound, ae.Code)
 }
 
-func TestPositionService_Update_MoveToOtherDept(t *testing.T) {
+func TestPositionService_Update_RenameOK(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
 
-	deptA := makeDept(t, "Origin")
-	deptB := makeDept(t, "Target")
-	svc, _, _ := newPosSvc(t)
-
-	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Analyst", DepartmentID: deptA.ID})
+	svc, _ := newPosSvc(t)
+	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Analyst"})
 	require.NoError(t, err)
 
 	newName := "Senior Analyst"
-	updated, err := svc.Update(ctx, p.ID, dto.PositionUpdate{
-		Name:         &newName,
-		DepartmentID: &deptB.ID,
-	})
+	updated, err := svc.Update(ctx, p.ID, dto.PositionUpdate{Name: &newName})
 	require.NoError(t, err)
 	require.Equal(t, "Senior Analyst", updated.Name)
-	require.Equal(t, deptB.ID, updated.DepartmentID)
+}
 
-	// Moving to a non-existent department is rejected.
-	missing := uuid.New()
-	_, err = svc.Update(ctx, p.ID, dto.PositionUpdate{DepartmentID: &missing})
+func TestPositionService_Update_DuplicateName_Conflict(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newPosSvc(t)
+	_, err := svc.Create(ctx, dto.PositionCreate{Name: "Lead"})
+	require.NoError(t, err)
+	other, err := svc.Create(ctx, dto.PositionCreate{Name: "Junior"})
+	require.NoError(t, err)
+
+	clash := "lead"
+	_, err = svc.Update(ctx, other.ID, dto.PositionUpdate{Name: &clash})
 	require.Error(t, err)
 	ae, ok := apperrors.As(err)
 	require.True(t, ok)
-	require.Equal(t, apperrors.CodeBadRequest, ae.Code)
+	require.Equal(t, apperrors.CodeConflict, ae.Code)
 }
 
 func TestPositionService_Delete_BlockedByEmployees_Conflict(t *testing.T) {
@@ -154,8 +135,8 @@ func TestPositionService_Delete_BlockedByEmployees_Conflict(t *testing.T) {
 	ctx := context.Background()
 
 	dept := makeDept(t, "Delivery")
-	svc, _, _ := newPosSvc(t)
-	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Driver", DepartmentID: dept.ID})
+	svc, _ := newPosSvc(t)
+	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Driver"})
 	require.NoError(t, err)
 
 	makeEmployeeInDept(t, dept.ID, &p.ID)
@@ -173,9 +154,8 @@ func TestPositionService_Delete_SoftDeletesBothColumns(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	dept := makeDept(t, "Lab")
-	svc, _, _ := newPosSvc(t)
-	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Researcher", DepartmentID: dept.ID})
+	svc, _ := newPosSvc(t)
+	p, err := svc.Create(ctx, dto.PositionCreate{Name: "Researcher"})
 	require.NoError(t, err)
 	require.NoError(t, svc.Delete(ctx, p.ID))
 
@@ -196,37 +176,65 @@ func TestPositionService_Delete_SoftDeletesBothColumns(t *testing.T) {
 	require.Equal(t, apperrors.CodeNotFound, ae.Code)
 }
 
-func TestPositionService_List_SearchAndDeptFilter(t *testing.T) {
+func TestPositionService_List_Search(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
 
-	deptA := makeDept(t, "Eng")
-	deptB := makeDept(t, "Mkt")
-	svc, _, _ := newPosSvc(t)
-
-	_, err := svc.Create(ctx, dto.PositionCreate{Name: "Frontend Engineer", DepartmentID: deptA.ID})
+	svc, _ := newPosSvc(t)
+	_, err := svc.Create(ctx, dto.PositionCreate{Name: "Frontend Engineer"})
 	require.NoError(t, err)
-	_, err = svc.Create(ctx, dto.PositionCreate{Name: "Backend Engineer", DepartmentID: deptA.ID})
+	_, err = svc.Create(ctx, dto.PositionCreate{Name: "Backend Engineer"})
 	require.NoError(t, err)
-	_, err = svc.Create(ctx, dto.PositionCreate{Name: "Content Manager", DepartmentID: deptB.ID})
+	_, err = svc.Create(ctx, dto.PositionCreate{Name: "Content Manager"})
 	require.NoError(t, err)
 
-	// Search "engineer" -> 2 (both in deptA).
+	// Search "engineer" -> 2 hits.
 	res, err := svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 10, Search: "engineer"})
 	require.NoError(t, err)
 	require.Equal(t, int64(2), res.Total)
 
-	// Filter by deptB -> 1.
-	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 10, DepartmentID: deptB.ID.String()})
+	// Pagination across all 3 with page size 2 -> 2 total pages.
+	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 2})
 	require.NoError(t, err)
-	require.Equal(t, int64(1), res.Total)
-	require.Equal(t, "Content Manager", res.Items[0].Name)
-
-	// Pagination over deptA's 2 positions, page size 1 -> 2 total pages.
-	res, err = svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 1, DepartmentID: deptA.ID.String()})
-	require.NoError(t, err)
-	require.Equal(t, int64(2), res.Total)
+	require.Equal(t, int64(3), res.Total)
 	require.Equal(t, 2, res.TotalPages)
-	require.Len(t, res.Items, 1)
+	require.Len(t, res.Items, 2)
+}
+
+// EmployeeCount hydration parity with Python. Employees still link to
+// positions via employees.position_id; the position layer no longer holds
+// a department FK but must still report the live employee count on every
+// read path.
+func TestPositionService_EmployeeCount_HydratedOnGetAndList(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	dept := makeDept(t, "EngineeringCounts")
+	svc, _ := newPosSvc(t)
+	a, err := svc.Create(ctx, dto.PositionCreate{Name: "Counted Engineer A"})
+	require.NoError(t, err)
+	b, err := svc.Create(ctx, dto.PositionCreate{Name: "Counted Engineer B"})
+	require.NoError(t, err)
+
+	makeEmployeeInDept(t, dept.ID, &a.ID)
+	makeEmployeeInDept(t, dept.ID, &a.ID)
+
+	gotA, err := svc.Get(ctx, a.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), gotA.EmployeeCount)
+
+	gotB, err := svc.Get(ctx, b.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), gotB.EmployeeCount)
+
+	res, err := svc.List(ctx, dto.PositionListQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	byID := map[uuid.UUID]int64{}
+	for _, item := range res.Items {
+		byID[item.ID] = item.EmployeeCount
+	}
+	require.Equal(t, int64(2), byID[a.ID])
+	require.Equal(t, int64(0), byID[b.ID])
 }

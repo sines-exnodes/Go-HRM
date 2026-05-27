@@ -112,7 +112,7 @@ func (s *AttendanceService) toRead(ctx context.Context, a *models.Attendance) dt
 			}
 		}
 		if a.Employee.PositionID != nil {
-			if p, err := s.pos.FindByID(ctx, *a.Employee.PositionID, false); err == nil && p != nil {
+			if p, err := s.pos.FindByID(ctx, *a.Employee.PositionID); err == nil && p != nil {
 				brief.Position = &dto.AttendanceRefRead{ID: p.ID, Name: p.Name}
 			}
 		}

@@ -35,6 +35,11 @@ type DepartmentRepository interface {
 	HasChildren(ctx context.Context, id uuid.UUID) (bool, error)
 	// CountEmployees counts non-deleted employees whose department_id == id.
 	CountEmployees(ctx context.Context, id uuid.UUID) (int64, error)
+	// CountEmployeesByDepartmentIDs returns a map of department id →
+	// employee count. Departments with zero employees are absent from the
+	// map so callers must default-zero on lookup. Used by
+	// DepartmentService.List for batch hydration without N+1 queries.
+	CountEmployeesByDepartmentIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int64, error)
 }
 
 type departmentRepository struct{ db *gorm.DB }
@@ -142,4 +147,29 @@ func (r *departmentRepository) CountEmployees(ctx context.Context, id uuid.UUID)
 		Where("department_id = ? AND is_deleted = ?", id, false).
 		Count(&count).Error
 	return count, err
+}
+
+func (r *departmentRepository) CountEmployeesByDepartmentIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]int64, error) {
+	out := make(map[uuid.UUID]int64, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	type row struct {
+		DepartmentID uuid.UUID `gorm:"column:department_id"`
+		Count        int64     `gorm:"column:count"`
+	}
+	var rows []row
+	err := r.db.WithContext(ctx).
+		Model(&models.Employee{}).
+		Select("department_id, COUNT(*) AS count").
+		Where("department_id IN ? AND is_deleted = ?", ids, false).
+		Group("department_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.DepartmentID] = row.Count
+	}
+	return out, nil
 }

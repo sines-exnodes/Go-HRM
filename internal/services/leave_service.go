@@ -216,7 +216,7 @@ func (s *LeaveService) populateRead(ctx context.Context, lr *models.LeaveRequest
 		}
 	}
 	if emp.PositionID != nil {
-		if p, perr := s.pos.FindByID(ctx, *emp.PositionID, false); perr == nil && p != nil {
+		if p, perr := s.pos.FindByID(ctx, *emp.PositionID); perr == nil && p != nil {
 			out.Position = &dto.LeaveRefRead{ID: p.ID.String(), Name: p.Name}
 		}
 	}

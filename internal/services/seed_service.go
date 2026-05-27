@@ -212,10 +212,13 @@ func (s *SeedService) seedOrgDefaults(ctx context.Context) error {
 		return err
 	}
 
+	// Positions are a flat global catalog post-000014 — no department FK.
+	// Seeded names are picked to be unambiguous on their own since the
+	// previously per-department uniqueness is now global.
 	positions := []*models.Position{
-		{Name: "Software Engineer", DepartmentID: backend.ID},
-		{Name: "Mobile Engineer", DepartmentID: mobile.ID},
-		{Name: "HR Specialist", DepartmentID: hr.ID},
+		{Name: "Software Engineer"},
+		{Name: "Mobile Engineer"},
+		{Name: "HR Specialist"},
 	}
 	for _, p := range positions {
 		if err := s.db.WithContext(ctx).Create(p).Error; err != nil {
