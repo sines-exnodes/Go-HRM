@@ -654,8 +654,6 @@ definitions:
     type: object
   github_com_exnodes_hrm-api_internal_dto.PositionCreate:
     properties:
-      department_id:
-        type: string
       description:
         maxLength: 1000
         type: string
@@ -664,13 +662,10 @@ definitions:
         minLength: 1
         type: string
     required:
-    - department_id
     - name
     type: object
   github_com_exnodes_hrm-api_internal_dto.PositionUpdate:
     properties:
-      department_id:
-        type: string
       description:
         maxLength: 1000
         type: string
@@ -1534,8 +1529,10 @@ paths:
       - Authentication
   /api/v1/departments:
     get:
-      description: Paginated list with optional name search and parent filter ("root"
-        returns top-level only).
+      description: |-
+        Paginated list with optional name search and parent filter ("root" returns top-level only).
+        Each item carries `employee_count` — the number of non-deleted employees whose
+        `employees.department_id` matches that department.
       parameters:
       - default: 1
         description: Page number
@@ -1593,8 +1590,11 @@ paths:
       - departments
   /api/v1/departments/{id}:
     delete:
-      description: Soft-deletes a department. Rejected with 409 if it has child departments,
-        active positions, or assigned employees.
+      description: |-
+        Soft-deletes a department. Rejected with 409 if it has child
+        departments or any assigned employee. Positions are a flat
+        global catalog (post-migration 000014) and no longer block
+        department deletion.
       parameters:
       - description: Department UUID
         in: path
@@ -2702,6 +2702,10 @@ paths:
       - organization-settings
   /api/v1/positions:
     get:
+      description: |-
+        Paginated list of the global position catalog. Each item
+        carries `employee_count` — the number of non-deleted
+        employees currently assigned to that position.
       parameters:
       - default: 1
         description: Page
@@ -2713,13 +2717,9 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: Substring match on name
+      - description: Substring match on name (case-insensitive)
         in: query
         name: search
-        type: string
-      - description: Filter by department UUID
-        in: query
-        name: department_id
         type: string
       produces:
       - application/json
@@ -2737,6 +2737,10 @@ paths:
     post:
       consumes:
       - application/json
+      description: |-
+        Position names are unique across the whole catalog
+        (case-insensitive) among non-deleted rows. A duplicate
+        name returns 409.
       parameters:
       - description: Position payload
         in: body
@@ -2752,6 +2756,10 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "409":
+          description: Duplicate name
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
       security:
       - BearerAuth: []
       summary: Create position
