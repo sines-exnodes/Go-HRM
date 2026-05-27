@@ -35,7 +35,7 @@ const (
 type Announcement struct {
 	BaseModel
 	Title          string                     `gorm:"type:text;not null"                        json:"title"`
-	Body           string                     `gorm:"type:text;not null"                        json:"body"`
+	Description    string                     `gorm:"column:description;type:text;not null"     json:"description"`
 	Summary        *string                    `gorm:"type:text"                                  json:"summary,omitempty"`
 	AuthorID       uuid.UUID                  `gorm:"type:uuid;not null;index"                   json:"author_id"`
 	Status         AnnouncementStatus         `gorm:"type:text;not null;default:'draft';index"   json:"status"`

@@ -49,7 +49,7 @@ func hasAnnounceManageAll(c *gin.Context) bool {
 // @Produce      json
 // @Param        page          query  int     false  "page"
 // @Param        page_size     query  int     false  "page size"
-// @Param        search        query  string  false  "title/body search"
+// @Param        search        query  string  false  "title/description search"
 // @Param        status        query  string  false  "draft|scheduled|published|archived"
 // @Param        label_id      query  string  false  "label UUID"
 // @Param        pinned        query  bool    false  "filter by pinned"
@@ -106,7 +106,11 @@ func (h *AnnouncementHandler) Get(c *gin.Context) {
 
 // Create godoc
 // @Summary      Create an announcement
-// @Description  Saved as draft by default. Pass status=published in the body to publish immediately (broadcasts via SSE).
+// @Description  Saved as draft by default. Pass `status: "published"` in the
+// @Description  body to publish immediately (broadcasts via SSE). The Python-
+// @Description  parity shortcut `send_now: true` also works — when set and
+// @Description  `status` is not explicitly provided, the row is created
+// @Description  already published. Explicit `status` always wins.
 // @Tags         announcements
 // @Security     BearerAuth
 // @Accept       json
@@ -247,16 +251,41 @@ func (h *AnnouncementHandler) MarkViewed(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.Response[struct{}]{Success: true, Message: "Marked as viewed"})
 }
 
+// MobileBrief godoc
+// @Summary      Top-5 announcements (mobile home widget)
+// @Description  Returns the latest 5 published announcements visible to the
+// @Description  current user, as `MobileAnnouncementBrief` items (description
+// @Description  omitted; fetch full detail via MobileGet). Unpaginated.
+// @Description  Mirrors Python's `GET /mobile/announcements/` contract.
+// @Tags         announcements
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  map[string]interface{}
+// @Router       /api/v1/mobile/announcements [get]
+func (h *AnnouncementHandler) MobileBrief(c *gin.Context) {
+	u, ok := currentUser(c)
+	if !ok {
+		return
+	}
+	items, err := h.svc.MobileBrief(c.Request.Context(), u.ID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[[]dto.MobileAnnouncementBrief]{Success: true, Data: items})
+}
+
 // MobileList godoc
-// @Summary      List announcements (mobile)
-// @Description  Always visibility-filtered to published + audience match. Body field omitted from each item; fetch detail via MobileGet.
+// @Summary      List announcements (mobile, paginated)
+// @Description  Always visibility-filtered to published + audience match.
+// @Description  Description field omitted from each item; fetch detail via MobileGet.
 // @Tags         announcements
 // @Security     BearerAuth
 // @Produce      json
 // @Param        page       query  int  false  "page"
 // @Param        page_size  query  int  false  "page size"
 // @Success      200  {object}  map[string]interface{}
-// @Router       /api/v1/mobile/announcements [get]
+// @Router       /api/v1/mobile/announcements/list [get]
 func (h *AnnouncementHandler) MobileList(c *gin.Context) {
 	u, ok := currentUser(c)
 	if !ok {

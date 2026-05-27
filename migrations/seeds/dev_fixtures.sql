@@ -524,7 +524,7 @@ WHERE a.id::text LIKE 'bbbbbbbb-%'
 -- 13. Announcements — 10 rows, all published. Author = HR / Admin / Marketing.
 -- ============================================================================
 INSERT INTO announcements (
-    id, title, body, summary, author_id, status, published_at,
+    id, title, description, summary, author_id, status, published_at,
     target_audience, pinned, cover_image_url
 ) VALUES
     ('cccccccc-0000-0000-0000-000000000001', 'Chào mừng năm mới 2026', 'Kính chào toàn thể nhân viên Exnodes. Ban giám đốc xin gửi lời chúc tốt đẹp nhất...', 'Lời chào năm mới',                   '66666666-0000-0000-0000-000000000001', 'published', '2026-01-02 08:00:00+07', 'all',        TRUE,  'https://example.com/banners/newyear-2026.jpg'),

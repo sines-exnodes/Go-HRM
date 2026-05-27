@@ -114,7 +114,7 @@ func (s *AnnouncementService) populateRead(a *models.Announcement, hasViewed boo
 	out := dto.AnnouncementRead{
 		ID:                a.ID,
 		Title:             a.Title,
-		Body:              a.Body,
+		Description:       a.Description,
 		Summary:           a.Summary,
 		Status:            a.Status,
 		ScheduledAt:       a.ScheduledAt,
@@ -210,14 +210,20 @@ func (s *AnnouncementService) Create(ctx context.Context, currentUserID uuid.UUI
 	}
 
 	row := &models.Announcement{
-		Title:    strings.TrimSpace(in.Title),
-		Body:     in.Body,
-		Summary:  in.Summary,
-		AuthorID: currentEmp.ID,
-		Status:   models.AnnouncementStatusDraft,
+		Title:       strings.TrimSpace(in.Title),
+		Description: in.Description,
+		Summary:     in.Summary,
+		AuthorID:    currentEmp.ID,
+		Status:      models.AnnouncementStatusDraft,
 	}
+	// send_now is the Python-parity shortcut: when true and status is
+	// not explicitly set, promote the draft to published immediately
+	// (mirrors what POST /:id/publish would do post-create). Explicit
+	// status wins — sending status=draft + send_now=true keeps it draft.
 	if in.Status != nil {
 		row.Status = *in.Status
+	} else if in.SendNow {
+		row.Status = models.AnnouncementStatusPublished
 	}
 	if in.ScheduledAt != nil {
 		row.ScheduledAt = in.ScheduledAt
@@ -303,8 +309,8 @@ func (s *AnnouncementService) Update(ctx context.Context, id uuid.UUID, currentU
 	if in.Title != nil {
 		row.Title = strings.TrimSpace(*in.Title)
 	}
-	if in.Body != nil {
-		row.Body = *in.Body
+	if in.Description != nil {
+		row.Description = *in.Description
 	}
 	if in.Summary != nil {
 		row.Summary = in.Summary
@@ -629,8 +635,24 @@ func (s *AnnouncementService) MobileList(ctx context.Context, currentUserID uuid
 	}, nil
 }
 
-// MobileGet returns the full detail (Body included) when visible to the
-// current user. Same visibility rules as Get.
+// MobileBrief returns the top 5 latest published announcements targeting
+// the current user — the home-screen widget projection. Always
+// visibility-filtered. No pagination metadata; the slice is the data.
+// Mirrors Python's `GET /mobile/announcements/` contract.
+func (s *AnnouncementService) MobileBrief(ctx context.Context, currentUserID uuid.UUID) ([]dto.MobileAnnouncementBrief, error) {
+	const briefLimit = 5
+	page, err := s.MobileList(ctx, currentUserID, dto.MobileAnnouncementListQuery{
+		Page:     1,
+		PageSize: briefLimit,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return page.Items, nil
+}
+
+// MobileGet returns the full detail (Description included) when visible
+// to the current user. Same visibility rules as Get.
 func (s *AnnouncementService) MobileGet(ctx context.Context, id uuid.UUID, currentUserID uuid.UUID) (*dto.AnnouncementRead, error) {
 	// Mobile never has admin manage perm — always non-admin path.
 	return s.Get(ctx, id, currentUserID, false)
