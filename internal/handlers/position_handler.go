@@ -21,13 +21,15 @@ func NewPositionHandler(svc *services.PositionService) *PositionHandler {
 
 // List godoc
 // @Summary      List positions
+// @Description  Paginated list of the global position catalog. Each item
+// @Description  carries `employee_count` — the number of non-deleted
+// @Description  employees currently assigned to that position.
 // @Tags         positions
 // @Security     BearerAuth
 // @Produce      json
-// @Param        page           query    int     false  "Page"        default(1)
-// @Param        page_size      query    int     false  "Page size"   default(10)
-// @Param        search         query    string  false  "Substring match on name"
-// @Param        department_id  query    string  false  "Filter by department UUID"
+// @Param        page       query    int     false  "Page"      default(1)
+// @Param        page_size  query    int     false  "Page size" default(10)
+// @Param        search     query    string  false  "Substring match on name (case-insensitive)"
 // @Success      200  {object}  map[string]interface{}
 // @Router       /api/v1/positions [get]
 func (h *PositionHandler) List(c *gin.Context) {
@@ -46,12 +48,16 @@ func (h *PositionHandler) List(c *gin.Context) {
 
 // Create godoc
 // @Summary      Create position
+// @Description  Position names are unique across the whole catalog
+// @Description  (case-insensitive) among non-deleted rows. A duplicate
+// @Description  name returns 409.
 // @Tags         positions
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.PositionCreate  true  "Position payload"
 // @Success      201   {object}  map[string]interface{}
+// @Failure      409   {object}  dto.Response[any]   "Duplicate name"
 // @Router       /api/v1/positions [post]
 func (h *PositionHandler) Create(c *gin.Context) {
 	var in dto.PositionCreate

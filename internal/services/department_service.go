@@ -15,29 +15,32 @@ import (
 	"github.com/exnodes/hrm-api/internal/repositories"
 )
 
-// DepartmentService owns department business logic. It also holds the
-// position repo so a single Delete call can enforce the cross-aggregate
-// invariant (a department with active positions cannot be deleted).
+// DepartmentService owns department business logic. Positions are now a
+// flat global catalog (see migration 000014), so the service no longer
+// holds a position-repo dependency and Delete no longer guards against
+// positions assigned to the department.
 type DepartmentService struct {
-	repo    repositories.DepartmentRepository
-	posRepo repositories.PositionRepository
+	repo repositories.DepartmentRepository
 }
 
-func NewDepartmentService(repo repositories.DepartmentRepository, posRepo repositories.PositionRepository) *DepartmentService {
-	return &DepartmentService{repo: repo, posRepo: posRepo}
+func NewDepartmentService(repo repositories.DepartmentRepository) *DepartmentService {
+	return &DepartmentService{repo: repo}
 }
 
-func departmentToRead(d *models.Department) dto.DepartmentRead {
+func departmentToRead(d *models.Department, employeeCount int64) dto.DepartmentRead {
 	out := dto.DepartmentRead{
-		ID:          d.ID,
-		Name:        d.Name,
-		Description: d.Description,
-		ParentID:    d.ParentID,
-		CreatedAt:   d.CreatedAt,
-		UpdatedAt:   d.UpdatedAt,
+		ID:            d.ID,
+		Name:          d.Name,
+		Description:   d.Description,
+		ParentID:      d.ParentID,
+		EmployeeCount: employeeCount,
+		CreatedAt:     d.CreatedAt,
+		UpdatedAt:     d.UpdatedAt,
 	}
 	if d.Parent != nil {
-		p := departmentToRead(d.Parent)
+		// Parent's own employee count is not hydrated here; the parent is
+		// shown as a denormalised reference, not a fully-formed record.
+		p := departmentToRead(d.Parent, 0)
 		out.Parent = &p
 	}
 	return out
@@ -57,8 +60,8 @@ func (s *DepartmentService) checkNameUnique(ctx context.Context, name string, ex
 	return apperrors.ErrConflict("Department name already exists")
 }
 
-// assertParent verifies the proposed parent exists and that setting it would
-// not create a cycle (only relevant when updating an existing node).
+// assertParent verifies the proposed parent exists and that setting it
+// would not create a cycle (only relevant when updating an existing node).
 func (s *DepartmentService) assertParent(ctx context.Context, parentID uuid.UUID, selfID *uuid.UUID) error {
 	if selfID != nil && parentID == *selfID {
 		return apperrors.ErrBadRequest("Department cannot be its own parent")
@@ -111,7 +114,7 @@ func (s *DepartmentService) Create(ctx context.Context, in dto.DepartmentCreate)
 	if err != nil {
 		return nil, err
 	}
-	out := departmentToRead(fresh)
+	out := departmentToRead(fresh, 0) // freshly created → zero employees
 	return &out, nil
 }
 
@@ -152,13 +155,18 @@ func (s *DepartmentService) Update(ctx context.Context, id uuid.UUID, in dto.Dep
 	if err != nil {
 		return nil, err
 	}
-	out := departmentToRead(fresh)
+	count, err := s.repo.CountEmployees(ctx, d.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := departmentToRead(fresh, count)
 	return &out, nil
 }
 
 // Delete soft-deletes the department after verifying it has no child
-// departments, no active positions, and no assigned employees. Any of those
-// returns a 409 Conflict.
+// departments and no assigned employees. The pre-000014 positions blocker
+// is gone — positions are a flat global catalog now, not bound to any
+// department.
 func (s *DepartmentService) Delete(ctx context.Context, id uuid.UUID) error {
 	if _, err := s.repo.FindByID(ctx, id, false); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -173,19 +181,6 @@ func (s *DepartmentService) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	if hasChildren {
 		return apperrors.ErrConflict("Cannot delete department — it has child departments. Move or delete them first.")
-	}
-
-	posCount, err := s.posRepo.CountByDepartment(ctx, id)
-	if err != nil {
-		return err
-	}
-	if posCount > 0 {
-		word := "position is"
-		if posCount > 1 {
-			word = "positions are"
-		}
-		return apperrors.ErrConflict(fmt.Sprintf(
-			"Cannot delete — %d %s assigned to this department. Delete or reassign them first.", posCount, word))
 	}
 
 	empCount, err := s.repo.CountEmployees(ctx, id)
@@ -211,7 +206,11 @@ func (s *DepartmentService) Get(ctx context.Context, id uuid.UUID) (*dto.Departm
 		}
 		return nil, err
 	}
-	out := departmentToRead(d)
+	count, err := s.repo.CountEmployees(ctx, d.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := departmentToRead(d, count)
 	return &out, nil
 }
 
@@ -235,9 +234,17 @@ func (s *DepartmentService) List(ctx context.Context, q dto.DepartmentListQuery)
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]uuid.UUID, 0, len(items))
+	for i := range items {
+		ids = append(ids, items[i].ID)
+	}
+	counts, err := s.repo.CountEmployeesByDepartmentIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	reads := make([]dto.DepartmentRead, 0, len(items))
 	for i := range items {
-		reads = append(reads, departmentToRead(&items[i]))
+		reads = append(reads, departmentToRead(&items[i], counts[items[i].ID]))
 	}
 	page := q.Page
 	if page < 1 {

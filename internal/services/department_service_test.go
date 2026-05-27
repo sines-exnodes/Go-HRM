@@ -13,18 +13,16 @@ import (
 	"github.com/exnodes/hrm-api/internal/services"
 )
 
-func newDeptSvc(t *testing.T) (*services.DepartmentService, repositories.DepartmentRepository, repositories.PositionRepository) {
+func newDeptSvc(t *testing.T) (*services.DepartmentService, repositories.DepartmentRepository) {
 	t.Helper()
 	dr := repositories.NewDepartmentRepository(testDB)
-	pr := repositories.NewPositionRepository(testDB)
-	return services.NewDepartmentService(dr, pr), dr, pr
+	return services.NewDepartmentService(dr), dr
 }
 
-func newPosSvc(t *testing.T) (*services.PositionService, repositories.PositionRepository, repositories.DepartmentRepository) {
+func newPosSvc(t *testing.T) (*services.PositionService, repositories.PositionRepository) {
 	t.Helper()
 	pr := repositories.NewPositionRepository(testDB)
-	dr := repositories.NewDepartmentRepository(testDB)
-	return services.NewPositionService(pr, dr), pr, dr
+	return services.NewPositionService(pr), pr
 }
 
 func TestDepartmentService_Create_OK(t *testing.T) {
@@ -32,13 +30,15 @@ func TestDepartmentService_Create_OK(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	d, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Engineering", Description: "  builds things  "})
 	require.NoError(t, err)
 	require.NotEqual(t, uuid.Nil, d.ID)
 	require.Equal(t, "Engineering", d.Name)
 	require.Equal(t, "builds things", d.Description)
 	require.Nil(t, d.ParentID)
+	// Freshly created department has zero employees.
+	require.Equal(t, int64(0), d.EmployeeCount)
 }
 
 func TestDepartmentService_Create_DuplicateName_Conflict(t *testing.T) {
@@ -46,7 +46,7 @@ func TestDepartmentService_Create_DuplicateName_Conflict(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	_, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Finance"})
 	require.NoError(t, err)
 
@@ -63,7 +63,7 @@ func TestDepartmentService_Create_BlankName_BadRequest(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	_, err := svc.Create(ctx, dto.DepartmentCreate{Name: "   "})
 	require.Error(t, err)
 	ae, ok := apperrors.As(err)
@@ -76,7 +76,7 @@ func TestDepartmentService_Create_InvalidParent_BadRequest(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	missing := uuid.New()
 	_, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Sub", ParentID: &missing})
 	require.Error(t, err)
@@ -90,7 +90,7 @@ func TestDepartmentService_Update_RenameAndReparent(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	parent, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Parent"})
 	require.NoError(t, err)
 	child, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Child"})
@@ -117,7 +117,7 @@ func TestDepartmentService_Update_CycleRejected(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	a, err := svc.Create(ctx, dto.DepartmentCreate{Name: "A"})
 	require.NoError(t, err)
 	b, err := svc.Create(ctx, dto.DepartmentCreate{Name: "B", ParentID: &a.ID})
@@ -143,7 +143,7 @@ func TestDepartmentService_Delete_BlockedByChildren_Conflict(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	parent, err := svc.Create(ctx, dto.DepartmentCreate{Name: "ParentDept"})
 	require.NoError(t, err)
 	_, err = svc.Create(ctx, dto.DepartmentCreate{Name: "ChildDept", ParentID: &parent.ID})
@@ -157,25 +157,24 @@ func TestDepartmentService_Delete_BlockedByChildren_Conflict(t *testing.T) {
 	require.Contains(t, ae.Message, "child departments")
 }
 
-func TestDepartmentService_Delete_BlockedByPositions_Conflict(t *testing.T) {
+// Post-000014: positions are no longer linked to departments, so a department
+// with positions hanging around is NOT a delete blocker. This test pins that
+// behavior so a future re-introduction of the FK has to update it deliberately.
+func TestDepartmentService_Delete_NotBlockedByPositions(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	dept, err := svc.Create(ctx, dto.DepartmentCreate{Name: "WithPositions"})
 	require.NoError(t, err)
 
-	posSvc, _, _ := newPosSvc(t)
-	_, err = posSvc.Create(ctx, dto.PositionCreate{Name: "Engineer", DepartmentID: dept.ID})
+	posSvc, _ := newPosSvc(t)
+	_, err = posSvc.Create(ctx, dto.PositionCreate{Name: "Engineer"})
 	require.NoError(t, err)
 
-	err = svc.Delete(ctx, dept.ID)
-	require.Error(t, err)
-	ae, ok := apperrors.As(err)
-	require.True(t, ok)
-	require.Equal(t, apperrors.CodeConflict, ae.Code)
-	require.Contains(t, ae.Message, "this department")
+	// Department with positions but no employees should soft-delete cleanly.
+	require.NoError(t, svc.Delete(ctx, dept.ID))
 }
 
 func TestDepartmentService_Delete_BlockedByEmployees_Conflict(t *testing.T) {
@@ -183,7 +182,7 @@ func TestDepartmentService_Delete_BlockedByEmployees_Conflict(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	dept, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Sales"})
 	require.NoError(t, err)
 
@@ -202,7 +201,7 @@ func TestDepartmentService_Delete_SoftDeletesBothColumns(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	dept, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Ops"})
 	require.NoError(t, err)
 	require.NoError(t, svc.Delete(ctx, dept.ID))
@@ -229,7 +228,7 @@ func TestDepartmentService_List_SearchAndParentFilter(t *testing.T) {
 	truncateAll(t)
 	ctx := context.Background()
 
-	svc, _, _ := newDeptSvc(t)
+	svc, _ := newDeptSvc(t)
 	root, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Alpha Group"})
 	require.NoError(t, err)
 	_, err = svc.Create(ctx, dto.DepartmentCreate{Name: "Beta Group"})
@@ -266,4 +265,40 @@ func TestDepartmentService_List_SearchAndParentFilter(t *testing.T) {
 	ae, ok := apperrors.As(err)
 	require.True(t, ok)
 	require.Equal(t, apperrors.CodeBadRequest, ae.Code)
+}
+
+// EmployeeCount hydration parity with Python: every read path
+// (Get, List) must include the live employee count for the department.
+// The test puts 2 employees in dept A and 0 in dept B and asserts both
+// the single-Get and the batch-List counts.
+func TestDepartmentService_EmployeeCount_HydratedOnGetAndList(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newDeptSvc(t)
+	a, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Counted A"})
+	require.NoError(t, err)
+	b, err := svc.Create(ctx, dto.DepartmentCreate{Name: "Counted B"})
+	require.NoError(t, err)
+
+	makeEmployeeInDept(t, a.ID, nil)
+	makeEmployeeInDept(t, a.ID, nil)
+
+	gotA, err := svc.Get(ctx, a.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), gotA.EmployeeCount)
+
+	gotB, err := svc.Get(ctx, b.ID)
+	require.NoError(t, err)
+	require.Equal(t, int64(0), gotB.EmployeeCount)
+
+	res, err := svc.List(ctx, dto.DepartmentListQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	byID := map[uuid.UUID]int64{}
+	for _, item := range res.Items {
+		byID[item.ID] = item.EmployeeCount
+	}
+	require.Equal(t, int64(2), byID[a.ID])
+	require.Equal(t, int64(0), byID[b.ID])
 }

@@ -22,6 +22,8 @@ func NewDepartmentHandler(svc *services.DepartmentService) *DepartmentHandler {
 // List godoc
 // @Summary      List departments
 // @Description  Paginated list with optional name search and parent filter ("root" returns top-level only).
+// @Description  Each item carries `employee_count` — the number of non-deleted employees whose
+// @Description  `employees.department_id` matches that department.
 // @Tags         departments
 // @Security     BearerAuth
 // @Produce      json
@@ -129,7 +131,10 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 
 // Delete godoc
 // @Summary      Delete department
-// @Description  Soft-deletes a department. Rejected with 409 if it has child departments, active positions, or assigned employees.
+// @Description  Soft-deletes a department. Rejected with 409 if it has child
+// @Description  departments or any assigned employee. Positions are a flat
+// @Description  global catalog (post-migration 000014) and no longer block
+// @Description  department deletion.
 // @Tags         departments
 // @Security     BearerAuth
 // @Produce      json

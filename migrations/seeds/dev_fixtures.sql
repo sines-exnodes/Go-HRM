@@ -64,24 +64,20 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
--- 2. Positions
---    We attach to either the base-seeded departments (looked up by name) or
---    the two new ones above. department_id is resolved via subquery so the
---    file does not need to hard-code the base-seed UUIDs.
+-- 2. Positions (flat global catalog post-000014 — no department linkage)
+--    HR Specialist is provided by the runtime SeedService; employees that
+--    reference it below resolve via name lookup so this script stays
+--    composable with the base seed.
+--    Unqualified ON CONFLICT DO NOTHING catches both PK and the partial
+--    unique index on LOWER(name), so re-running is a clean no-op.
 -- ============================================================================
-INSERT INTO positions (id, name, description, department_id)
-SELECT * FROM (VALUES
-    ('22222222-0000-0000-0000-000000000001'::uuid, 'Senior Software Engineer', 'Backend senior',  (SELECT id FROM departments WHERE LOWER(name) = 'backend'           AND is_deleted = false)),
-    ('22222222-0000-0000-0000-000000000002'::uuid, 'Junior Software Engineer', 'Backend junior',  (SELECT id FROM departments WHERE LOWER(name) = 'backend'           AND is_deleted = false)),
-    ('22222222-0000-0000-0000-000000000003'::uuid, 'Senior Mobile Engineer',   'Mobile senior',   (SELECT id FROM departments WHERE LOWER(name) = 'mobile'            AND is_deleted = false)),
-    ('22222222-0000-0000-0000-000000000004'::uuid, 'Junior Mobile Engineer',   'Mobile junior',   (SELECT id FROM departments WHERE LOWER(name) = 'mobile'            AND is_deleted = false)),
-    -- NOTE: HR Specialist is already created by the runtime SeedService.
-    -- Employees referencing it below look it up by name to avoid colliding
-    -- with the (department_id, lower(name)) partial unique index.
-    ('22222222-0000-0000-0000-000000000006'::uuid, 'Marketing Lead',           'Marketing lead',  '11111111-0000-0000-0000-000000000005'),
-    ('22222222-0000-0000-0000-000000000007'::uuid, 'Accountant',               'General ledger',  '11111111-0000-0000-0000-000000000006')
-) AS v(id, name, description, department_id)
-WHERE department_id IS NOT NULL
+INSERT INTO positions (id, name, description) VALUES
+    ('22222222-0000-0000-0000-000000000001', 'Senior Software Engineer', 'Backend senior'),
+    ('22222222-0000-0000-0000-000000000002', 'Junior Software Engineer', 'Backend junior'),
+    ('22222222-0000-0000-0000-000000000003', 'Senior Mobile Engineer',   'Mobile senior'),
+    ('22222222-0000-0000-0000-000000000004', 'Junior Mobile Engineer',   'Mobile junior'),
+    ('22222222-0000-0000-0000-000000000006', 'Marketing Lead',           'Marketing lead'),
+    ('22222222-0000-0000-0000-000000000007', 'Accountant',               'General ledger')
 ON CONFLICT DO NOTHING;
 
 

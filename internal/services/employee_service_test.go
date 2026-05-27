@@ -167,8 +167,8 @@ func TestEmployeeService_SelfUpdate_WhitelistEnforced(t *testing.T) {
 		dept, "Self-Update Test Dept").Error)
 	pos := uuid.New()
 	require.NoError(t, testDB.Exec(
-		"INSERT INTO positions (id, name, department_id) VALUES (?, ?, ?)",
-		pos, "Self-Update Test Position", dept).Error)
+		"INSERT INTO positions (id, name) VALUES (?, ?)",
+		pos, "Self-Update Test Position").Error)
 	mgr := boss.ID
 	require.NoError(t, testDB.Exec(
 		"UPDATE employees SET department_id = ?, position_id = ?, manager_id = ? WHERE id = ?",

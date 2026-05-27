@@ -16,42 +16,29 @@ import (
 )
 
 type PositionService struct {
-	repo     repositories.PositionRepository
-	deptRepo repositories.DepartmentRepository
+	repo repositories.PositionRepository
 }
 
-func NewPositionService(repo repositories.PositionRepository, deptRepo repositories.DepartmentRepository) *PositionService {
-	return &PositionService{repo: repo, deptRepo: deptRepo}
+func NewPositionService(repo repositories.PositionRepository) *PositionService {
+	return &PositionService{repo: repo}
 }
 
-func positionToRead(p *models.Position) dto.PositionRead {
-	out := dto.PositionRead{
-		ID:           p.ID,
-		Name:         p.Name,
-		Description:  p.Description,
-		DepartmentID: p.DepartmentID,
-		CreatedAt:    p.CreatedAt,
-		UpdatedAt:    p.UpdatedAt,
+func positionToRead(p *models.Position, employeeCount int64) dto.PositionRead {
+	return dto.PositionRead{
+		ID:            p.ID,
+		Name:          p.Name,
+		Description:   p.Description,
+		EmployeeCount: employeeCount,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
 	}
-	if p.Department != nil {
-		d := departmentToRead(p.Department)
-		out.Department = &d
-	}
-	return out
 }
 
-func (s *PositionService) assertDept(ctx context.Context, deptID uuid.UUID) error {
-	if _, err := s.deptRepo.FindByID(ctx, deptID, false); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperrors.ErrBadRequest("Department not found")
-		}
-		return err
-	}
-	return nil
-}
-
-func (s *PositionService) checkNameUniqueInDept(ctx context.Context, name string, deptID uuid.UUID, excludeID *uuid.UUID) error {
-	existing, err := s.repo.FindByNameInDept(ctx, name, deptID)
+// checkNameUnique enforces the global case-insensitive uniqueness of
+// position names (post-migration 000014). excludeID, when non-nil, allows
+// the owning row to keep its current name.
+func (s *PositionService) checkNameUnique(ctx context.Context, name string, excludeID *uuid.UUID) error {
+	existing, err := s.repo.FindByName(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -61,7 +48,7 @@ func (s *PositionService) checkNameUniqueInDept(ctx context.Context, name string
 	if excludeID != nil && existing.ID == *excludeID {
 		return nil
 	}
-	return apperrors.ErrConflict("Position name already exists in this department")
+	return apperrors.ErrConflict("Position name already exists")
 }
 
 func (s *PositionService) Create(ctx context.Context, in dto.PositionCreate) (*dto.PositionRead, error) {
@@ -69,49 +56,34 @@ func (s *PositionService) Create(ctx context.Context, in dto.PositionCreate) (*d
 	if name == "" {
 		return nil, apperrors.ErrBadRequest("Position name cannot be blank")
 	}
-	if err := s.assertDept(ctx, in.DepartmentID); err != nil {
-		return nil, err
-	}
-	if err := s.checkNameUniqueInDept(ctx, name, in.DepartmentID, nil); err != nil {
+	if err := s.checkNameUnique(ctx, name, nil); err != nil {
 		return nil, err
 	}
 	p := &models.Position{
-		Name:         name,
-		Description:  strings.TrimSpace(in.Description),
-		DepartmentID: in.DepartmentID,
+		Name:        name,
+		Description: strings.TrimSpace(in.Description),
 	}
 	if err := s.repo.Create(ctx, p); err != nil {
 		return nil, err
 	}
-	fresh, err := s.repo.FindByID(ctx, p.ID, true)
-	if err != nil {
-		return nil, err
-	}
-	out := positionToRead(fresh)
+	out := positionToRead(p, 0) // freshly created → zero employees
 	return &out, nil
 }
 
 func (s *PositionService) Update(ctx context.Context, id uuid.UUID, in dto.PositionUpdate) (*dto.PositionRead, error) {
-	p, err := s.repo.FindByID(ctx, id, false)
+	p, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.ErrNotFound("Position")
 		}
 		return nil, err
 	}
-	newDept := p.DepartmentID
-	if in.DepartmentID != nil {
-		if err := s.assertDept(ctx, *in.DepartmentID); err != nil {
-			return nil, err
-		}
-		newDept = *in.DepartmentID
-	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" {
 			return nil, apperrors.ErrBadRequest("Position name cannot be blank")
 		}
-		if err := s.checkNameUniqueInDept(ctx, name, newDept, &p.ID); err != nil {
+		if err := s.checkNameUnique(ctx, name, &p.ID); err != nil {
 			return nil, err
 		}
 		p.Name = name
@@ -119,20 +91,19 @@ func (s *PositionService) Update(ctx context.Context, id uuid.UUID, in dto.Posit
 	if in.Description != nil {
 		p.Description = strings.TrimSpace(*in.Description)
 	}
-	p.DepartmentID = newDept
 	if err := s.repo.Update(ctx, p); err != nil {
 		return nil, err
 	}
-	fresh, err := s.repo.FindByID(ctx, p.ID, true)
+	count, err := s.repo.CountEmployees(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}
-	out := positionToRead(fresh)
+	out := positionToRead(p, count)
 	return &out, nil
 }
 
 func (s *PositionService) Delete(ctx context.Context, id uuid.UUID) error {
-	if _, err := s.repo.FindByID(ctx, id, false); err != nil {
+	if _, err := s.repo.FindByID(ctx, id); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperrors.ErrNotFound("Position")
 		}
@@ -154,37 +125,41 @@ func (s *PositionService) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *PositionService) Get(ctx context.Context, id uuid.UUID) (*dto.PositionRead, error) {
-	p, err := s.repo.FindByID(ctx, id, true)
+	p, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.ErrNotFound("Position")
 		}
 		return nil, err
 	}
-	out := positionToRead(p)
+	count, err := s.repo.CountEmployees(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := positionToRead(p, count)
 	return &out, nil
 }
 
 func (s *PositionService) List(ctx context.Context, q dto.PositionListQuery) (*dto.PaginatedData[dto.PositionRead], error) {
-	f := repositories.PositionFilter{
+	items, total, err := s.repo.List(ctx, repositories.PositionFilter{
 		Page:     q.Page,
 		PageSize: q.PageSize,
 		Search:   q.Search,
+	})
+	if err != nil {
+		return nil, err
 	}
-	if dep := strings.TrimSpace(q.DepartmentID); dep != "" {
-		parsed, err := uuid.Parse(dep)
-		if err != nil {
-			return nil, apperrors.ErrBadRequest("Invalid department_id")
-		}
-		f.DepartmentID = &parsed
+	ids := make([]uuid.UUID, 0, len(items))
+	for i := range items {
+		ids = append(ids, items[i].ID)
 	}
-	items, total, err := s.repo.List(ctx, f)
+	counts, err := s.repo.CountEmployeesByPositionIDs(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
 	reads := make([]dto.PositionRead, 0, len(items))
 	for i := range items {
-		reads = append(reads, positionToRead(&items[i]))
+		reads = append(reads, positionToRead(&items[i], counts[items[i].ID]))
 	}
 	page := q.Page
 	if page < 1 {

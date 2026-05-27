@@ -963,7 +963,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Paginated list with optional name search and parent filter (\"root\" returns top-level only).",
+                "description": "Paginated list with optional name search and parent filter (\"root\" returns top-level only).\nEach item carries ` + "`" + `employee_count` + "`" + ` — the number of non-deleted employees whose\n` + "`" + `employees.department_id` + "`" + ` matches that department.",
                 "produces": [
                     "application/json"
                 ],
@@ -1086,7 +1086,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Soft-deletes a department. Rejected with 409 if it has child departments, active positions, or assigned employees.",
+                "description": "Soft-deletes a department. Rejected with 409 if it has child\ndepartments or any assigned employee. Positions are a flat\nglobal catalog (post-migration 000014) and no longer block\ndepartment deletion.",
                 "produces": [
                     "application/json"
                 ],
@@ -2786,6 +2786,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Paginated list of the global position catalog. Each item\ncarries ` + "`" + `employee_count` + "`" + ` — the number of non-deleted\nemployees currently assigned to that position.",
                 "produces": [
                     "application/json"
                 ],
@@ -2810,14 +2811,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Substring match on name",
+                        "description": "Substring match on name (case-insensitive)",
                         "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by department UUID",
-                        "name": "department_id",
                         "in": "query"
                     }
                 ],
@@ -2837,6 +2832,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Position names are unique across the whole catalog\n(case-insensitive) among non-deleted rows. A duplicate\nname returns 409.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2864,6 +2860,12 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    },
+                    "409": {
+                        "description": "Duplicate name",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
                         }
                     }
                 }
@@ -4719,13 +4721,9 @@ const docTemplate = `{
         "github_com_exnodes_hrm-api_internal_dto.PositionCreate": {
             "type": "object",
             "required": [
-                "department_id",
                 "name"
             ],
             "properties": {
-                "department_id": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string",
                     "maxLength": 1000
@@ -4740,9 +4738,6 @@ const docTemplate = `{
         "github_com_exnodes_hrm-api_internal_dto.PositionUpdate": {
             "type": "object",
             "properties": {
-                "department_id": {
-                    "type": "string"
-                },
                 "description": {
                     "type": "string",
                     "maxLength": 1000

@@ -24,14 +24,18 @@ type DepartmentUpdate struct {
 }
 
 // DepartmentRead is the wire shape returned by every department endpoint.
+// employee_count is the number of non-deleted employees whose
+// employees.department_id == this department's id (matches Python's
+// DepartmentRead).
 type DepartmentRead struct {
-	ID          uuid.UUID       `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	ParentID    *uuid.UUID      `json:"parent_id,omitempty"`
-	Parent      *DepartmentRead `json:"parent,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID            uuid.UUID       `json:"id"`
+	Name          string          `json:"name"`
+	Description   string          `json:"description"`
+	ParentID      *uuid.UUID      `json:"parent_id,omitempty"`
+	Parent        *DepartmentRead `json:"parent,omitempty"`
+	EmployeeCount int64           `json:"employee_count"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 // DepartmentListQuery binds the querystring for GET /api/v1/departments.
