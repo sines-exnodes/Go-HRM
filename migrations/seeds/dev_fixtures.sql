@@ -60,7 +60,7 @@ END $$;
 INSERT INTO departments (id, name, description, parent_id) VALUES
     ('11111111-0000-0000-0000-000000000005', 'Marketing', 'Marketing & communications', NULL),
     ('11111111-0000-0000-0000-000000000006', 'Finance',   'Finance & accounting',      NULL)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -75,12 +75,14 @@ SELECT * FROM (VALUES
     ('22222222-0000-0000-0000-000000000002'::uuid, 'Junior Software Engineer', 'Backend junior',  (SELECT id FROM departments WHERE LOWER(name) = 'backend'           AND is_deleted = false)),
     ('22222222-0000-0000-0000-000000000003'::uuid, 'Senior Mobile Engineer',   'Mobile senior',   (SELECT id FROM departments WHERE LOWER(name) = 'mobile'            AND is_deleted = false)),
     ('22222222-0000-0000-0000-000000000004'::uuid, 'Junior Mobile Engineer',   'Mobile junior',   (SELECT id FROM departments WHERE LOWER(name) = 'mobile'            AND is_deleted = false)),
-    ('22222222-0000-0000-0000-000000000005'::uuid, 'HR Specialist',            'HR generalist',   (SELECT id FROM departments WHERE LOWER(name) = 'human resources'   AND is_deleted = false)),
+    -- NOTE: HR Specialist is already created by the runtime SeedService.
+    -- Employees referencing it below look it up by name to avoid colliding
+    -- with the (department_id, lower(name)) partial unique index.
     ('22222222-0000-0000-0000-000000000006'::uuid, 'Marketing Lead',           'Marketing lead',  '11111111-0000-0000-0000-000000000005'),
     ('22222222-0000-0000-0000-000000000007'::uuid, 'Accountant',               'General ledger',  '11111111-0000-0000-0000-000000000006')
 ) AS v(id, name, description, department_id)
 WHERE department_id IS NOT NULL
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -107,7 +109,7 @@ INSERT INTO skills (id, name, description) VALUES
     ('33333333-0000-0000-0000-000000000018', 'GraphQL',    'API spec'),
     ('33333333-0000-0000-0000-000000000019', 'gRPC',       'RPC framework'),
     ('33333333-0000-0000-0000-000000000020', 'Redis',      'In-memory store')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -119,7 +121,7 @@ INSERT INTO labels (id, name) VALUES
     ('44444444-0000-0000-0000-000000000003', 'Hoạt động công ty'),
     ('44444444-0000-0000-0000-000000000004', 'Khẩn'),
     ('44444444-0000-0000-0000-000000000005', 'Đào tạo')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -146,7 +148,7 @@ INSERT INTO users (id, email, password_hash, is_active) VALUES
     ('55555555-0000-0000-0000-000000000017', 'mai.trang@exnodes.vn',       crypt('Exnodes@2026', gen_salt('bf', 12)), TRUE),
     ('55555555-0000-0000-0000-000000000018', 'duong.khoa@exnodes.vn',      crypt('Exnodes@2026', gen_salt('bf', 12)), TRUE),
     ('55555555-0000-0000-0000-000000000019', 'lam.phuc@exnodes.vn',        crypt('Exnodes@2026', gen_salt('bf', 12)), TRUE)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -163,15 +165,15 @@ INSERT INTO employees (
 ) VALUES
     ('66666666-0000-0000-0000-000000000001', '55555555-0000-0000-0000-000000000001', 'Trần Thị Lan',     '0901111001', 'female', '1988-04-12',
         (SELECT id FROM departments WHERE LOWER(name) = 'human resources' AND is_deleted = false),
-        '22222222-0000-0000-0000-000000000005',
+        (SELECT id FROM positions WHERE LOWER(name) = 'hr specialist' AND is_deleted = false),
         '2020-01-15', 'official', 1, 'bank_transfer', 25000000, 25000000),
     ('66666666-0000-0000-0000-000000000002', '55555555-0000-0000-0000-000000000002', 'Phạm Thị Hương',   '0901111002', 'female', '1990-07-21',
         (SELECT id FROM departments WHERE LOWER(name) = 'human resources' AND is_deleted = false),
-        '22222222-0000-0000-0000-000000000005',
+        (SELECT id FROM positions WHERE LOWER(name) = 'hr specialist' AND is_deleted = false),
         '2021-03-01', 'official', 1, 'bank_transfer', 18000000, 18000000),
     ('66666666-0000-0000-0000-000000000003', '55555555-0000-0000-0000-000000000003', 'Lê Văn Minh',      '0901111003', 'male',   '1985-11-03',
         (SELECT id FROM departments WHERE LOWER(name) = 'human resources' AND is_deleted = false),
-        '22222222-0000-0000-0000-000000000005',
+        (SELECT id FROM positions WHERE LOWER(name) = 'hr specialist' AND is_deleted = false),
         '2019-06-10', 'official', 2, 'bank_transfer', 22000000, 22000000),
     ('66666666-0000-0000-0000-000000000004', '55555555-0000-0000-0000-000000000004', 'Nguyễn Văn An',    '0901111004', 'male',   '1992-02-18',
         (SELECT id FROM departments WHERE LOWER(name) = 'backend' AND is_deleted = false),
@@ -237,7 +239,7 @@ INSERT INTO employees (
         '11111111-0000-0000-0000-000000000006',
         '22222222-0000-0000-0000-000000000007',
         '2023-10-18', 'official', 1, 'bank_transfer', 18000000, 18000000)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -316,7 +318,7 @@ INSERT INTO dependents (id, employee_id, full_name, dob, gender, relationship) V
     ('77777777-0000-0000-0000-000000000013', '66666666-0000-0000-0000-000000000017', 'Đinh Quang Vinh',  '1988-07-04', 'male',   'spouse'),
     ('77777777-0000-0000-0000-000000000014', '66666666-0000-0000-0000-000000000017', 'Đinh Bảo Hà',      '2016-02-14', 'female', 'child'),
     ('77777777-0000-0000-0000-000000000015', '66666666-0000-0000-0000-000000000017', 'Đinh Bảo Nam',     '2019-11-11', 'male',   'child')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -372,7 +374,7 @@ SELECT v.id::uuid, v.employee_id::uuid, v.skill_id::uuid FROM (VALUES
     ('88888888-0000-0000-0000-000000000041', '66666666-0000-0000-0000-000000000018', '33333333-0000-0000-0000-000000000012'),
     ('88888888-0000-0000-0000-000000000042', '66666666-0000-0000-0000-000000000019', '33333333-0000-0000-0000-000000000009')
 ) AS v(id, employee_id, skill_id)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -447,7 +449,7 @@ INSERT INTO leave_requests (
     -- Cancelled (2)
     ('aaaaaaaa-0000-0000-0000-000000000024', '66666666-0000-0000-0000-000000000012', '2026-03-23', '2026-03-23', 'full_day',       'sick',     1.0, 'Đã đỡ, huỷ',                    'cancelled','66666666-0000-0000-0000-000000000012'),
     ('aaaaaaaa-0000-0000-0000-000000000025', '66666666-0000-0000-0000-000000000018', '2026-04-27', '2026-04-27', 'full_day',       'personal', 1.0, 'Không cần nghỉ nữa',            'cancelled','66666666-0000-0000-0000-000000000018')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================================
@@ -502,7 +504,7 @@ VALUES
     ('bbbbbbbb-0000-0000-0000-000000000038', '66666666-0000-0000-0000-000000000017', '2026-05-11', FALSE, FALSE, 'office',  NULL),
     ('bbbbbbbb-0000-0000-0000-000000000039', '66666666-0000-0000-0000-000000000017', '2026-05-12', FALSE, TRUE,  'office',  'Đưa con đi khám'),
     ('bbbbbbbb-0000-0000-0000-000000000040', '66666666-0000-0000-0000-000000000017', '2026-05-13', FALSE, FALSE, 'office',  NULL)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- One closed session per attendance row. check_in is 08:30 + late delta;
@@ -539,7 +541,7 @@ INSERT INTO announcements (
     ('cccccccc-0000-0000-0000-000000000008', 'Team building Q2 — Đà Lạt 23-25/5', 'Team building Q2 sẽ tổ chức tại Đà Lạt từ 23-25/5. HR sẽ gửi form đăng ký tuần này...', 'Team building Đà Lạt',         '66666666-0000-0000-0000-000000000002', 'published', '2026-04-22 09:00:00+07', 'all',        FALSE, 'https://example.com/banners/teambuilding.jpg'),
     ('cccccccc-0000-0000-0000-000000000009', 'Chiến dịch Marketing tháng 5', 'Phòng Marketing triển khai chiến dịch "Exnodes 6 năm" trên các kênh social...', 'Chiến dịch tháng 5',                   '66666666-0000-0000-0000-000000000014', 'published', '2026-05-01 10:00:00+07', 'department', FALSE, NULL),
     ('cccccccc-0000-0000-0000-000000000010', 'Quy định mới về chấm công remote', 'Bắt đầu 01/06, nhân viên WFH bắt buộc check-in qua app HRM trước 09:30. Vui lòng cập nhật app...', 'WFH check-in qua app',  '66666666-0000-0000-0000-000000000001', 'published', '2026-05-20 08:00:00+07', 'all',        FALSE, NULL)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 -- announcement_labels — link each announcement to 1-2 labels.

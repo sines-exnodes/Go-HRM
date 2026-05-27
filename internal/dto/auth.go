@@ -6,6 +6,10 @@ import "github.com/google/uuid"
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email" example:"admin@exnodes.vn"`
 	Password string `json:"password" binding:"required,min=1" example:"ChangeMe!2026"`
+	// RememberMe, when true, requests a long-lived refresh token (see
+	// REMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS, default 30 days) instead of
+	// the default refresh-token TTL.
+	RememberMe bool `json:"remember_me,omitempty" example:"false"`
 }
 
 // RefreshRequest is the body for POST /api/v1/auth/refresh.

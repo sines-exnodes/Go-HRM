@@ -827,7 +827,7 @@
         },
         "/api/v1/auth/login": {
             "post": {
-                "description": "Exchanges an email + password for a token pair. Required permission: auth:login.",
+                "description": "Exchanges an email + password for a token pair. Required permission: `auth:login`.\n\n**Brute-force protection.** After `MAX_FAILED_LOGIN_ATTEMPTS` (default 5)\nconsecutive bad passwords the account is locked for `ACCOUNT_LOCKOUT_MINUTES`\n(default 15). During the lockout window, every login attempt — including the\ncorrect one — returns 401 with `\"Account temporarily locked. Try again in N minutes.\"`.\nA successful login resets the failed-attempt counter.\n\n**`remember_me`.** When `true`, the refresh token is issued with the long-lived\nTTL (`REMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS`, default 30 days) instead of the\ndefault refresh-token TTL. The access token TTL is unaffected.\n\n**`is_active`.** A deactivated account is rejected with 401 *after* password\nverification so the response cannot be used to enumerate which accounts exist.",
                 "consumes": [
                     "application/json"
                 ],
@@ -857,19 +857,19 @@
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Malformed body",
                         "schema": {
                             "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Invalid credentials, account deactivated, or temporarily locked",
                         "schema": {
                             "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Missing auth:login permission",
                         "schema": {
                             "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
                         }
@@ -4651,6 +4651,11 @@
                     "type": "string",
                     "minLength": 1,
                     "example": "ChangeMe!2026"
+                },
+                "remember_me": {
+                    "description": "RememberMe, when true, requests a long-lived refresh token (see\nREMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS, default 30 days) instead of\nthe default refresh-token TTL.",
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },

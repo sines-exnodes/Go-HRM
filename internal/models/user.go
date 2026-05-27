@@ -14,6 +14,13 @@ type User struct {
 	EmailChangedAt  *time.Time `json:"email_changed_at,omitempty"`
 	PasswordResetAt *time.Time `json:"password_reset_at,omitempty"`
 
+	// Brute-force protection (see migration 000013). FailedLoginAttempts is
+	// incremented on each bad password; once it hits the configured
+	// threshold LockedUntil is stamped and both are reset on the next
+	// successful login (or when the lockout window has expired).
+	FailedLoginAttempts int        `gorm:"not null;default:0" json:"-"`
+	LockedUntil         *time.Time `json:"-"`
+
 	// Many-to-many via user_roles join table.
 	Roles []Role `gorm:"many2many:user_roles;joinForeignKey:user_id;joinReferences:role_id" json:"roles,omitempty"`
 

@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,9 +19,12 @@ const (
 
 func newAuthSvc() *services.AuthService {
 	return services.NewAuthService(testUserRepo, testRoleRepo, services.AuthConfig{
-		JWTSecret:  jwtSecret,
-		AccessTTL:  accessTTL,
-		RefreshTTL: refreshTTL,
+		JWTSecret:            jwtSecret,
+		AccessTTL:            accessTTL,
+		RefreshTTL:           refreshTTL,
+		RememberMeRefreshTTL: 30 * 24 * time.Hour,
+		MaxFailedAttempts:    5,
+		LockoutDuration:      15 * time.Minute,
 	})
 }
 
@@ -32,7 +36,7 @@ func TestAuthService_Login_Success(t *testing.T) {
 	makeEmployee(t, u, "Alice Tester")
 
 	svc := newAuthSvc()
-	result, err := svc.Login(context.Background(), "alice@test.com", "Secret123!")
+	result, err := svc.Login(context.Background(), "alice@test.com", "Secret123!", false)
 	if err != nil {
 		t.Fatalf("login err: %v", err)
 	}
@@ -61,7 +65,7 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 	makeUser(t, "alice@test.com", "Secret123!", role)
 
 	svc := newAuthSvc()
-	_, err := svc.Login(context.Background(), "alice@test.com", "wrong")
+	_, err := svc.Login(context.Background(), "alice@test.com", "wrong", false)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -71,7 +75,7 @@ func TestAuthService_Login_UnknownEmail(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	svc := newAuthSvc()
-	_, err := svc.Login(context.Background(), "ghost@test.com", "anything")
+	_, err := svc.Login(context.Background(), "ghost@test.com", "anything", false)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -88,7 +92,7 @@ func TestAuthService_Login_InactiveAccount(t *testing.T) {
 	}
 
 	svc := newAuthSvc()
-	_, err := svc.Login(context.Background(), "alice@test.com", "Secret123!")
+	_, err := svc.Login(context.Background(), "alice@test.com", "Secret123!", false)
 	if err == nil {
 		t.Fatal("expected error for inactive account")
 	}
@@ -102,7 +106,7 @@ func TestAuthService_Login_MissingAuthLoginPermission(t *testing.T) {
 	makeUser(t, "alice@test.com", "Secret123!", role)
 
 	svc := newAuthSvc()
-	_, err := svc.Login(context.Background(), "alice@test.com", "Secret123!")
+	_, err := svc.Login(context.Background(), "alice@test.com", "Secret123!", false)
 	if err == nil {
 		t.Fatal("expected error when user lacks auth:login")
 	}
@@ -116,12 +120,114 @@ func TestAuthService_Login_WildcardBypasses(t *testing.T) {
 	makeEmployee(t, u, "The Boss")
 
 	svc := newAuthSvc()
-	result, err := svc.Login(context.Background(), "boss@test.com", "Secret123!")
+	result, err := svc.Login(context.Background(), "boss@test.com", "Secret123!", false)
 	if err != nil {
 		t.Fatalf("login err: %v", err)
 	}
 	if result.Tokens.AccessToken == "" {
 		t.Fatal("expected access token")
+	}
+}
+
+// TestAuthService_Login_LocksAfterMaxFailedAttempts encodes the brute-force
+// protection rule: the configured number of consecutive bad passwords must
+// trigger a temporary lockout. Without this, an attacker can credential-stuff
+// indefinitely — the exact regression the Python repo's lockout flow guards
+// against, ported here for parity.
+func TestAuthService_Login_LocksAfterMaxFailedAttempts(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
+	makeUser(t, "alice@test.com", "Secret123!", role)
+
+	svc := newAuthSvc()
+	ctx := context.Background()
+	// Attempts 1..4 should be plain "invalid email or password"; the 5th
+	// must announce the lockout. The lockout test config uses MaxFailedAttempts=5.
+	for i := 1; i <= 4; i++ {
+		if _, err := svc.Login(ctx, "alice@test.com", "wrong", false); err == nil {
+			t.Fatalf("attempt %d: expected error", i)
+		}
+	}
+	_, err := svc.Login(ctx, "alice@test.com", "wrong", false)
+	if err == nil || !strings.Contains(err.Error(), "Account temporarily locked") {
+		t.Fatalf("5th attempt: expected lockout error, got %v", err)
+	}
+
+	// And the correct password must now be refused while the lockout is in
+	// effect — otherwise the lockout is cosmetic.
+	if _, err := svc.Login(ctx, "alice@test.com", "Secret123!", false); err == nil ||
+		!strings.Contains(err.Error(), "Account temporarily locked") {
+		t.Fatalf("correct password during lockout: expected lockout error, got %v", err)
+	}
+}
+
+// TestAuthService_Login_SuccessResetsFailedAttempts proves a partial-fail-
+// then-succeed flow does not leave the counter armed. Without the reset, a
+// user who mistypes once is one mistake away from lockout forever.
+func TestAuthService_Login_SuccessResetsFailedAttempts(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
+	u := makeUser(t, "alice@test.com", "Secret123!", role)
+
+	svc := newAuthSvc()
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		_, _ = svc.Login(ctx, "alice@test.com", "wrong", false)
+	}
+	if _, err := svc.Login(ctx, "alice@test.com", "Secret123!", false); err != nil {
+		t.Fatalf("good password after partial fails: %v", err)
+	}
+	got, err := testUserRepo.FindByID(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got.FailedLoginAttempts != 0 {
+		t.Errorf("FailedLoginAttempts: want 0 after success, got %d", got.FailedLoginAttempts)
+	}
+	if got.LockedUntil != nil {
+		t.Errorf("LockedUntil: want nil after success, got %v", got.LockedUntil)
+	}
+}
+
+// TestAuthService_Login_RememberMeIssuesLongerRefresh proves remember_me
+// actually changes the refresh-token TTL. The test config sets the
+// remember-me TTL to 30 days vs the 7-day base, so the issued refresh
+// must expire materially later than a non-remember-me one.
+func TestAuthService_Login_RememberMeIssuesLongerRefresh(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
+	makeUser(t, "alice@test.com", "Secret123!", role)
+
+	svc := newAuthSvc()
+	ctx := context.Background()
+	normal, err := svc.Login(ctx, "alice@test.com", "Secret123!", false)
+	if err != nil {
+		t.Fatalf("normal login: %v", err)
+	}
+	remembered, err := svc.Login(ctx, "alice@test.com", "Secret123!", true)
+	if err != nil {
+		t.Fatalf("remember_me login: %v", err)
+	}
+
+	normalClaims, err := utils.VerifyToken(normal.Tokens.RefreshToken, jwtSecret)
+	if err != nil {
+		t.Fatalf("verify normal refresh: %v", err)
+	}
+	rememberedClaims, err := utils.VerifyToken(remembered.Tokens.RefreshToken, jwtSecret)
+	if err != nil {
+		t.Fatalf("verify remembered refresh: %v", err)
+	}
+	if normalClaims.ExpiresAt == nil || rememberedClaims.ExpiresAt == nil {
+		t.Fatal("expected ExpiresAt on both refresh tokens")
+	}
+	// Allow 2-second slack for clock drift between the two Sign calls; the
+	// real gap is days, so anything tighter than that is a regression.
+	gap := rememberedClaims.ExpiresAt.Time.Sub(normalClaims.ExpiresAt.Time)
+	if gap < 24*time.Hour {
+		t.Errorf("remember_me refresh expiry should be much later than normal; gap=%v", gap)
 	}
 }
 
