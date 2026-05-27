@@ -160,7 +160,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Saved as draft by default. Pass ` + "`" + `status: \"published\"` + "`" + ` in the\nbody to publish immediately (broadcasts via SSE). The Python-\nparity shortcut ` + "`" + `send_now: true` + "`" + ` also works — when set and\n` + "`" + `status` + "`" + ` is not explicitly provided, the row is created\nalready published. Explicit ` + "`" + `status` + "`" + ` always wins.",
+                "description": "Saved as draft by default. Pass ` + "`" + `status: \"published\"` + "`" + ` in the\nbody to publish immediately (broadcasts via SSE). The Python-\nparity shortcut ` + "`" + `send_now: true` + "`" + ` also works — when set and\n` + "`" + `status` + "`" + ` is not explicitly provided, the row is created\nalready published. Explicit ` + "`" + `status` + "`" + ` always wins.\n\n` + "`" + `target_audience` + "`" + ` accepts ` + "`" + `all` + "`" + `, ` + "`" + `department` + "`" + `, or ` + "`" + `custom` + "`" + `.\n` + "`" + `department` + "`" + ` requires at least one ` + "`" + `department_ids` + "`" + ` entry;\n` + "`" + `custom` + "`" + ` requires at least one ` + "`" + `recipient_ids` + "`" + ` entry\n(employee_ids).",
                 "consumes": [
                     "application/json"
                 ],
@@ -3838,6 +3838,12 @@ const docTemplate = `{
                 "pinned": {
                     "type": "boolean"
                 },
+                "recipient_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "scheduled_at": {
                     "type": "string"
                 },
@@ -3863,7 +3869,8 @@ const docTemplate = `{
                 "target_audience": {
                     "enum": [
                         "all",
-                        "department"
+                        "department",
+                        "custom"
                     ],
                     "allOf": [
                         {
@@ -3902,6 +3909,12 @@ const docTemplate = `{
                 "pinned": {
                     "type": "boolean"
                 },
+                "recipient_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "scheduled_at": {
                     "type": "string"
                 },
@@ -3924,7 +3937,8 @@ const docTemplate = `{
                 "target_audience": {
                     "enum": [
                         "all",
-                        "department"
+                        "department",
+                        "custom"
                     ],
                     "allOf": [
                         {
@@ -4937,11 +4951,13 @@ const docTemplate = `{
             "type": "string",
             "enum": [
                 "all",
-                "department"
+                "department",
+                "custom"
             ],
             "x-enum-varnames": [
                 "AnnouncementAudienceAll",
-                "AnnouncementAudienceDepartment"
+                "AnnouncementAudienceDepartment",
+                "AnnouncementAudienceCustom"
             ]
         },
         "github_com_exnodes_hrm-api_internal_permissions.Permission": {

@@ -108,6 +108,26 @@ func (s *AnnouncementService) validateDepartmentIDs(ctx context.Context, ids []u
 	return nil
 }
 
+// validateRecipientIDs ensures every recipient_id references a live
+// employee row. Mirrors validateDepartmentIDs — small N expected per call
+// (handful of named recipients), so a per-ID lookup is fine.
+func (s *AnnouncementService) validateRecipientIDs(ctx context.Context, ids []uuid.UUID) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	missing := make([]string, 0)
+	for _, id := range ids {
+		e, err := s.emps.FindByID(ctx, id)
+		if err != nil || e == nil {
+			missing = append(missing, id.String())
+		}
+	}
+	if len(missing) > 0 {
+		return apperrors.ErrBadRequest("unknown recipient_id(s): " + strings.Join(missing, ","))
+	}
+	return nil
+}
+
 // populateRead inflates the model into the canonical wire shape.
 // hasViewed is computed by the caller and passed in.
 func (s *AnnouncementService) populateRead(a *models.Announcement, hasViewed bool) dto.AnnouncementRead {
@@ -124,6 +144,7 @@ func (s *AnnouncementService) populateRead(a *models.Announcement, hasViewed boo
 		CoverImageURL:     a.CoverImageURL,
 		Labels:            make([]dto.AnnouncementLabelBrief, 0, len(a.AnnouncementLabels)),
 		TargetDepartments: make([]dto.AnnouncementDepartmentBrief, 0, len(a.TargetDepartments)),
+		TargetRecipients:  make([]dto.AnnouncementRecipientBrief, 0, len(a.TargetUsers)),
 		Attachments:       make([]dto.AnnouncementAttachmentRead, 0, len(a.Attachments)),
 		HasViewed:         hasViewed,
 		CreatedAt:         a.CreatedAt,
@@ -154,6 +175,16 @@ func (s *AnnouncementService) populateRead(a *models.Announcement, hasViewed boo
 			Name: td.Department.Name,
 		})
 	}
+	for _, tu := range a.TargetUsers {
+		if tu.Employee == nil {
+			continue
+		}
+		out.TargetRecipients = append(out.TargetRecipients, dto.AnnouncementRecipientBrief{
+			ID:        tu.Employee.ID,
+			FullName:  tu.Employee.FullName,
+			AvatarURL: tu.Employee.AvatarURL,
+		})
+	}
 	for _, att := range a.Attachments {
 		out.Attachments = append(out.Attachments, dto.AnnouncementAttachmentRead{
 			ID:          att.ID,
@@ -177,12 +208,17 @@ func (s *AnnouncementService) broadcastPublished(a *models.Announcement) {
 	for _, td := range a.TargetDepartments {
 		deptIDs = append(deptIDs, td.DepartmentID)
 	}
+	recipientIDs := make([]uuid.UUID, 0, len(a.TargetUsers))
+	for _, tu := range a.TargetUsers {
+		recipientIDs = append(recipientIDs, tu.EmployeeID)
+	}
 	payload := dto.SSEAnnouncementPublishedEvent{
 		ID:             a.ID,
 		Title:          a.Title,
 		Summary:        a.Summary,
 		TargetAudience: a.TargetAudience,
 		DepartmentIDs:  deptIDs,
+		RecipientIDs:   recipientIDs,
 		Pinned:         a.Pinned,
 		PublishedAt:    *a.PublishedAt,
 	}
@@ -206,6 +242,9 @@ func (s *AnnouncementService) Create(ctx context.Context, currentUserID uuid.UUI
 		return nil, err
 	}
 	if err := s.validateDepartmentIDs(ctx, in.DepartmentIDs); err != nil {
+		return nil, err
+	}
+	if err := s.validateRecipientIDs(ctx, in.RecipientIDs); err != nil {
 		return nil, err
 	}
 
@@ -247,6 +286,10 @@ func (s *AnnouncementService) Create(ctx context.Context, currentUserID uuid.UUI
 	if row.TargetAudience == models.AnnouncementAudienceDepartment && len(in.DepartmentIDs) == 0 {
 		return nil, apperrors.ErrBadRequest("target_audience=department requires at least one department_id")
 	}
+	// custom audience requires at least one recipient
+	if row.TargetAudience == models.AnnouncementAudienceCustom && len(in.RecipientIDs) == 0 {
+		return nil, apperrors.ErrBadRequest("target_audience=custom requires at least one recipient_id")
+	}
 
 	if err := s.repo.Create(ctx, row); err != nil {
 		return nil, err
@@ -258,6 +301,11 @@ func (s *AnnouncementService) Create(ctx context.Context, currentUserID uuid.UUI
 	}
 	if len(in.DepartmentIDs) > 0 {
 		if err := s.repo.ReplaceTargetDepartments(ctx, row.ID, in.DepartmentIDs); err != nil {
+			return nil, err
+		}
+	}
+	if len(in.RecipientIDs) > 0 {
+		if err := s.repo.ReplaceTargetRecipients(ctx, row.ID, in.RecipientIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -305,6 +353,11 @@ func (s *AnnouncementService) Update(ctx context.Context, id uuid.UUID, currentU
 			return nil, err
 		}
 	}
+	if in.RecipientIDs != nil {
+		if err := s.validateRecipientIDs(ctx, *in.RecipientIDs); err != nil {
+			return nil, err
+		}
+	}
 
 	if in.Title != nil {
 		row.Title = strings.TrimSpace(*in.Title)
@@ -346,6 +399,11 @@ func (s *AnnouncementService) Update(ctx context.Context, id uuid.UUID, currentU
 	}
 	if in.DepartmentIDs != nil {
 		if err := s.repo.ReplaceTargetDepartments(ctx, row.ID, *in.DepartmentIDs); err != nil {
+			return nil, err
+		}
+	}
+	if in.RecipientIDs != nil {
+		if err := s.repo.ReplaceTargetRecipients(ctx, row.ID, *in.RecipientIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -478,6 +536,13 @@ func (s *AnnouncementService) canSee(a *models.Announcement, emp *models.Employe
 	if a.TargetAudience == models.AnnouncementAudienceDepartment && emp.DepartmentID != nil {
 		for _, td := range a.TargetDepartments {
 			if td.DepartmentID == *emp.DepartmentID {
+				return true
+			}
+		}
+	}
+	if a.TargetAudience == models.AnnouncementAudienceCustom {
+		for _, tu := range a.TargetUsers {
+			if tu.EmployeeID == emp.ID {
 				return true
 			}
 		}
