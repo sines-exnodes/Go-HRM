@@ -36,6 +36,15 @@ type Config struct {
 	JWTRefreshTTLHours  int
 	JWTRefreshTTLDays   int
 
+	// Brute-force protection on /auth/login. Defaults match the Python
+	// repo: 5 bad passwords trigger a 15-minute account lockout.
+	MaxFailedLoginAttempts int
+	AccountLockoutMinutes  int
+
+	// Remember-me flag on /auth/login extends the refresh-token TTL. Default
+	// matches Python's REMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS (30 days).
+	RememberMeRefreshTTLDays int
+
 	SuperAdminEmail    string
 	SuperAdminPassword string
 	SuperAdminName     string
@@ -106,6 +115,10 @@ func Load() *Config {
 		JWTAccessTTLMinutes: getEnvInt("JWT_ACCESS_TTL_MINUTES", 60),
 		JWTRefreshTTLHours:  getEnvInt("JWT_REFRESH_TTL_HOURS", 720),
 		JWTRefreshTTLDays:   getEnvInt("JWT_REFRESH_TTL_DAYS", 14),
+
+		MaxFailedLoginAttempts:   getEnvInt("MAX_FAILED_LOGIN_ATTEMPTS", 5),
+		AccountLockoutMinutes:    getEnvInt("ACCOUNT_LOCKOUT_MINUTES", 15),
+		RememberMeRefreshTTLDays: getEnvInt("REMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS", 30),
 
 		SuperAdminEmail:    getEnv("SUPER_ADMIN_EMAIL", ""),
 		SuperAdminPassword: getEnv("SUPER_ADMIN_PASSWORD", ""),

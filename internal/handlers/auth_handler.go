@@ -60,15 +60,28 @@ func toUserSummary(u *models.User) dto.UserSummary {
 
 // Login godoc
 // @Summary      Authenticate and receive access + refresh tokens
-// @Description  Exchanges an email + password for a token pair. Required permission: auth:login.
+// @Description  Exchanges an email + password for a token pair. Required permission: `auth:login`.
+// @Description
+// @Description  **Brute-force protection.** After `MAX_FAILED_LOGIN_ATTEMPTS` (default 5)
+// @Description  consecutive bad passwords the account is locked for `ACCOUNT_LOCKOUT_MINUTES`
+// @Description  (default 15). During the lockout window, every login attempt — including the
+// @Description  correct one — returns 401 with `"Account temporarily locked. Try again in N minutes."`.
+// @Description  A successful login resets the failed-attempt counter.
+// @Description
+// @Description  **`remember_me`.** When `true`, the refresh token is issued with the long-lived
+// @Description  TTL (`REMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS`, default 30 days) instead of the
+// @Description  default refresh-token TTL. The access token TTL is unaffected.
+// @Description
+// @Description  **`is_active`.** A deactivated account is rejected with 401 *after* password
+// @Description  verification so the response cannot be used to enumerate which accounts exist.
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.LoginRequest  true  "Login credentials"
 // @Success      200   {object}  dto.Response[dto.LoginResponse]
-// @Failure      400   {object}  dto.Response[any]
-// @Failure      401   {object}  dto.Response[any]
-// @Failure      403   {object}  dto.Response[any]
+// @Failure      400   {object}  dto.Response[any]  "Malformed body"
+// @Failure      401   {object}  dto.Response[any]  "Invalid credentials, account deactivated, or temporarily locked"
+// @Failure      403   {object}  dto.Response[any]  "Missing auth:login permission"
 // @Router       /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
@@ -76,7 +89,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		_ = c.Error(apperr.ErrBadRequest(err.Error()))
 		return
 	}
-	result, err := h.auth.Login(c.Request.Context(), req.Email, req.Password)
+	result, err := h.auth.Login(c.Request.Context(), req.Email, req.Password, req.RememberMe)
 	if err != nil {
 		_ = c.Error(err)
 		return

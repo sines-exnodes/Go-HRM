@@ -68,9 +68,12 @@ func main() {
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
-		JWTSecret:  cfg.JWTSecret,
-		AccessTTL:  time.Duration(cfg.JWTAccessTTLMinutes) * time.Minute,
-		RefreshTTL: time.Duration(cfg.JWTRefreshTTLDays) * 24 * time.Hour,
+		JWTSecret:            cfg.JWTSecret,
+		AccessTTL:            time.Duration(cfg.JWTAccessTTLMinutes) * time.Minute,
+		RefreshTTL:           time.Duration(cfg.JWTRefreshTTLDays) * 24 * time.Hour,
+		RememberMeRefreshTTL: time.Duration(cfg.RememberMeRefreshTTLDays) * 24 * time.Hour,
+		MaxFailedAttempts:    cfg.MaxFailedLoginAttempts,
+		LockoutDuration:      time.Duration(cfg.AccountLockoutMinutes) * time.Minute,
 	})
 	seedSvc := services.NewSeedService(db, userRepo, roleRepo, employeeRepo, systemConfigRepo, services.SeedConfig{
 		SuperAdminEmail:    cfg.SuperAdminEmail,

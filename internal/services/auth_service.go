@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,11 +16,24 @@ import (
 	"github.com/exnodes/hrm-api/pkg/utils"
 )
 
-// AuthConfig configures token TTLs and secret.
+// AuthConfig configures token TTLs, secret, and brute-force-protection
+// parameters for the login flow.
 type AuthConfig struct {
 	JWTSecret  string
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
+
+	// RememberMeRefreshTTL is the refresh-token lifetime when the caller
+	// sets remember_me=true on /auth/login. Zero falls back to RefreshTTL.
+	RememberMeRefreshTTL time.Duration
+
+	// MaxFailedAttempts is the number of consecutive bad passwords that
+	// trigger a temporary account lockout. Zero disables the feature.
+	MaxFailedAttempts int
+
+	// LockoutDuration is how long the account stays locked once the
+	// threshold is hit. Ignored when MaxFailedAttempts == 0.
+	LockoutDuration time.Duration
 }
 
 // TokenPair is the access+refresh result of Login/Refresh.
@@ -51,7 +65,20 @@ func NewAuthService(users repositories.UserRepository, roles repositories.RoleRe
 
 // Login authenticates an email/password pair and returns a token pair plus
 // the authenticated user with Roles and Employee preloaded.
-func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResult, error) {
+//
+// Flow (mirrors the Python repo for parity):
+//  1. Look up user by email.
+//  2. Enforce account lockout if locked_until is in the future.
+//  3. Reject if no password has been set (invite flow).
+//  4. Verify password — on failure increment the counter and lock after
+//     the configured threshold.
+//  5. Reject if the account is deactivated (checked AFTER the password
+//     so a wrong-password attempt cannot be told apart from an attempt
+//     on a disabled account).
+//  6. Require auth:login permission (or wildcard).
+//  7. Reset counter + locked_until and issue a token pair. When
+//     rememberMe=true the refresh token uses RememberMeRefreshTTL.
+func (s *AuthService) Login(ctx context.Context, email, password string, rememberMe bool) (*LoginResult, error) {
 	user, err := s.users.FindByEmailWithRolesAndEmployee(ctx, email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -59,14 +86,28 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 		}
 		return nil, err
 	}
-	if !user.IsActive {
-		return nil, apperr.ErrUnauthorized("Your account has been deactivated. Contact your administrator.")
+
+	now := time.Now().UTC()
+	if user.LockedUntil != nil && user.LockedUntil.After(now) {
+		remaining := user.LockedUntil.Sub(now)
+		// Round UP so the user is never told "0 minutes" — matches Python.
+		mins := int(remaining/time.Minute) + 1
+		if mins < 1 {
+			mins = 1
+		}
+		return nil, apperr.ErrUnauthorized(fmt.Sprintf("Account temporarily locked. Try again in %d minutes.", mins))
 	}
+
 	if user.PasswordHash == "" {
 		return nil, apperr.ErrUnauthorized("Please set your password using the invite link sent to your email.")
 	}
+
 	if !utils.CheckPassword(password, user.PasswordHash) {
-		return nil, apperr.ErrUnauthorized("Invalid email or password")
+		return nil, s.recordFailedLogin(ctx, user)
+	}
+
+	if !user.IsActive {
+		return nil, apperr.ErrUnauthorized("Your account has been deactivated. Contact your administrator.")
 	}
 
 	perms, err := s.resolvePermsFromUser(user.Roles)
@@ -77,11 +118,48 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (*Login
 		return nil, apperr.ErrForbidden("You do not have permission to access this system.")
 	}
 
-	tokens, err := s.issueTokenPair(user.ID)
+	if user.FailedLoginAttempts > 0 || user.LockedUntil != nil {
+		if err := s.users.SetLoginAttempts(ctx, user.ID, 0, nil); err != nil {
+			return nil, err
+		}
+	}
+
+	tokens, err := s.issueTokenPair(user.ID, rememberMe)
 	if err != nil {
 		return nil, err
 	}
 	return &LoginResult{Tokens: *tokens, User: user}, nil
+}
+
+// recordFailedLogin increments the user's failed-attempt counter, stamps
+// locked_until once the threshold is hit, and returns the user-facing
+// 401 error. Persistence errors are surfaced (the caller treats them as
+// transient and does NOT leak them as auth failures).
+func (s *AuthService) recordFailedLogin(ctx context.Context, user *models.User) error {
+	// Lockout disabled — preserve the original generic 401.
+	if s.cfg.MaxFailedAttempts <= 0 {
+		return apperr.ErrUnauthorized("Invalid email or password")
+	}
+
+	attempts := user.FailedLoginAttempts + 1
+	if attempts >= s.cfg.MaxFailedAttempts {
+		lockUntil := time.Now().UTC().Add(s.cfg.LockoutDuration)
+		// Reset the counter to zero on lock so the lockout window resets
+		// from scratch the next time the account unlocks — matches Python.
+		if err := s.users.SetLoginAttempts(ctx, user.ID, 0, &lockUntil); err != nil {
+			return err
+		}
+		mins := int(s.cfg.LockoutDuration / time.Minute)
+		if mins < 1 {
+			mins = 1
+		}
+		return apperr.ErrUnauthorized(fmt.Sprintf("Account temporarily locked. Try again in %d minutes.", mins))
+	}
+
+	if err := s.users.SetLoginAttempts(ctx, user.ID, attempts, nil); err != nil {
+		return err
+	}
+	return apperr.ErrUnauthorized("Invalid email or password")
 }
 
 // Refresh exchanges a refresh token for a new token pair (and returns the
@@ -120,7 +198,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*LoginR
 		}
 	}
 
-	tokens, err := s.issueTokenPair(user.ID)
+	tokens, err := s.issueTokenPair(user.ID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -163,12 +241,16 @@ func tokenInvalidatedBy(ts *time.Time, iat time.Time) bool {
 	return ts != nil && iat.Before(ts.UTC())
 }
 
-func (s *AuthService) issueTokenPair(userID uuid.UUID) (*TokenPair, error) {
+func (s *AuthService) issueTokenPair(userID uuid.UUID, rememberMe bool) (*TokenPair, error) {
 	access, err := utils.SignToken(userID.String(), utils.TokenTypeAccess, s.cfg.JWTSecret, s.cfg.AccessTTL)
 	if err != nil {
 		return nil, err
 	}
-	refresh, err := utils.SignToken(userID.String(), utils.TokenTypeRefresh, s.cfg.JWTSecret, s.cfg.RefreshTTL)
+	refreshTTL := s.cfg.RefreshTTL
+	if rememberMe && s.cfg.RememberMeRefreshTTL > 0 {
+		refreshTTL = s.cfg.RememberMeRefreshTTL
+	}
+	refresh, err := utils.SignToken(userID.String(), utils.TokenTypeRefresh, s.cfg.JWTSecret, refreshTTL)
 	if err != nil {
 		return nil, err
 	}

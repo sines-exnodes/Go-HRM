@@ -42,6 +42,12 @@ type UserRepository interface {
 	ToggleActive(ctx context.Context, id uuid.UUID, active bool) error
 	AssignRoles(ctx context.Context, id uuid.UUID, roleIDs []uuid.UUID) error
 	CreateTx(ctx context.Context, tx *gorm.DB, u *models.User) error
+
+	// SetLoginAttempts persists the brute-force-protection counters.
+	// A nil lockedUntil clears the lock; a non-nil value stamps it. Used
+	// by AuthService.Login on bad password, threshold-hit, and successful
+	// login (which calls it with attempts=0, lockedUntil=nil).
+	SetLoginAttempts(ctx context.Context, id uuid.UUID, attempts int, lockedUntil *time.Time) error
 }
 
 type userRepository struct{ db *gorm.DB }
@@ -308,4 +314,13 @@ func (r *userRepository) CreateTx(ctx context.Context, tx *gorm.DB, u *models.Us
 		tx = r.db
 	}
 	return tx.WithContext(ctx).Create(u).Error
+}
+
+func (r *userRepository) SetLoginAttempts(ctx context.Context, id uuid.UUID, attempts int, lockedUntil *time.Time) error {
+	return r.db.WithContext(ctx).Model(&models.User{}).
+		Where("id = ? AND is_deleted = ?", id, false).
+		Updates(map[string]any{
+			"failed_login_attempts": attempts,
+			"locked_until":          lockedUntil,
+		}).Error
 }
