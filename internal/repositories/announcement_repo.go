@@ -152,7 +152,7 @@ func (r *announcementRepo) List(ctx context.Context, f AnnouncementListFilter) (
 	// ---- Generic filters ----
 	if s := strings.TrimSpace(f.Search); s != "" {
 		pat := utils.BuildILIKEPattern(s)
-		q = q.Where("announcements.title ILIKE ? OR announcements.body ILIKE ?", pat, pat)
+		q = q.Where("announcements.title ILIKE ? OR announcements.description ILIKE ?", pat, pat)
 	}
 	if len(f.Statuses) > 0 {
 		strs := make([]string, 0, len(f.Statuses))

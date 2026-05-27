@@ -11,12 +11,17 @@ import (
 // ---- Write inputs ----
 
 // AnnouncementCreate is the body for POST /announcements. When status is
-// omitted the row is created as a draft. label_ids must reference live
-// rows in the labels catalog. department_ids is meaningful only when
-// target_audience == "department".
+// omitted the row is created as a draft (unless send_now=true — see below).
+// label_ids must reference live rows in the labels catalog. department_ids
+// is meaningful only when target_audience == "department".
+//
+// send_now is the Python-parity shortcut: when true and status is not
+// explicitly set, the row is created already in the "published" state and
+// the SSE event is broadcast immediately. When status IS explicitly set,
+// send_now is ignored (explicit status wins).
 type AnnouncementCreate struct {
 	Title          string                             `json:"title"           binding:"required,min=1"`
-	Body           string                             `json:"body"            binding:"required,min=1"`
+	Description    string                             `json:"description"     binding:"required,min=1"`
 	Summary        *string                            `json:"summary,omitempty"`
 	Status         *models.AnnouncementStatus         `json:"status,omitempty"          binding:"omitempty,oneof=draft scheduled published archived"`
 	ScheduledAt    *time.Time                         `json:"scheduled_at,omitempty"`
@@ -25,6 +30,7 @@ type AnnouncementCreate struct {
 	CoverImageURL  *string                            `json:"cover_image_url,omitempty"`
 	LabelIDs       []uuid.UUID                        `json:"label_ids,omitempty"`
 	DepartmentIDs  []uuid.UUID                        `json:"department_ids,omitempty"`
+	SendNow        bool                               `json:"send_now,omitempty"`
 }
 
 // AnnouncementUpdate is the PATCH body. Pointer types preserve "not
@@ -32,7 +38,7 @@ type AnnouncementCreate struct {
 // unchanged"; empty slice (length 0) means "clear all links".
 type AnnouncementUpdate struct {
 	Title          *string                            `json:"title,omitempty"           binding:"omitempty,min=1"`
-	Body           *string                            `json:"body,omitempty"            binding:"omitempty,min=1"`
+	Description    *string                            `json:"description,omitempty"     binding:"omitempty,min=1"`
 	Summary        *string                            `json:"summary,omitempty"`
 	Status         *models.AnnouncementStatus         `json:"status,omitempty"          binding:"omitempty,oneof=draft scheduled published archived"`
 	ScheduledAt    *time.Time                         `json:"scheduled_at,omitempty"`
@@ -82,7 +88,7 @@ type AnnouncementAttachmentRead struct {
 type AnnouncementRead struct {
 	ID                uuid.UUID                         `json:"id"`
 	Title             string                            `json:"title"`
-	Body              string                            `json:"body"`
+	Description       string                            `json:"description"`
 	Summary           *string                           `json:"summary,omitempty"`
 	Status            models.AnnouncementStatus         `json:"status"`
 	ScheduledAt       *time.Time                        `json:"scheduled_at,omitempty"`

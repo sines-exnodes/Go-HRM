@@ -96,8 +96,8 @@ func TestAnnouncement_Create_DraftDefault(t *testing.T) {
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 
 	out, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
-		Title: "Hello",
-		Body:  "world",
+		Title:       "Hello",
+		Description: "world",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, models.AnnouncementStatusDraft, out.Status)
@@ -115,9 +115,9 @@ func TestAnnouncement_Create_PublishesAndBroadcasts(t *testing.T) {
 
 	published := models.AnnouncementStatusPublished
 	out, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
-		Title:  "Live",
-		Body:   "hello",
-		Status: &published,
+		Title:       "Live",
+		Description: "hello",
+		Status:      &published,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, models.AnnouncementStatusPublished, out.Status)
@@ -135,7 +135,7 @@ func TestAnnouncement_Create_NoEmployeeProfile_Forbidden(t *testing.T) {
 	// User without an Employee row.
 	u := makeUser(t, "noemp@example.com", "pw-Aa123456")
 
-	_, err := svc.Create(ctx, u.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	_, err := svc.Create(ctx, u.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "No employee record")
 }
@@ -151,7 +151,7 @@ func TestAnnouncement_Create_DepartmentAudienceRequiresTargets(t *testing.T) {
 
 	_, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
 		Title:          "deptonly",
-		Body:           "x",
+		Description:    "x",
 		TargetAudience: &dept,
 	})
 	require.Error(t, err)
@@ -171,7 +171,7 @@ func TestAnnouncement_Create_WithLabelsAndDepartments(t *testing.T) {
 	dept := models.AnnouncementAudienceDepartment
 	out, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
 		Title:          "for-eng",
-		Body:           "x",
+		Description:    "x",
 		TargetAudience: &dept,
 		LabelIDs:       []uuid.UUID{l1.ID},
 		DepartmentIDs:  []uuid.UUID{d1.ID},
@@ -192,9 +192,9 @@ func TestAnnouncement_Create_UnknownLabel_BadRequest(t *testing.T) {
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 
 	_, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
-		Title:    "x",
-		Body:     "y",
-		LabelIDs: []uuid.UUID{uuid.New()},
+		Title:       "x",
+		Description: "y",
+		LabelIDs:    []uuid.UUID{uuid.New()},
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown label_id")
@@ -208,7 +208,7 @@ func TestAnnouncement_Publish_BroadcastsOnce(t *testing.T) {
 	svc, hub := newAnnouncementSvc(t)
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 
-	draft, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	draft, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
 	require.Equal(t, 0, hub.Count())
 
@@ -233,7 +233,7 @@ func TestAnnouncement_Publish_NonOwner_Forbidden(t *testing.T) {
 	author, _ := makeEmpUser(t, "author@example.com", "Author")
 	stranger, _ := makeEmpUser(t, "stranger@example.com", "Stranger")
 
-	draft, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	draft, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
 
 	_, err = svc.Publish(ctx, draft.ID, stranger.ID, false)
@@ -251,7 +251,7 @@ func TestAnnouncement_Update_PublishTransition_Broadcasts(t *testing.T) {
 	svc, hub := newAnnouncementSvc(t)
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 
-	draft, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	draft, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
 	require.Equal(t, 0, hub.Count())
 
@@ -271,7 +271,7 @@ func TestAnnouncement_Update_AlreadyPublished_DoesNotRebroadcast(t *testing.T) {
 	svc, hub := newAnnouncementSvc(t)
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 	pub := models.AnnouncementStatusPublished
-	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Body: "y", Status: &pub})
+	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y", Status: &pub})
 	require.NoError(t, err)
 	require.Equal(t, 1, hub.Count())
 
@@ -290,7 +290,7 @@ func TestAnnouncement_Update_NonOwner_Forbidden(t *testing.T) {
 	author, _ := makeEmpUser(t, "author@example.com", "Author")
 	stranger, _ := makeEmpUser(t, "stranger@example.com", "Stranger")
 
-	draft, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	draft, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
 
 	newTitle := "hacked"
@@ -311,9 +311,9 @@ func TestAnnouncement_Update_LabelsReplaceSet(t *testing.T) {
 	l3 := makeLabel(t, "L3")
 
 	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
-		Title:    "x",
-		Body:     "y",
-		LabelIDs: []uuid.UUID{l1.ID, l2.ID},
+		Title:       "x",
+		Description: "y",
+		LabelIDs:    []uuid.UUID{l1.ID, l2.ID},
 	})
 	require.NoError(t, err)
 	require.Len(t, a.Labels, 2)
@@ -338,7 +338,7 @@ func TestAnnouncement_Delete_OwnerOnly(t *testing.T) {
 	stranger, _ := makeEmpUser(t, "stranger@example.com", "Stranger")
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 
-	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
 
 	// Stranger (non-admin) → forbidden.
@@ -365,7 +365,7 @@ func TestAnnouncement_Get_NonOwner_AllAudience_VisibleWhenPublished(t *testing.T
 	reader, _ := makeEmpUser(t, "reader@example.com", "Reader")
 	pub := models.AnnouncementStatusPublished
 
-	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Body: "y", Status: &pub})
+	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Description: "y", Status: &pub})
 	require.NoError(t, err)
 
 	out, err := svc.Get(ctx, a.ID, reader.ID, false)
@@ -382,7 +382,7 @@ func TestAnnouncement_Get_NonOwner_DraftAllAudience_Forbidden(t *testing.T) {
 	author, _ := makeEmpUser(t, "author@example.com", "Author")
 	reader, _ := makeEmpUser(t, "reader@example.com", "Reader")
 
-	draft, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Body: "y"})
+	draft, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
 
 	_, err = svc.Get(ctx, draft.ID, reader.ID, false)
@@ -405,7 +405,7 @@ func TestAnnouncement_Get_DepartmentMatch_Visible(t *testing.T) {
 	pub := models.AnnouncementStatusPublished
 	dept := models.AnnouncementAudienceDepartment
 	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{
-		Title: "for-eng", Body: "x",
+		Title: "for-eng", Description: "x",
 		Status:         &pub,
 		TargetAudience: &dept,
 		DepartmentIDs:  []uuid.UUID{d1.ID},
@@ -434,7 +434,7 @@ func TestAnnouncement_MarkViewed_Idempotent(t *testing.T) {
 	reader, _ := makeEmpUser(t, "reader@example.com", "Reader")
 	pub := models.AnnouncementStatusPublished
 
-	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Body: "y", Status: &pub})
+	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "x", Description: "y", Status: &pub})
 	require.NoError(t, err)
 
 	require.NoError(t, svc.MarkViewed(ctx, a.ID, reader.ID, false))
@@ -456,10 +456,10 @@ func TestAnnouncement_List_AdminSeesAll(t *testing.T) {
 	svc, _ := newAnnouncementSvc(t)
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
 
-	_, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "draft1", Body: "x"})
+	_, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "draft1", Description: "x"})
 	require.NoError(t, err)
 	pub := models.AnnouncementStatusPublished
-	_, err = svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "live1", Body: "x", Status: &pub})
+	_, err = svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "live1", Description: "x", Status: &pub})
 	require.NoError(t, err)
 
 	out, err := svc.List(ctx, admin.ID, true, dto.AnnouncementListQuery{Page: 1, PageSize: 50})
@@ -477,9 +477,9 @@ func TestAnnouncement_List_NonAdmin_OnlyPublishedVisible(t *testing.T) {
 	reader, _ := makeEmpUser(t, "reader@example.com", "Reader")
 	pub := models.AnnouncementStatusPublished
 
-	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "draft", Body: "x"})
+	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "draft", Description: "x"})
 	require.NoError(t, err)
-	_, err = svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "live", Body: "x", Status: &pub})
+	_, err = svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "live", Description: "x", Status: &pub})
 	require.NoError(t, err)
 
 	out, err := svc.List(ctx, reader.ID, false, dto.AnnouncementListQuery{Page: 1, PageSize: 50})
@@ -496,7 +496,7 @@ func TestAnnouncement_List_Mine_IncludesDrafts(t *testing.T) {
 	svc, _ := newAnnouncementSvc(t)
 	author, _ := makeEmpUser(t, "author@example.com", "Author")
 
-	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "draft", Body: "x"})
+	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "draft", Description: "x"})
 	require.NoError(t, err)
 
 	out, err := svc.List(ctx, author.ID, false, dto.AnnouncementListQuery{Page: 1, PageSize: 50, Scope: "mine"})
@@ -516,9 +516,9 @@ func TestAnnouncement_MobileList_OnlyPublished(t *testing.T) {
 	reader, _ := makeEmpUser(t, "reader@example.com", "Reader")
 	pub := models.AnnouncementStatusPublished
 
-	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "draft", Body: "x"})
+	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "draft", Description: "x"})
 	require.NoError(t, err)
-	_, err = svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "live", Body: "x", Status: &pub})
+	_, err = svc.Create(ctx, author.ID, dto.AnnouncementCreate{Title: "live", Description: "x", Status: &pub})
 	require.NoError(t, err)
 
 	out, err := svc.MobileList(ctx, reader.ID, dto.MobileAnnouncementListQuery{Page: 1, PageSize: 20})

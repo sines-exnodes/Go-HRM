@@ -109,7 +109,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "title/body search",
+                        "description": "title/description search",
                         "name": "search",
                         "in": "query"
                     },
@@ -160,7 +160,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Saved as draft by default. Pass status=published in the body to publish immediately (broadcasts via SSE).",
+                "description": "Saved as draft by default. Pass ` + "`" + `status: \"published\"` + "`" + ` in the\nbody to publish immediately (broadcasts via SSE). The Python-\nparity shortcut ` + "`" + `send_now: true` + "`" + ` also works — when set and\n` + "`" + `status` + "`" + ` is not explicitly provided, the row is created\nalready published. Explicit ` + "`" + `status` + "`" + ` always wins.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2545,14 +2545,40 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Always visibility-filtered to published + audience match. Body field omitted from each item; fetch detail via MobileGet.",
+                "description": "Returns the latest 5 published announcements visible to the\ncurrent user, as ` + "`" + `MobileAnnouncementBrief` + "`" + ` items (description\nomitted; fetch full detail via MobileGet). Unpaginated.\nMirrors Python's ` + "`" + `GET /mobile/announcements/` + "`" + ` contract.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "announcements"
                 ],
-                "summary": "List announcements (mobile)",
+                "summary": "Top-5 announcements (mobile home widget)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/mobile/announcements/list": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Always visibility-filtered to published + audience match.\nDescription field omitted from each item; fetch detail via MobileGet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "announcements"
+                ],
+                "summary": "List announcements (mobile, paginated)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -3786,14 +3812,10 @@ const docTemplate = `{
         "github_com_exnodes_hrm-api_internal_dto.AnnouncementCreate": {
             "type": "object",
             "required": [
-                "body",
+                "description",
                 "title"
             ],
             "properties": {
-                "body": {
-                    "type": "string",
-                    "minLength": 1
-                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -3802,6 +3824,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "description": {
+                    "type": "string",
+                    "minLength": 1
                 },
                 "label_ids": {
                     "type": "array",
@@ -3814,6 +3840,9 @@ const docTemplate = `{
                 },
                 "scheduled_at": {
                     "type": "string"
+                },
+                "send_now": {
+                    "type": "boolean"
                 },
                 "status": {
                     "enum": [
@@ -3851,10 +3880,6 @@ const docTemplate = `{
         "github_com_exnodes_hrm-api_internal_dto.AnnouncementUpdate": {
             "type": "object",
             "properties": {
-                "body": {
-                    "type": "string",
-                    "minLength": 1
-                },
                 "cover_image_url": {
                     "type": "string"
                 },
@@ -3863,6 +3888,10 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "description": {
+                    "type": "string",
+                    "minLength": 1
                 },
                 "label_ids": {
                     "type": "array",

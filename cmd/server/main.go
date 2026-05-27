@@ -299,10 +299,14 @@ func main() {
 		announce.POST(":id/publish", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), announcementH.Publish)
 
 		// ---- /mobile/announcements (Phase 7 — mobile) ----
-		// JWT-only; service forces visibility filtering. Body omitted from
-		// list items; detail fetch via :id.
+		// JWT-only; service forces visibility filtering. Description
+		// omitted from list items; detail fetch via :id.
+		// `` → top-5 unpaginated brief (home widget — matches Python's
+		// GET /mobile/announcements/).
+		// `/list` → paginated brief.
 		mobileAnnounce := authed.Group("/mobile/announcements")
-		mobileAnnounce.GET("", announcementH.MobileList)
+		mobileAnnounce.GET("", announcementH.MobileBrief)
+		mobileAnnounce.GET("/list", announcementH.MobileList)
 		mobileAnnounce.GET(":id", announcementH.MobileGet)
 
 		// ---- /attendance (Phase 6) ----
