@@ -526,3 +526,173 @@ func TestAnnouncement_MobileList_OnlyPublished(t *testing.T) {
 	require.Len(t, out.Items, 1)
 	assert.Equal(t, "live", out.Items[0].Title)
 }
+
+// ---- Custom (per-user) audience — closes parity audit decision #6 ----
+
+func TestAnnouncement_Create_CustomAudienceRequiresRecipients(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
+	custom := models.AnnouncementAudienceCustom
+
+	_, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
+		Title:          "custom-no-recipients",
+		Description:    "x",
+		TargetAudience: &custom,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requires at least one recipient_id")
+}
+
+func TestAnnouncement_Create_WithRecipients(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
+	_, target1 := makeEmpUser(t, "t1@example.com", "Target One")
+	_, target2 := makeEmpUser(t, "t2@example.com", "Target Two")
+	l1 := makeLabel(t, "Personal")
+	custom := models.AnnouncementAudienceCustom
+
+	out, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
+		Title:          "named",
+		Description:    "x",
+		TargetAudience: &custom,
+		LabelIDs:       []uuid.UUID{l1.ID},
+		RecipientIDs:   []uuid.UUID{target1.ID, target2.ID},
+	})
+	require.NoError(t, err)
+	require.Len(t, out.Labels, 1)
+	require.Len(t, out.TargetRecipients, 2)
+	assert.Equal(t, models.AnnouncementAudienceCustom, out.TargetAudience)
+	ids := []uuid.UUID{out.TargetRecipients[0].ID, out.TargetRecipients[1].ID}
+	assert.Contains(t, ids, target1.ID)
+	assert.Contains(t, ids, target2.ID)
+}
+
+func TestAnnouncement_Visibility_TargetedAtUser(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	author, _ := makeEmpUser(t, "author@example.com", "Author")
+	userA, empA := makeEmpUser(t, "a@example.com", "A")
+	userB, _ := makeEmpUser(t, "b@example.com", "B")
+	custom := models.AnnouncementAudienceCustom
+	pub := models.AnnouncementStatusPublished
+
+	a, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{
+		Title:          "for-A-only",
+		Description:    "x",
+		Status:         &pub,
+		TargetAudience: &custom,
+		RecipientIDs:   []uuid.UUID{empA.ID},
+	})
+	require.NoError(t, err)
+
+	// A is targeted → visible via Get and via targeted-at-me scope.
+	_, err = svc.Get(ctx, a.ID, userA.ID, false)
+	require.NoError(t, err)
+
+	listA, err := svc.List(ctx, userA.ID, false, dto.AnnouncementListQuery{
+		Page: 1, PageSize: 20, Scope: "targeted-at-me",
+	})
+	require.NoError(t, err)
+	require.Len(t, listA.Items, 1)
+	assert.Equal(t, a.ID, listA.Items[0].ID)
+
+	// B is not targeted → forbidden on Get, absent from targeted-at-me list.
+	_, err = svc.Get(ctx, a.ID, userB.ID, false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot view")
+
+	listB, err := svc.List(ctx, userB.ID, false, dto.AnnouncementListQuery{
+		Page: 1, PageSize: 20, Scope: "targeted-at-me",
+	})
+	require.NoError(t, err)
+	assert.Len(t, listB.Items, 0)
+}
+
+func TestAnnouncement_SSE_BroadcastIncludesRecipientIDs(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, hub := newAnnouncementSvc(t)
+	author, _ := makeEmpUser(t, "author@example.com", "Author")
+	_, empA := makeEmpUser(t, "a@example.com", "A")
+	pub := models.AnnouncementStatusPublished
+	custom := models.AnnouncementAudienceCustom
+
+	_, err := svc.Create(ctx, author.ID, dto.AnnouncementCreate{
+		Title:          "ping-A",
+		Description:    "x",
+		Status:         &pub,
+		TargetAudience: &custom,
+		RecipientIDs:   []uuid.UUID{empA.ID},
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, 1, hub.Count())
+	ev := hub.Last()
+	assert.Equal(t, "announcement_published", ev.Type)
+	payload, ok := ev.Data.(dto.SSEAnnouncementPublishedEvent)
+	require.True(t, ok, "expected SSEAnnouncementPublishedEvent payload, got %T", ev.Data)
+	assert.Equal(t, models.AnnouncementAudienceCustom, payload.TargetAudience)
+	require.Len(t, payload.RecipientIDs, 1)
+	assert.Equal(t, empA.ID, payload.RecipientIDs[0])
+}
+
+func TestAnnouncement_Update_ReplaceRecipients(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
+	_, e1 := makeEmpUser(t, "e1@example.com", "E1")
+	_, e2 := makeEmpUser(t, "e2@example.com", "E2")
+	_, e3 := makeEmpUser(t, "e3@example.com", "E3")
+	custom := models.AnnouncementAudienceCustom
+
+	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{
+		Title:          "x",
+		Description:    "y",
+		TargetAudience: &custom,
+		RecipientIDs:   []uuid.UUID{e1.ID, e2.ID},
+	})
+	require.NoError(t, err)
+	require.Len(t, a.TargetRecipients, 2)
+
+	// Replace with a different set.
+	newSet := []uuid.UUID{e2.ID, e3.ID}
+	out, err := svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{
+		RecipientIDs: &newSet,
+	})
+	require.NoError(t, err)
+	require.Len(t, out.TargetRecipients, 2)
+	ids := []uuid.UUID{out.TargetRecipients[0].ID, out.TargetRecipients[1].ID}
+	assert.Contains(t, ids, e2.ID)
+	assert.Contains(t, ids, e3.ID)
+	assert.NotContains(t, ids, e1.ID, "e1 must be soft-deleted from the join")
+
+	// Nil pointer → leave unchanged.
+	newTitle := "still-x"
+	out2, err := svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{Title: &newTitle})
+	require.NoError(t, err)
+	require.Len(t, out2.TargetRecipients, 2, "nil RecipientIDs must leave the set unchanged")
+
+	// Empty slice → clear all.
+	empty := []uuid.UUID{}
+	out3, err := svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{
+		RecipientIDs: &empty,
+	})
+	require.NoError(t, err)
+	assert.Len(t, out3.TargetRecipients, 0, "empty slice must clear the set")
+}

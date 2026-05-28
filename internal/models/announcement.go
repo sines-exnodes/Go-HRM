@@ -18,14 +18,17 @@ const (
 )
 
 // AnnouncementTargetAudience controls how recipients are resolved.
-// Phase 7 supports 'all' (everyone) and 'department' (target_departments
-// join). 'custom' (per-user targeting) is deferred until BA confirms — no
-// backing table exists yet (REVISION NOTES item #4).
+//
+//	'all'        — every employee.
+//	'department' — employees whose department_id ∈ target_departments join.
+//	'custom'     — employees whose id ∈ target_recipients join (added in
+//	               migration 000016, closing parity audit decision #6).
 type AnnouncementTargetAudience string
 
 const (
 	AnnouncementAudienceAll        AnnouncementTargetAudience = "all"
 	AnnouncementAudienceDepartment AnnouncementTargetAudience = "department"
+	AnnouncementAudienceCustom     AnnouncementTargetAudience = "custom"
 )
 
 // Announcement is the publishable entity. author_id references the HR
@@ -52,6 +55,7 @@ type Announcement struct {
 	Author             *Employee                      `gorm:"foreignKey:AuthorID;references:ID"          json:"author,omitempty"`
 	AnnouncementLabels []AnnouncementLabel            `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"-"`
 	TargetDepartments  []AnnouncementTargetDepartment `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"target_departments,omitempty"`
+	TargetUsers        []AnnouncementTargetUser       `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"target_recipients,omitempty"`
 	Attachments        []AnnouncementAttachment       `gorm:"foreignKey:AnnouncementID;references:ID;constraint:OnDelete:CASCADE" json:"attachments,omitempty"`
 }
 
@@ -91,6 +95,23 @@ type AnnouncementTargetDepartment struct {
 }
 
 func (AnnouncementTargetDepartment) TableName() string { return "announcement_target_departments" }
+
+// AnnouncementTargetUser is the join row for target_audience='custom' —
+// per-employee targeting. FK points to employees(id), not users(id), per
+// the Go schema split (cross-aggregate FKs target the HR profile). Audit
+// columns + composite PK mirror AnnouncementTargetDepartment.
+type AnnouncementTargetUser struct {
+	AnnouncementID uuid.UUID  `gorm:"type:uuid;primaryKey;not null"          json:"announcement_id"`
+	EmployeeID     uuid.UUID  `gorm:"type:uuid;primaryKey;not null;index"    json:"employee_id"`
+	CreatedAt      time.Time  `gorm:"not null;default:now()"                  json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"not null;default:now()"                  json:"updated_at"`
+	IsDeleted      bool       `gorm:"not null;default:false"                  json:"-"`
+	DeletedAt      *time.Time `                                               json:"-"`
+
+	Employee *Employee `gorm:"foreignKey:EmployeeID;references:ID" json:"employee,omitempty"`
+}
+
+func (AnnouncementTargetUser) TableName() string { return "announcement_target_users" }
 
 // AnnouncementAttachment is one uploaded file linked to an announcement.
 // Multiple per announcement supported (HR commonly attaches a PDF + a

@@ -111,6 +111,11 @@ func (h *AnnouncementHandler) Get(c *gin.Context) {
 // @Description  parity shortcut `send_now: true` also works — when set and
 // @Description  `status` is not explicitly provided, the row is created
 // @Description  already published. Explicit `status` always wins.
+// @Description
+// @Description  `target_audience` accepts `all`, `department`, or `custom`.
+// @Description  `department` requires at least one `department_ids` entry;
+// @Description  `custom` requires at least one `recipient_ids` entry
+// @Description  (employee_ids).
 // @Tags         announcements
 // @Security     BearerAuth
 // @Accept       json

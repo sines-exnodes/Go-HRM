@@ -56,6 +56,7 @@ type AnnouncementRepository interface {
 	// shape as Phase 4 EmployeeSkill.ReplaceForEmployee.
 	ReplaceLabels(ctx context.Context, announcementID uuid.UUID, labelIDs []uuid.UUID) error
 	ReplaceTargetDepartments(ctx context.Context, announcementID uuid.UUID, departmentIDs []uuid.UUID) error
+	ReplaceTargetRecipients(ctx context.Context, announcementID uuid.UUID, employeeIDs []uuid.UUID) error
 
 	// Attachment lifecycle.
 	CreateAttachment(ctx context.Context, att *models.AnnouncementAttachment) error
@@ -91,6 +92,11 @@ func preloadTargetDepartments(db *gorm.DB) *gorm.DB {
 	return db.Where("announcement_target_departments.is_deleted = ?", false)
 }
 
+// preloadTargetUsers preloads live per-user target joins (audience=custom).
+func preloadTargetUsers(db *gorm.DB) *gorm.DB {
+	return db.Where("announcement_target_users.is_deleted = ?", false)
+}
+
 func (r *announcementRepo) Create(ctx context.Context, a *models.Announcement) error {
 	return r.db.WithContext(ctx).Create(a).Error
 }
@@ -115,6 +121,8 @@ func (r *announcementRepo) FindByID(ctx context.Context, id uuid.UUID) (*models.
 		Preload("AnnouncementLabels.Label").
 		Preload("TargetDepartments", preloadTargetDepartments).
 		Preload("TargetDepartments.Department").
+		Preload("TargetUsers", preloadTargetUsers).
+		Preload("TargetUsers.Employee").
 		Preload("Attachments", preloadAttachments).
 		Where("announcements.id = ?", id).
 		First(&a).Error
@@ -204,6 +212,8 @@ func (r *announcementRepo) List(ctx context.Context, f AnnouncementListFilter) (
 		Preload("AnnouncementLabels.Label").
 		Preload("TargetDepartments", preloadTargetDepartments).
 		Preload("TargetDepartments.Department").
+		Preload("TargetUsers", preloadTargetUsers).
+		Preload("TargetUsers.Employee").
 		Preload("Attachments", preloadAttachments).
 		Order("announcements.pinned DESC, announcements.published_at DESC NULLS LAST, announcements.created_at DESC").
 		Distinct("announcements.*").
@@ -216,33 +226,48 @@ func (r *announcementRepo) List(ctx context.Context, f AnnouncementListFilter) (
 // When includeAuthor=true, rows where announcements.author_id = empID
 // are also included regardless of audience match (the "all" scope —
 // authors always see their own work). When false, only audience matches.
+//
+// Three audience branches: 'all', 'department', 'custom'. The 'custom'
+// branch checks per-employee membership in announcement_target_users —
+// always applicable (no dependency on the caller's department).
 func applyAudienceFilter(q *gorm.DB, empID uuid.UUID, deptID *uuid.UUID, includeAuthor bool) *gorm.DB {
 	deptMatch := "EXISTS (SELECT 1 FROM announcement_target_departments td " +
 		"WHERE td.announcement_id = announcements.id " +
 		"AND td.is_deleted = false AND td.department_id = ?)"
+	customMatch := "EXISTS (SELECT 1 FROM announcement_target_users tu " +
+		"WHERE tu.announcement_id = announcements.id " +
+		"AND tu.is_deleted = false AND tu.employee_id = ?)"
 	allMatch := "announcements.target_audience = 'all'"
 
 	if deptID == nil {
-		// User has no department — can match only 'all'.
+		// User has no department — can match 'all' or 'custom' (the
+		// per-user join doesn't depend on departmental membership).
 		if includeAuthor {
 			return q.Where(
-				"(announcements.author_id = ? OR "+allMatch+")",
-				empID,
+				"(announcements.author_id = ? OR "+allMatch+" "+
+					"OR (announcements.target_audience = 'custom' AND "+customMatch+"))",
+				empID, empID,
 			)
 		}
-		return q.Where(allMatch)
+		return q.Where(
+			"("+allMatch+" OR (announcements.target_audience = 'custom' AND "+customMatch+"))",
+			empID,
+		)
 	}
 
 	if includeAuthor {
 		return q.Where(
 			"(announcements.author_id = ? OR "+allMatch+" "+
-				"OR (announcements.target_audience = 'department' AND "+deptMatch+"))",
-			empID, *deptID,
+				"OR (announcements.target_audience = 'department' AND "+deptMatch+") "+
+				"OR (announcements.target_audience = 'custom' AND "+customMatch+"))",
+			empID, *deptID, empID,
 		)
 	}
 	return q.Where(
-		"("+allMatch+" OR (announcements.target_audience = 'department' AND "+deptMatch+"))",
-		*deptID,
+		"("+allMatch+" "+
+			"OR (announcements.target_audience = 'department' AND "+deptMatch+") "+
+			"OR (announcements.target_audience = 'custom' AND "+customMatch+"))",
+		*deptID, empID,
 	)
 }
 
@@ -360,6 +385,65 @@ func (r *announcementRepo) ReplaceTargetDepartments(ctx context.Context, announc
 			case row.IsDeleted:
 				if err := tx.Model(&models.AnnouncementTargetDepartment{}).
 					Where("announcement_id = ? AND department_id = ?", announcementID, did).
+					Updates(map[string]any{"is_deleted": false, "deleted_at": gorm.Expr("NULL")}).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// ReplaceTargetRecipients mirrors ReplaceTargetDepartments — composite-PK
+// aware: soft-deletes rows that should drop out of the set, reactivates
+// existing soft-deleted rows for IDs that re-enter the set, inserts fresh
+// rows otherwise. employee_ids are dedup'd; uuid.Nil entries are dropped.
+func (r *announcementRepo) ReplaceTargetRecipients(ctx context.Context, announcementID uuid.UUID, employeeIDs []uuid.UUID) error {
+	want := make(map[uuid.UUID]struct{}, len(employeeIDs))
+	for _, id := range employeeIDs {
+		if id == uuid.Nil {
+			continue
+		}
+		want[id] = struct{}{}
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var existing []models.AnnouncementTargetUser
+		if err := tx.Where("announcement_id = ?", announcementID).Find(&existing).Error; err != nil {
+			return err
+		}
+		have := make(map[uuid.UUID]models.AnnouncementTargetUser, len(existing))
+		for _, row := range existing {
+			have[row.EmployeeID] = row
+		}
+
+		var toRemove []uuid.UUID
+		for eid, row := range have {
+			if row.IsDeleted {
+				continue
+			}
+			if _, keep := want[eid]; !keep {
+				toRemove = append(toRemove, eid)
+			}
+		}
+		if len(toRemove) > 0 {
+			if err := tx.Model(&models.AnnouncementTargetUser{}).
+				Where("announcement_id = ? AND employee_id IN ?", announcementID, toRemove).
+				Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error; err != nil {
+				return err
+			}
+		}
+
+		for eid := range want {
+			row, ok := have[eid]
+			switch {
+			case !ok:
+				newRow := models.AnnouncementTargetUser{AnnouncementID: announcementID, EmployeeID: eid}
+				if err := tx.Create(&newRow).Error; err != nil {
+					return err
+				}
+			case row.IsDeleted:
+				if err := tx.Model(&models.AnnouncementTargetUser{}).
+					Where("announcement_id = ? AND employee_id = ?", announcementID, eid).
 					Updates(map[string]any{"is_deleted": false, "deleted_at": gorm.Expr("NULL")}).Error; err != nil {
 					return err
 				}

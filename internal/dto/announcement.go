@@ -13,7 +13,8 @@ import (
 // AnnouncementCreate is the body for POST /announcements. When status is
 // omitted the row is created as a draft (unless send_now=true — see below).
 // label_ids must reference live rows in the labels catalog. department_ids
-// is meaningful only when target_audience == "department".
+// is meaningful only when target_audience == "department". recipient_ids
+// is meaningful only when target_audience == "custom" (per-employee target).
 //
 // send_now is the Python-parity shortcut: when true and status is not
 // explicitly set, the row is created already in the "published" state and
@@ -25,28 +26,30 @@ type AnnouncementCreate struct {
 	Summary        *string                            `json:"summary,omitempty"`
 	Status         *models.AnnouncementStatus         `json:"status,omitempty"          binding:"omitempty,oneof=draft scheduled published archived"`
 	ScheduledAt    *time.Time                         `json:"scheduled_at,omitempty"`
-	TargetAudience *models.AnnouncementTargetAudience `json:"target_audience,omitempty" binding:"omitempty,oneof=all department"`
+	TargetAudience *models.AnnouncementTargetAudience `json:"target_audience,omitempty" binding:"omitempty,oneof=all department custom"`
 	Pinned         *bool                              `json:"pinned,omitempty"`
 	CoverImageURL  *string                            `json:"cover_image_url,omitempty"`
 	LabelIDs       []uuid.UUID                        `json:"label_ids,omitempty"`
 	DepartmentIDs  []uuid.UUID                        `json:"department_ids,omitempty"`
+	RecipientIDs   []uuid.UUID                        `json:"recipient_ids,omitempty"`
 	SendNow        bool                               `json:"send_now,omitempty"`
 }
 
 // AnnouncementUpdate is the PATCH body. Pointer types preserve "not
-// provided" semantics; nil slice means "leave label/department links
-// unchanged"; empty slice (length 0) means "clear all links".
+// provided" semantics; nil slice means "leave label/department/recipient
+// links unchanged"; empty slice (length 0) means "clear all links".
 type AnnouncementUpdate struct {
 	Title          *string                            `json:"title,omitempty"           binding:"omitempty,min=1"`
 	Description    *string                            `json:"description,omitempty"     binding:"omitempty,min=1"`
 	Summary        *string                            `json:"summary,omitempty"`
 	Status         *models.AnnouncementStatus         `json:"status,omitempty"          binding:"omitempty,oneof=draft scheduled published archived"`
 	ScheduledAt    *time.Time                         `json:"scheduled_at,omitempty"`
-	TargetAudience *models.AnnouncementTargetAudience `json:"target_audience,omitempty" binding:"omitempty,oneof=all department"`
+	TargetAudience *models.AnnouncementTargetAudience `json:"target_audience,omitempty" binding:"omitempty,oneof=all department custom"`
 	Pinned         *bool                              `json:"pinned,omitempty"`
 	CoverImageURL  *string                            `json:"cover_image_url,omitempty"`
 	LabelIDs       *[]uuid.UUID                       `json:"label_ids,omitempty"`
 	DepartmentIDs  *[]uuid.UUID                       `json:"department_ids,omitempty"`
+	RecipientIDs   *[]uuid.UUID                       `json:"recipient_ids,omitempty"`
 }
 
 // ---- Read outputs ----
@@ -70,6 +73,14 @@ type AnnouncementLabelBrief struct {
 type AnnouncementDepartmentBrief struct {
 	ID   uuid.UUID `json:"id"`
 	Name string    `json:"name"`
+}
+
+// AnnouncementRecipientBrief is the per-employee projection for the
+// target_audience='custom' join. Mirrors AnnouncementAuthorBrief.
+type AnnouncementRecipientBrief struct {
+	ID        uuid.UUID `json:"id"`
+	FullName  string    `json:"full_name"`
+	AvatarURL *string   `json:"avatar_url,omitempty"`
 }
 
 // AnnouncementAttachmentRead is the per-attachment projection.
@@ -99,6 +110,7 @@ type AnnouncementRead struct {
 	Author            *AnnouncementAuthorBrief          `json:"author,omitempty"`
 	Labels            []AnnouncementLabelBrief          `json:"labels"`
 	TargetDepartments []AnnouncementDepartmentBrief     `json:"target_departments"`
+	TargetRecipients  []AnnouncementRecipientBrief      `json:"target_recipients"`
 	Attachments       []AnnouncementAttachmentRead      `json:"attachments"`
 	HasViewed         bool                              `json:"has_viewed"`
 	CreatedAt         time.Time                         `json:"created_at"`
@@ -154,12 +166,17 @@ type MobileAnnouncementListQuery struct {
 // "announcement_published" event broadcast on /sse/announcements.
 // Includes only the fields the FE needs to render a toast or refresh
 // its list — Body is omitted to keep frames small.
+//
+// RecipientIDs carries employee_ids when target_audience='custom'; FE may
+// short-circuit the refetch when the current user is not in the set.
+// Server-side visibility is still enforced on the subsequent GET.
 type SSEAnnouncementPublishedEvent struct {
 	ID             uuid.UUID                         `json:"id"`
 	Title          string                            `json:"title"`
 	Summary        *string                           `json:"summary,omitempty"`
 	TargetAudience models.AnnouncementTargetAudience `json:"target_audience"`
 	DepartmentIDs  []uuid.UUID                       `json:"department_ids,omitempty"`
+	RecipientIDs   []uuid.UUID                       `json:"recipient_ids,omitempty"`
 	Pinned         bool                              `json:"pinned"`
 	PublishedAt    time.Time                         `json:"published_at"`
 }
