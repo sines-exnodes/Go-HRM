@@ -13,6 +13,7 @@ import (
 	apperrors "github.com/exnodes/hrm-api/internal/errors"
 	"github.com/exnodes/hrm-api/internal/middleware"
 	"github.com/exnodes/hrm-api/internal/models"
+	"github.com/exnodes/hrm-api/internal/permissions"
 	"github.com/exnodes/hrm-api/internal/services"
 )
 
@@ -55,6 +56,39 @@ func parseIDParam(c *gin.Context, key string) (uuid.UUID, error) {
 		return uuid.Nil, apperrors.ErrBadRequest("invalid " + key)
 	}
 	return id, nil
+}
+
+// employeeFieldPerms derives the caller's salary/banking field-level perms
+// (employees parity #6) from their JWT-loaded roles. The wildcard "*" grants
+// all four. Does not error when the user is absent (returns the zero value);
+// the route's RequirePerms already guards authentication.
+func employeeFieldPerms(c *gin.Context) services.EmployeeFieldPerms {
+	v, exists := c.Get(middleware.ContextKeyUser)
+	if !exists {
+		return services.EmployeeFieldPerms{}
+	}
+	u, ok := v.(*models.User)
+	if !ok {
+		return services.EmployeeFieldPerms{}
+	}
+	var p services.EmployeeFieldPerms
+	for _, r := range u.Roles {
+		for _, perm := range []string(r.Permissions) {
+			switch perm {
+			case string(permissions.PermAll):
+				return services.AllEmployeeFieldPerms
+			case string(permissions.PermUsersSalaryView):
+				p.SalaryView = true
+			case string(permissions.PermUsersSalaryManage):
+				p.SalaryManage = true
+			case string(permissions.PermUsersBankingView):
+				p.BankingView = true
+			case string(permissions.PermUsersBankingManage):
+				p.BankingManage = true
+			}
+		}
+	}
+	return p
 }
 
 // ---- Avatar multipart helper ----
@@ -119,6 +153,10 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	perms := employeeFieldPerms(c)
+	for i := range items {
+		services.ApplyEmployeeFieldVisibility(&items[i], perms, false)
+	}
 	totalPages := 0
 	if q.PageSize > 0 && total > 0 {
 		totalPages = int((total + int64(q.PageSize) - 1) / int64(q.PageSize))
@@ -144,11 +182,23 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
 		return
 	}
+	perms := employeeFieldPerms(c)
+	// Salary/banking write-gating (employees parity #6) — 403 if the payload
+	// sets fields the caller may not manage.
+	if err := services.GuardSalaryWrite(in.BasicSalary != nil || in.InsuranceSalary != nil, perms); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := services.GuardBankingWrite(in.BankAccount != nil || in.BankName != nil || in.BankHolderName != nil || in.PaymentMethod != nil, perms); err != nil {
+		_ = c.Error(err)
+		return
+	}
 	view, err := h.svc.Create(c.Request.Context(), in)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, perms, true) // write echo: unmasked
 	ok(c, http.StatusCreated, view, "Employee created")
 }
 
@@ -171,6 +221,7 @@ func (h *EmployeeHandler) Get(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), false) // read: masked
 	ok(c, http.StatusOK, view, "")
 }
 
@@ -199,11 +250,22 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
 		return
 	}
+	perms := employeeFieldPerms(c)
+	// Salary/banking write-gating (employees parity #6).
+	if err := services.GuardSalaryWrite(in.BasicSalary != nil || in.InsuranceSalary != nil, perms); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	if err := services.GuardBankingWrite(in.BankAccount != nil || in.BankName != nil || in.BankHolderName != nil || in.PaymentMethod != nil, perms); err != nil {
+		_ = c.Error(err)
+		return
+	}
 	view, err := h.svc.Update(c.Request.Context(), id, in, u.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, perms, true) // write echo: unmasked
 	ok(c, http.StatusOK, view, "Employee updated")
 }
 
@@ -258,6 +320,7 @@ func (h *EmployeeHandler) UpdateAvatarAdmin(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), true) // write echo
 	ok(c, http.StatusOK, view, "Avatar updated")
 }
 
@@ -287,6 +350,7 @@ func (h *EmployeeHandler) UpdateLeaveQuota(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), true) // write echo
 	ok(c, http.StatusOK, view, "Leave quota updated")
 }
 
@@ -309,6 +373,7 @@ func (h *EmployeeHandler) GetMe(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), false) // read: masked
 	ok(c, http.StatusOK, view, "")
 }
 
@@ -336,6 +401,7 @@ func (h *EmployeeHandler) UpdateMe(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), true) // own write echo
 	ok(c, http.StatusOK, view, "Profile updated")
 }
 
@@ -363,5 +429,6 @@ func (h *EmployeeHandler) UpdateMyAvatar(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), true) // own write echo
 	ok(c, http.StatusOK, view, "Avatar updated")
 }
