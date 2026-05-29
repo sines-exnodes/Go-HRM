@@ -268,16 +268,49 @@ func (h *UserHandler) AdminPatch(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	admin, okC := currentUser(c)
+	if !okC {
+		return
+	}
 	var in dto.AdminUserPatch
 	if err := c.ShouldBindJSON(&in); err != nil {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
 		return
 	}
-	if err := h.svc.AdminPatch(c.Request.Context(), id, in); err != nil {
+	if err := h.svc.AdminPatch(c.Request.Context(), id, in, admin); err != nil {
 		_ = c.Error(err)
 		return
 	}
 	okEmpty(c, "User updated")
+}
+
+// AdminChangeEmail godoc
+// @Summary      Admin changes a user's email (employees parity #13)
+// @Tags         users
+// @Security     BearerAuth
+// @Accept       json
+// @Produce      json
+// @Param        id   path string true "user uuid"
+// @Param        body body dto.AdminChangeEmailRequest true "new email"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/users/{id}/change-email [post]
+func (h *UserHandler) AdminChangeEmail(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	var in dto.AdminChangeEmailRequest
+	if err := c.ShouldBindJSON(&in); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	view, err := h.svc.AdminChangeEmail(c.Request.Context(), id, in.NewEmail)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	ok(c, http.StatusOK, view, "User email updated")
 }
 
 // AdminDelete godoc

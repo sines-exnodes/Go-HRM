@@ -225,7 +225,7 @@ func TestEmployeeService_AdminUpdate_AllowsRestrictedFields(t *testing.T) {
 	out, err := svc.Update(ctx, view.ID, dto.EmployeeUpdate{
 		BasicSalary:  &newSalary,
 		ContractType: &contract,
-	})
+	}, uuid.New())
 	require.NoError(t, err)
 	require.NotNil(t, out.BasicSalary)
 	assert.InDelta(t, 50000.0, *out.BasicSalary, 0.01)
@@ -281,7 +281,7 @@ func TestEmployeeService_SoftDelete_CascadesUserDeactivate(t *testing.T) {
 		Email: "kill@example.com", Password: "Pass12345", FullName: "Kill Me",
 	})
 	require.NoError(t, err)
-	require.NoError(t, svc.SoftDelete(ctx, view.ID))
+	require.NoError(t, svc.SoftDelete(ctx, view.ID, uuid.New()))
 
 	// Employee no longer fetchable (soft-deleted).
 	_, err = svc.Get(ctx, view.ID)

@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  github_com_exnodes_hrm-api_internal_dto.AdminChangeEmailRequest:
+    properties:
+      new_email:
+        type: string
+    required:
+    - new_email
+    type: object
   github_com_exnodes_hrm-api_internal_dto.AdminUserPatch:
     properties:
       is_active:
@@ -310,6 +317,21 @@ definitions:
         - other
         type: string
     type: object
+  github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput:
+    properties:
+      full_name:
+        maxLength: 200
+        minLength: 1
+        type: string
+      phone_number:
+        maxLength: 50
+        type: string
+      relationship:
+        maxLength: 100
+        type: string
+    required:
+    - full_name
+    type: object
   github_com_exnodes_hrm-api_internal_dto.EmployeeCreate:
     properties:
       bank_account:
@@ -332,22 +354,33 @@ definitions:
         type: string
       current_address:
         type: string
+      cv_url:
+        type: string
       department_id:
         description: Work
         type: string
       dob:
         type: string
       education:
+        enum:
+        - high_school
+        - college
+        - bachelor
+        - master
+        - doctorate
         type: string
       email:
         description: User credentials (created in tx)
         type: string
-      emergency_contact_name:
-        type: string
-      emergency_contact_phone:
-        type: string
-      emergency_contact_relation:
-        type: string
+      emergency_contacts:
+        description: 'Emergency contacts — full replacement list at create (employees
+          parity #4).'
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput'
+        type: array
+      experience_year:
+        minimum: 0
+        type: integer
       full_name:
         description: HR personal info
         maxLength: 200
@@ -380,8 +413,7 @@ definitions:
         enum:
         - single
         - married
-        - divorced
-        - widowed
+        - other
         type: string
       nationality:
         type: string
@@ -412,18 +444,30 @@ definitions:
     properties:
       current_address:
         type: string
-      emergency_contact_name:
+      dob:
         type: string
-      emergency_contact_phone:
+      emergency_contacts:
+        description: |-
+          Emergency contacts — self may manage their own list (pointer-to-slice:
+          nil = leave unchanged, [] = clear all, non-empty = replace the set).
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput'
+        type: array
+      full_name:
+        maxLength: 200
+        minLength: 1
         type: string
-      emergency_contact_relation:
+      gender:
+        enum:
+        - male
+        - female
+        - other
         type: string
       marital_status:
         enum:
         - single
         - married
-        - divorced
-        - widowed
+        - other
         type: string
       permanent_address:
         type: string
@@ -483,18 +527,30 @@ definitions:
         type: string
       current_address:
         type: string
+      cv_url:
+        type: string
       department_id:
         type: string
       dob:
         type: string
       education:
+        enum:
+        - high_school
+        - college
+        - bachelor
+        - master
+        - doctorate
         type: string
-      emergency_contact_name:
-        type: string
-      emergency_contact_phone:
-        type: string
-      emergency_contact_relation:
-        type: string
+      emergency_contacts:
+        description: |-
+          Emergency contacts — pointer-to-slice partial-PATCH semantics:
+          nil/absent = leave unchanged, [] = clear all, non-empty = replace the set.
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput'
+        type: array
+      experience_year:
+        minimum: 0
+        type: integer
       full_name:
         type: string
       gender:
@@ -525,8 +581,7 @@ definitions:
         enum:
         - single
         - married
-        - divorced
-        - widowed
+        - other
         type: string
       nationality:
         type: string
@@ -3184,6 +3239,35 @@ paths:
       security:
       - BearerAuth: []
       summary: Admin toggle is_active on a user
+      tags:
+      - users
+  /api/v1/users/{id}/change-email:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: new email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AdminChangeEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 'Admin changes a user''s email (employees parity #13)'
       tags:
       - users
   /api/v1/users/{id}/change-password:

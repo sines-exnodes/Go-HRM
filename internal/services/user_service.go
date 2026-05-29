@@ -213,11 +213,45 @@ func (s *UserService) AssignRoles(ctx context.Context, id uuid.UUID, roleIDs []u
 
 // ---- Admin user patch (toggle is_active) ----
 
-func (s *UserService) AdminPatch(ctx context.Context, id uuid.UUID, in dto.AdminUserPatch) error {
+func (s *UserService) AdminPatch(ctx context.Context, id uuid.UUID, in dto.AdminUserPatch, admin *models.User) error {
 	if in.IsActive == nil {
 		return nil
 	}
+	// Cannot deactivate your own account (employees parity #12).
+	if !*in.IsActive && admin.ID == id {
+		return apperrors.ErrBadRequest("You cannot deactivate your own account")
+	}
 	return s.users.ToggleActive(ctx, id, *in.IsActive)
+}
+
+// ---- Admin change email (employees parity #13) ----
+
+// AdminChangeEmail changes another user's email. No password required — the
+// route is gated by users:update. UpdateEmail stamps email_changed_at, which
+// invalidates the target's existing access tokens on their next request.
+func (s *UserService) AdminChangeEmail(ctx context.Context, id uuid.UUID, newEmail string) (*dto.UserAdminRead, error) {
+	u, err := s.users.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrNotFound("User")
+		}
+		return nil, err
+	}
+	newEmail = strings.ToLower(strings.TrimSpace(newEmail))
+	if newEmail == u.Email {
+		return nil, apperrors.ErrBadRequest("New email must be different from the current email")
+	}
+	exists, err := s.users.ExistsByEmail(ctx, newEmail, &u.ID)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, apperrors.ErrConflict("This email is already in use")
+	}
+	if err := s.users.UpdateEmail(ctx, u.ID, newEmail); err != nil {
+		return nil, err
+	}
+	return s.Get(ctx, u.ID)
 }
 
 // ---- Admin delete (with reauth) ----

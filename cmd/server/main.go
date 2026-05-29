@@ -201,6 +201,7 @@ func main() {
 		adminUsers.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermUsersUpdate), userH.AdminPatch)
 		adminUsers.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermUsersDelete), userH.AdminDelete)
 		adminUsers.PATCH(":id/change-password", middleware.RequirePerms(authSvc, permissions.PermUsersChangePwd), userH.AdminChangePassword)
+		adminUsers.POST(":id/change-email", middleware.RequirePerms(authSvc, permissions.PermUsersUpdate), userH.AdminChangeEmail)
 		adminUsers.PUT(":id/roles", middleware.RequirePerms(authSvc, permissions.PermUsersManageRoles), userH.AssignRoles)
 
 		// ---- /employees/me* self-service (auth only) ----

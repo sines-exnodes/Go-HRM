@@ -50,6 +50,13 @@ type ChangeEmailRequest struct {
 	CurrentPassword string `json:"current_password" binding:"required,min=1"`
 }
 
+// AdminChangeEmailRequest is the body for admin POST /users/{id}/change-email
+// (employees parity #13). No password — the route is gated by users:update.
+// The service stamps email_changed_at to invalidate the target's sessions.
+type AdminChangeEmailRequest struct {
+	NewEmail string `json:"new_email" binding:"required,email"`
+}
+
 type RoleAssignmentRequest struct {
 	RoleIDs []uuid.UUID `json:"role_ids" binding:"required"`
 }

@@ -190,12 +190,16 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
 	var in dto.EmployeeUpdate
 	if err := c.ShouldBindJSON(&in); err != nil {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
 		return
 	}
-	view, err := h.svc.Update(c.Request.Context(), id, in)
+	view, err := h.svc.Update(c.Request.Context(), id, in, u.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -217,7 +221,11 @@ func (h *EmployeeHandler) Delete(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-	if err := h.svc.SoftDelete(c.Request.Context(), id); err != nil {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	if err := h.svc.SoftDelete(c.Request.Context(), id, u.ID); err != nil {
 		_ = c.Error(err)
 		return
 	}

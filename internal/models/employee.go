@@ -27,11 +27,12 @@ type Employee struct {
 	AvatarURL        *string    `gorm:"type:text" json:"avatar_url,omitempty"`
 	Education        *string    `gorm:"type:text" json:"education,omitempty"`
 	MaritalStatus    *string    `gorm:"type:text" json:"marital_status,omitempty"`
+	ExperienceYear   *int       `gorm:"type:int" json:"experience_year,omitempty"`
+	CVURL            *string    `gorm:"type:text" json:"cv_url,omitempty"`
 
-	// Emergency contact
-	EmergencyContactName     *string `gorm:"type:text" json:"emergency_contact_name,omitempty"`
-	EmergencyContactRelation *string `gorm:"type:text" json:"emergency_contact_relation,omitempty"`
-	EmergencyContactPhone    *string `gorm:"type:text" json:"emergency_contact_phone,omitempty"`
+	// Emergency contacts are a 1-N list (migration 000017); the former single
+	// emergency_contact_{name,relation,phone} columns were dropped. See the
+	// EmergencyContacts relation below.
 
 	// Work info — department_id / position_id have NO FK constraint until
 	// Phase 3 introduces departments/positions tables.
@@ -55,10 +56,13 @@ type Employee struct {
 	PaymentMethod  string  `gorm:"type:text;not null;default:'bank_transfer'" json:"payment_method"`
 
 	// Relations
-	User         *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Manager      *Employee   `gorm:"foreignKey:ManagerID" json:"manager,omitempty"`
-	Subordinates []Employee  `gorm:"foreignKey:ManagerID" json:"subordinates,omitempty"`
-	Dependents   []Dependent `gorm:"foreignKey:EmployeeID" json:"dependents,omitempty"`
+	User              *User                      `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Manager           *Employee                  `gorm:"foreignKey:ManagerID" json:"manager,omitempty"`
+	Subordinates      []Employee                 `gorm:"foreignKey:ManagerID" json:"subordinates,omitempty"`
+	Dependents        []Dependent                `gorm:"foreignKey:EmployeeID" json:"dependents,omitempty"`
+	EmergencyContacts []EmployeeEmergencyContact `gorm:"foreignKey:EmployeeID" json:"emergency_contacts,omitempty"`
+	EmployeeSkills    []EmployeeSkill            `gorm:"foreignKey:EmployeeID" json:"employee_skills,omitempty"`
+	LeaveQuota        *EmployeeLeaveQuota        `gorm:"foreignKey:EmployeeID" json:"leave_quota,omitempty"`
 }
 
 func (Employee) TableName() string { return "employees" }
