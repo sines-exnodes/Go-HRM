@@ -1,10 +1,10 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity in flight
 
-**Last updated:** 2026-05-22
-**Stopped at:** Phases 0–9 done, live-verified, and committed on `main`. **The Go migration is feature-complete.**
-**Branch:** `main`
-**HEAD:** ~180 commits (run `git log --oneline -1` for exact SHA)
-**DB migration version:** **12** (main + test DB both at 12)
+**Last updated:** 2026-05-29
+**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity** work ongoing: announcements (merged), employees (two PRs pushed, awaiting open).
+**Branch:** `main` — parity work on `feat/employees-parity` → `feat/employees-salary-banking`.
+**DB migration version:** **16** on `main`; **17** on `feat/employees-parity` (000017_employee_parity).
+**See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
 ## How to resume next session
 
@@ -18,13 +18,52 @@ descending value):
 5. **Production env wiring** — set `FIREBASE_CREDENTIALS_PATH` + real SMTP host for invite emails.
 6. **Phase 9 password-reset flow** — reuse `EmailService` + add a `password-reset.html` template if BA confirms scope.
 
-If a Phase 10 is added later: REVISION NOTES pattern remains the way to draft it. Latest taken migration = **000012**; next is **000013**.
+If a Phase 10 is added later: REVISION NOTES pattern remains the way to draft it. Latest taken migration = **000017**; next is **000018**.
 
 ### Resume entry points
 
 1. **`docs/superpowers/CHECKPOINT.md`** (this file).
 2. **`.serena/memories/project_overview.md`** — code-map + boot protocol.
 3. **`CLAUDE.md`** — auto-loaded into every Claude session.
+
+## Post-migration parity work (Python ↔ Go API parity)
+
+The migration is done; ongoing work reconciles Go's API shape with the Python
+source, audited module-by-module: audit → locked decisions → PR(s) →
+verification log → FE doc → handoff for deferred items.
+
+### Announcements — DONE (merged)
+PR #5 (`body`→`description`, `send_now`, brief mobile widget) + PR #6 (hybrid
+per-user targeting `target_audience:"custom"` + `recipient_ids[]`, CORS fix).
+Migrations 000013–000016, both on `main`. 13-decision audit.
+
+### Employees — PUSHED (PRs not yet opened)
+19-decision audit (Python `users` module ↔ Go `users`⟂`employees`⟂`dependents`).
+Two stacked branches off `main`@`bcb4c0b`:
+
+- **`feat/employees-parity`** (PR A, `a377e44`) — emergency-contact list,
+  leave-quota/skills/cv on read, widened self-edit (name/gender/dob), self &
+  destructive guards, admin change-email, marital/education enum fixes.
+  **Migration 000017_employee_parity.**
+- **`feat/employees-salary-banking`** (PR B, stacked on A) — salary/banking
+  field-level perms (`users:salary_view/manage`, `users:banking_view/manage`)
+  + account-number masking + write-gate (decision #6). No migration.
+
+Verified: [`verification/employees-parity-pr-a.md`](verification/employees-parity-pr-a.md)
++ [`verification/employees-parity-pr-b.md`](verification/employees-parity-pr-b.md)
+(build/vet, full integration suite, migration up/down round-trip, live HTTP e2e).
+
+**3 decisions deferred** → [`handoff-2026-05-29-employee-parity.md`](handoff-2026-05-29-employee-parity.md):
+#10 line-manager suite (picker + direct-reports + cycle validation), #11 cv/
+id-card upload endpoints, #15 role-level assignment authority (N/A — Go RBAC
+has no role levels).
+
+FE docs (on disk, uncommitted in the web repo `api_info_go/`): `employee.md`
+(new) + `me.md` (refreshed for the new `/employees/me` shape).
+
+**Resume order:** open PR A → `main`, then rebase/merge PR B (it's stacked);
+commit the FE docs on the web side; then pick up the deferred items from the
+handoff. PR B currently contains A's commits via a merge of A into B.
 
 ## Phase Summary (final)
 
