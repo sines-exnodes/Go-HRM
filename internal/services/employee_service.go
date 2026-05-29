@@ -45,6 +45,77 @@ func toEmergencyModels(in []dto.EmergencyContactInput) []models.EmployeeEmergenc
 	return out
 }
 
+// EmployeeFieldPerms captures the caller's field-level salary/banking
+// permissions (employees parity #6). The handler builds it from the caller's
+// roles; the wildcard "*" grants all four. *_view gates whether the section
+// is returned on reads; *_manage gates whether it may be set on write.
+type EmployeeFieldPerms struct {
+	SalaryView    bool
+	SalaryManage  bool
+	BankingView   bool
+	BankingManage bool
+}
+
+// AllEmployeeFieldPerms grants every field-level perm — used for internal
+// callers that legitimately need the full unmasked shape (e.g. tests).
+var AllEmployeeFieldPerms = EmployeeFieldPerms{true, true, true, true}
+
+// maskAccountNumber renders a bank account number as "•••• 1234" (last 4),
+// matching the Python read shape. nil/empty passes through.
+func maskAccountNumber(acct *string) *string {
+	if acct == nil || *acct == "" {
+		return acct
+	}
+	s := *acct
+	last := s
+	if len(s) > 4 {
+		last = s[len(s)-4:]
+	}
+	masked := "•••• " + last
+	return &masked
+}
+
+// ApplyEmployeeFieldVisibility gates and masks the salary/banking sections of
+// an employee read in place, per the caller's field perms (employees parity
+// #6). On reads (unmask=false) the account number is masked even for banking
+// viewers; on write echoes (unmask=true) it is returned in full. Sections the
+// caller may neither view nor manage are stripped to nil.
+func ApplyEmployeeFieldVisibility(view *dto.EmployeeRead, p EmployeeFieldPerms, unmask bool) {
+	if view == nil {
+		return
+	}
+	if !(p.SalaryView || p.SalaryManage) {
+		view.BasicSalary = nil
+		view.InsuranceSalary = nil
+	}
+	if !(p.BankingView || p.BankingManage) {
+		view.BankAccount = nil
+		view.BankName = nil
+		view.BankHolderName = nil
+		view.PaymentMethod = nil
+	} else if !unmask {
+		view.BankAccount = maskAccountNumber(view.BankAccount)
+	}
+}
+
+// GuardSalaryWrite / GuardBankingWrite return a forbidden error when a payload
+// sets salary or banking fields the caller may not manage (employees parity
+// #6). Pure functions — called by the handler before Create/Update (the
+// codebase's handler-level authorization pattern) and unit-tested directly.
+func GuardSalaryWrite(set bool, p EmployeeFieldPerms) error {
+	if set && !p.SalaryManage {
+		return apperrors.ErrForbidden("You do not have permission to set salary fields")
+	}
+	return nil
+}
+
+func GuardBankingWrite(set bool, p EmployeeFieldPerms) error {
+	if set && !p.BankingManage {
+		return apperrors.ErrForbidden("You do not have permission to set banking fields")
+	}
+	return nil
+}
+
 // EmployeeService owns the HR-profile business logic. All repository fields
 // use the repository INTERFACE types for mockability.
 type EmployeeService struct {
