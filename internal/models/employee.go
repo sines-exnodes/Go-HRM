@@ -58,6 +58,8 @@ type Employee struct {
 	// Relations
 	User              *User                      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Manager           *Employee                  `gorm:"foreignKey:ManagerID" json:"manager,omitempty"`
+	Department        *Department                `gorm:"foreignKey:DepartmentID;references:ID" json:"-"`
+	Position          *Position                  `gorm:"foreignKey:PositionID;references:ID" json:"-"`
 	Subordinates      []Employee                 `gorm:"foreignKey:ManagerID" json:"subordinates,omitempty"`
 	Dependents        []Dependent                `gorm:"foreignKey:EmployeeID" json:"dependents,omitempty"`
 	EmergencyContacts []EmployeeEmergencyContact `gorm:"foreignKey:EmployeeID" json:"emergency_contacts,omitempty"`

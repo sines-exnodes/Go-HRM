@@ -21,6 +21,9 @@ type EmployeeRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*models.Employee, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) (*models.Employee, error)
 	FindByIDWithUser(ctx context.Context, id uuid.UUID) (*models.Employee, error)
+	// FindByIDWithOrg preloads User + Department + Position (for line-manager
+	// candidate/brief rows that need the org context — employees parity #10).
+	FindByIDWithOrg(ctx context.Context, id uuid.UUID) (*models.Employee, error)
 
 	// Phase 2 admin queries.
 	FindByIDWithFull(ctx context.Context, id uuid.UUID) (*models.Employee, error)
@@ -32,6 +35,19 @@ type EmployeeRepository interface {
 	// employee: soft-deletes all current live rows, then inserts the new set
 	// fresh (UUID PKs, so no reactivation is needed). Empty slice = clear all.
 	ReplaceEmergencyContacts(ctx context.Context, employeeID uuid.UUID, contacts []models.EmployeeEmergencyContact) error
+
+	// Line-manager suite (employees parity #10).
+	// SubordinateIDs returns the transitive set of employees reporting (directly
+	// or via chain) to rootEmployeeID. The root itself is NOT included.
+	SubordinateIDs(ctx context.Context, rootEmployeeID uuid.UUID) (map[uuid.UUID]bool, error)
+	// ListManagerCandidates returns active, non-deleted employees not in
+	// excludeIDs, with User/Department/Position preloaded. Optional search
+	// matches full_name / position name / department name.
+	ListManagerCandidates(ctx context.Context, excludeIDs []uuid.UUID, search string, limit int) ([]models.Employee, error)
+	// ListDirectReports returns live employees whose manager_id = managerID
+	// (active AND inactive), with User/Department/Position preloaded.
+	ListDirectReports(ctx context.Context, managerID uuid.UUID) ([]models.Employee, error)
+
 	WithTx(tx *gorm.DB) EmployeeRepository
 	DB() *gorm.DB
 }
@@ -95,6 +111,20 @@ func (r *employeeRepository) FindByIDWithUser(ctx context.Context, id uuid.UUID)
 	return &e, nil
 }
 
+func (r *employeeRepository) FindByIDWithOrg(ctx context.Context, id uuid.UUID) (*models.Employee, error) {
+	var e models.Employee
+	err := r.db.WithContext(ctx).
+		Scopes(notDeleted).
+		Preload("User").
+		Preload("Department").
+		Preload("Position").
+		First(&e, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
 // FindByIDWithFull preloads user, roles, manager, dependents.
 // Department/Position preloads are deferred to Phase 3 (those tables land
 // later), so they are intentionally not preloaded here.
@@ -104,6 +134,9 @@ func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID)
 		Preload("User").
 		Preload("User.Roles").
 		Preload("Manager").
+		Preload("Manager.User").
+		Preload("Manager.Department").
+		Preload("Manager.Position").
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -123,6 +156,9 @@ func (r *employeeRepository) FindByUserIDWithFull(ctx context.Context, userID uu
 		Preload("User").
 		Preload("User.Roles").
 		Preload("Manager").
+		Preload("Manager.User").
+		Preload("Manager.Department").
+		Preload("Manager.Position").
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -141,6 +177,9 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 		Preload("User").
 		Preload("User.Roles").
 		Preload("Manager").
+		Preload("Manager.User").
+		Preload("Manager.Department").
+		Preload("Manager.Position").
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
 		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
@@ -235,6 +274,66 @@ func (r *employeeRepository) ReplaceEmergencyContacts(ctx context.Context, emplo
 		}
 		return tx.Create(&rows).Error
 	})
+}
+
+func (r *employeeRepository) SubordinateIDs(ctx context.Context, rootEmployeeID uuid.UUID) (map[uuid.UUID]bool, error) {
+	result := make(map[uuid.UUID]bool)
+	frontier := []uuid.UUID{rootEmployeeID}
+	for len(frontier) > 0 {
+		var children []uuid.UUID
+		if err := r.db.WithContext(ctx).Model(&models.Employee{}).
+			Where("manager_id IN ? AND is_deleted = ?", frontier, false).
+			Pluck("id", &children).Error; err != nil {
+			return nil, err
+		}
+		next := make([]uuid.UUID, 0, len(children))
+		for _, c := range children {
+			// Guard against self-reference and re-visits (cycle-safe BFS).
+			if c == rootEmployeeID || result[c] {
+				continue
+			}
+			result[c] = true
+			next = append(next, c)
+		}
+		frontier = next
+	}
+	return result, nil
+}
+
+func (r *employeeRepository) ListManagerCandidates(ctx context.Context, excludeIDs []uuid.UUID, search string, limit int) ([]models.Employee, error) {
+	q := r.db.WithContext(ctx).Model(&models.Employee{}).
+		Preload("User").
+		Preload("Department").
+		Preload("Position").
+		Joins("JOIN users ON users.id = employees.user_id").
+		Where("employees.is_deleted = ? AND users.is_active = ?", false, true)
+	if len(excludeIDs) > 0 {
+		q = q.Where("employees.id NOT IN ?", excludeIDs)
+	}
+	if search != "" {
+		p := utils.BuildILIKEPattern(search)
+		q = q.Joins("LEFT JOIN positions ON positions.id = employees.position_id").
+			Joins("LEFT JOIN departments ON departments.id = employees.department_id").
+			Where("employees.full_name ILIKE ? OR positions.name ILIKE ? OR departments.name ILIKE ?", p, p, p)
+	}
+	if limit < 1 {
+		limit = 50
+	}
+	var emps []models.Employee
+	err := q.Order("employees.full_name ASC").Limit(limit).Find(&emps).Error
+	return emps, err
+}
+
+func (r *employeeRepository) ListDirectReports(ctx context.Context, managerID uuid.UUID) ([]models.Employee, error) {
+	var emps []models.Employee
+	err := r.db.WithContext(ctx).
+		Preload("User").
+		Preload("Department").
+		Preload("Position").
+		Where("manager_id = ? AND is_deleted = ?", managerID, false).
+		Order("full_name ASC").
+		Find(&emps).Error
+	return emps, err
 }
 
 // WithTx returns a repository bound to the given transaction handle.

@@ -1,0 +1,226 @@
+package services_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/exnodes/hrm-api/internal/dto"
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
+)
+
+// ---------------------------------------------------------------------------
+// Line-manager suite (deferred audit decision #10): assignment validation
+// (self / cycle / inactive / missing), rich manager brief, candidate picker,
+// direct reports. Each test states WHY the behavior matters (AGENTS Rule 9).
+// ---------------------------------------------------------------------------
+
+func uptr(u uuid.UUID) *uuid.UUID { return &u }
+
+// helper: make a department + position, return their ids
+func makeOrg(t *testing.T, deptName, posName string) (uuid.UUID, uuid.UUID) {
+	t.Helper()
+	d := uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO departments (id, name) VALUES (?, ?)", d, deptName).Error)
+	p := uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO positions (id, name) VALUES (?, ?)", p, posName).Error)
+	return d, p
+}
+
+func TestLineManager_RejectsSelfAssignment(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	e, err := svc.Create(ctx, dto.EmployeeCreate{Email: "self-mgr@x.com", Password: "Pass12345", FullName: "Self Mgr"})
+	require.NoError(t, err)
+
+	_, err = svc.Update(ctx, e.ID, dto.EmployeeUpdate{ManagerID: uptr(e.ID)}, uuid.New())
+	require.Error(t, err)
+	var ae *apperrors.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
+}
+
+func TestLineManager_RejectsCycle(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	// Chain A <- B <- C  (B reports to A, C reports to B).
+	a, err := svc.Create(ctx, dto.EmployeeCreate{Email: "a@x.com", Password: "Pass12345", FullName: "A"})
+	require.NoError(t, err)
+	b, err := svc.Create(ctx, dto.EmployeeCreate{Email: "b@x.com", Password: "Pass12345", FullName: "B", ManagerID: uptr(a.ID)})
+	require.NoError(t, err)
+	c, err := svc.Create(ctx, dto.EmployeeCreate{Email: "c@x.com", Password: "Pass12345", FullName: "C", ManagerID: uptr(b.ID)})
+	require.NoError(t, err)
+
+	// Setting A's manager to C would create a cycle (C is in A's chain).
+	_, err = svc.Update(ctx, a.ID, dto.EmployeeUpdate{ManagerID: uptr(c.ID)}, uuid.New())
+	require.Error(t, err)
+	var ae *apperrors.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
+}
+
+func TestLineManager_RejectsMissingManager(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	e, err := svc.Create(ctx, dto.EmployeeCreate{Email: "miss@x.com", Password: "Pass12345", FullName: "Miss"})
+	require.NoError(t, err)
+
+	_, err = svc.Update(ctx, e.ID, dto.EmployeeUpdate{ManagerID: uptr(uuid.New())}, uuid.New())
+	require.Error(t, err)
+	var ae *apperrors.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
+}
+
+func TestLineManager_RejectsInactiveManager(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "mgr@x.com", Password: "Pass12345", FullName: "Mgr"})
+	require.NoError(t, err)
+	x, err := svc.Create(ctx, dto.EmployeeCreate{Email: "x@x.com", Password: "Pass12345", FullName: "X"})
+	require.NoError(t, err)
+
+	// Deactivate the manager (a different caller, so the self-guard doesn't trip).
+	no := false
+	_, err = svc.Update(ctx, mgr.ID, dto.EmployeeUpdate{IsActive: &no}, uuid.New())
+	require.NoError(t, err)
+
+	// Assigning the now-inactive manager must be rejected.
+	_, err = svc.Update(ctx, x.ID, dto.EmployeeUpdate{ManagerID: uptr(mgr.ID)}, uuid.New())
+	require.Error(t, err)
+	var ae *apperrors.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
+
+	// On create, too.
+	_, err = svc.Create(ctx, dto.EmployeeCreate{Email: "y@x.com", Password: "Pass12345", FullName: "Y", ManagerID: uptr(mgr.ID)})
+	require.Error(t, err)
+}
+
+func TestLineManager_RichManagerBriefOnRead(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	dept, pos := makeOrg(t, "Engineering", "Engineering Manager")
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "boss@x.com", Password: "Pass12345", FullName: "The Boss",
+		DepartmentID: &dept, PositionID: &pos,
+	})
+	require.NoError(t, err)
+	rep, err := svc.Create(ctx, dto.EmployeeCreate{Email: "rep@x.com", Password: "Pass12345", FullName: "Report", ManagerID: uptr(mgr.ID)})
+	require.NoError(t, err)
+
+	got, err := svc.Get(ctx, rep.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.Manager)
+	assert.Equal(t, mgr.ID, got.Manager.ID)
+	assert.Equal(t, "The Boss", got.Manager.FullName)
+	require.NotNil(t, got.Manager.Position)
+	assert.Equal(t, "Engineering Manager", *got.Manager.Position)
+	require.NotNil(t, got.Manager.Department)
+	assert.Equal(t, "Engineering", *got.Manager.Department)
+	assert.True(t, got.Manager.IsActive)
+}
+
+func TestLineManager_Candidates_ExcludesSelfAndSubordinates(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	a, err := svc.Create(ctx, dto.EmployeeCreate{Email: "ca@x.com", Password: "Pass12345", FullName: "Cand A"})
+	require.NoError(t, err)
+	b, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cb@x.com", Password: "Pass12345", FullName: "Cand B", ManagerID: uptr(a.ID)})
+	require.NoError(t, err)
+	c, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cc@x.com", Password: "Pass12345", FullName: "Cand C", ManagerID: uptr(b.ID)})
+	require.NoError(t, err)
+	d, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cd@x.com", Password: "Pass12345", FullName: "Cand D"}) // unrelated
+	require.NoError(t, err)
+
+	rows, err := svc.ManagerCandidates(ctx, uptr(a.ID), "", 50)
+	require.NoError(t, err)
+	ids := map[uuid.UUID]bool{}
+	for _, r := range rows {
+		ids[r.ID] = true
+	}
+	assert.False(t, ids[a.ID], "self excluded")
+	assert.False(t, ids[b.ID], "direct subordinate excluded")
+	assert.False(t, ids[c.ID], "transitive subordinate excluded")
+	assert.True(t, ids[d.ID], "unrelated active employee included")
+}
+
+func TestLineManager_Candidates_KeepsInactiveCurrentManager(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "km@x.com", Password: "Pass12345", FullName: "Kept Mgr"})
+	require.NoError(t, err)
+	emp, err := svc.Create(ctx, dto.EmployeeCreate{Email: "ke@x.com", Password: "Pass12345", FullName: "Kept Emp", ManagerID: uptr(mgr.ID)})
+	require.NoError(t, err)
+
+	// Deactivate the assigned manager — normally excluded, but kept for this target.
+	no := false
+	_, err = svc.Update(ctx, mgr.ID, dto.EmployeeUpdate{IsActive: &no}, uuid.New())
+	require.NoError(t, err)
+
+	rows, err := svc.ManagerCandidates(ctx, uptr(emp.ID), "", 50)
+	require.NoError(t, err)
+	var kept *dto.ManagerCandidateRead
+	for i := range rows {
+		if rows[i].ID == mgr.ID {
+			kept = &rows[i]
+		}
+	}
+	require.NotNil(t, kept, "the currently-assigned but deactivated manager must remain selectable")
+	assert.False(t, kept.IsActive)
+}
+
+func TestLineManager_DirectReports_IncludesInactive(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dm@x.com", Password: "Pass12345", FullName: "DR Mgr"})
+	require.NoError(t, err)
+	r1, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dr1@x.com", Password: "Pass12345", FullName: "Report One", ManagerID: uptr(mgr.ID)})
+	require.NoError(t, err)
+	r2, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dr2@x.com", Password: "Pass12345", FullName: "Report Two", ManagerID: uptr(mgr.ID)})
+	require.NoError(t, err)
+
+	// Deactivate one report — it must still show up in the direct-reports list.
+	no := false
+	_, err = svc.Update(ctx, r2.ID, dto.EmployeeUpdate{IsActive: &no}, uuid.New())
+	require.NoError(t, err)
+
+	rows, err := svc.DirectReports(ctx, mgr.ID)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	active := map[uuid.UUID]bool{}
+	for _, r := range rows {
+		active[r.ID] = r.IsActive
+	}
+	assert.True(t, active[r1.ID], "active report present")
+	_, ok := active[r2.ID]
+	assert.True(t, ok, "inactive report still listed")
+	assert.False(t, active[r2.ID], "inactive report flagged is_active=false")
+}

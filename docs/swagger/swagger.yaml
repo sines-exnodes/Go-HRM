@@ -864,6 +864,10 @@ definitions:
     - users:delete
     - users:manage_roles
     - users:change_password
+    - users:salary_view
+    - users:salary_manage
+    - users:banking_view
+    - users:banking_manage
     - employees:read
     - employees:create
     - employees:update
@@ -908,6 +912,10 @@ definitions:
     - PermUsersDelete
     - PermUsersManageRoles
     - PermUsersChangePwd
+    - PermUsersSalaryView
+    - PermUsersSalaryManage
+    - PermUsersBankingView
+    - PermUsersBankingManage
     - PermEmployeesRead
     - PermEmployeesCreate
     - PermEmployeesUpdate
@@ -2024,6 +2032,29 @@ paths:
       summary: Update a dependent
       tags:
       - dependents
+  /api/v1/employees/{id}/direct-reports:
+    get:
+      description: All live employees whose line manager is {id} — includes both active
+        and deactivated reports.
+      parameters:
+      - description: manager employee uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Direct reports of an employee (admin)
+      tags:
+      - employees
   /api/v1/employees/{id}/leave-quota:
     patch:
       consumes:
@@ -2105,6 +2136,37 @@ paths:
       summary: Replace an employee's skill set (PUT semantics)
       tags:
       - skills
+  /api/v1/employees/manager-candidates:
+    get:
+      description: Active employees eligible as a line manager. Excludes the target
+        (for_employee_id) and its transitive subordinate chain (cycle prevention);
+        keeps a currently-assigned but deactivated manager visible.
+      parameters:
+      - description: exclude this employee + its subordinate chain
+        in: query
+        name: for_employee_id
+        type: string
+      - description: match full_name / position / department
+        in: query
+        name: search
+        type: string
+      - description: max rows (default 50, max 200)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Line-manager picker candidates (admin)
+      tags:
+      - employees
   /api/v1/employees/me:
     get:
       produces:

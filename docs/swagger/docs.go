@@ -1270,6 +1270,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/employees/manager-candidates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Active employees eligible as a line manager. Excludes the target (for_employee_id) and its transitive subordinate chain (cycle prevention); keeps a currently-assigned but deactivated manager visible.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Line-manager picker candidates (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "exclude this employee + its subordinate chain",
+                        "name": "for_employee_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "match full_name / position / department",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "max rows (default 50, max 200)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/employees/me": {
             "get": {
                 "security": [
@@ -1692,6 +1738,41 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DependentUpdate"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/employees/{id}/direct-reports": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "All live employees whose line manager is {id} — includes both active and deactivated reports.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "employees"
+                ],
+                "summary": "Direct reports of an employee (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "manager employee uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -5084,6 +5165,10 @@ const docTemplate = `{
                 "users:delete",
                 "users:manage_roles",
                 "users:change_password",
+                "users:salary_view",
+                "users:salary_manage",
+                "users:banking_view",
+                "users:banking_manage",
                 "employees:read",
                 "employees:create",
                 "employees:update",
@@ -5128,6 +5213,10 @@ const docTemplate = `{
                 "PermUsersDelete",
                 "PermUsersManageRoles",
                 "PermUsersChangePwd",
+                "PermUsersSalaryView",
+                "PermUsersSalaryManage",
+                "PermUsersBankingView",
+                "PermUsersBankingManage",
                 "PermEmployeesRead",
                 "PermEmployeesCreate",
                 "PermEmployeesUpdate",
