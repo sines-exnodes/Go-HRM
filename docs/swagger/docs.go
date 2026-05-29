@@ -3687,6 +3687,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/users/{id}/change-email": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Admin changes a user's email (employees parity #13)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "user uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "new email",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.AdminChangeEmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/{id}/change-password": {
             "patch": {
                 "security": [
@@ -3801,6 +3847,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_exnodes_hrm-api_internal_dto.AdminChangeEmailRequest": {
+            "type": "object",
+            "required": [
+                "new_email"
+            ],
+            "properties": {
+                "new_email": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.AdminUserPatch": {
             "type": "object",
             "properties": {
@@ -4252,6 +4309,27 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput": {
+            "type": "object",
+            "required": [
+                "full_name"
+            ],
+            "properties": {
+                "full_name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1
+                },
+                "phone_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "relationship": {
+                    "type": "string",
+                    "maxLength": 100
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.EmployeeCreate": {
             "type": "object",
             "required": [
@@ -4289,6 +4367,9 @@ const docTemplate = `{
                 "current_address": {
                     "type": "string"
                 },
+                "cv_url": {
+                    "type": "string"
+                },
                 "department_id": {
                     "description": "Work",
                     "type": "string"
@@ -4297,20 +4378,29 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "education": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "high_school",
+                        "college",
+                        "bachelor",
+                        "master",
+                        "doctorate"
+                    ]
                 },
                 "email": {
                     "description": "User credentials (created in tx)",
                     "type": "string"
                 },
-                "emergency_contact_name": {
-                    "type": "string"
+                "emergency_contacts": {
+                    "description": "Emergency contacts — full replacement list at create (employees parity #4).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput"
+                    }
                 },
-                "emergency_contact_phone": {
-                    "type": "string"
-                },
-                "emergency_contact_relation": {
-                    "type": "string"
+                "experience_year": {
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "full_name": {
                     "description": "HR personal info",
@@ -4356,8 +4446,7 @@ const docTemplate = `{
                     "enum": [
                         "single",
                         "married",
-                        "divorced",
-                        "widowed"
+                        "other"
                     ]
                 },
                 "nationality": {
@@ -4397,22 +4486,35 @@ const docTemplate = `{
                 "current_address": {
                     "type": "string"
                 },
-                "emergency_contact_name": {
+                "dob": {
                     "type": "string"
                 },
-                "emergency_contact_phone": {
-                    "type": "string"
+                "emergency_contacts": {
+                    "description": "Emergency contacts — self may manage their own list (pointer-to-slice:\nnil = leave unchanged, [] = clear all, non-empty = replace the set).",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput"
+                    }
                 },
-                "emergency_contact_relation": {
-                    "type": "string"
+                "full_name": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1
+                },
+                "gender": {
+                    "type": "string",
+                    "enum": [
+                        "male",
+                        "female",
+                        "other"
+                    ]
                 },
                 "marital_status": {
                     "type": "string",
                     "enum": [
                         "single",
                         "married",
-                        "divorced",
-                        "widowed"
+                        "other"
                     ]
                 },
                 "permanent_address": {
@@ -4503,6 +4605,9 @@ const docTemplate = `{
                 "current_address": {
                     "type": "string"
                 },
+                "cv_url": {
+                    "type": "string"
+                },
                 "department_id": {
                     "type": "string"
                 },
@@ -4510,16 +4615,25 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "education": {
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "high_school",
+                        "college",
+                        "bachelor",
+                        "master",
+                        "doctorate"
+                    ]
                 },
-                "emergency_contact_name": {
-                    "type": "string"
+                "emergency_contacts": {
+                    "description": "Emergency contacts — pointer-to-slice partial-PATCH semantics:\nnil/absent = leave unchanged, [] = clear all, non-empty = replace the set.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput"
+                    }
                 },
-                "emergency_contact_phone": {
-                    "type": "string"
-                },
-                "emergency_contact_relation": {
-                    "type": "string"
+                "experience_year": {
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "full_name": {
                     "type": "string"
@@ -4563,8 +4677,7 @@ const docTemplate = `{
                     "enum": [
                         "single",
                         "married",
-                        "divorced",
-                        "widowed"
+                        "other"
                     ]
                 },
                 "nationality": {

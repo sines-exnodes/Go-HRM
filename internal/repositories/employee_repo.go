@@ -28,6 +28,10 @@ type EmployeeRepository interface {
 	List(ctx context.Context, q dto.EmployeeListQuery) ([]models.Employee, int64, error)
 	UpdateAvatarURL(ctx context.Context, id uuid.UUID, url *string) error
 	UpdateFields(ctx context.Context, id uuid.UUID, fields map[string]any) error
+	// ReplaceEmergencyContacts replaces the live emergency-contact set for an
+	// employee: soft-deletes all current live rows, then inserts the new set
+	// fresh (UUID PKs, so no reactivation is needed). Empty slice = clear all.
+	ReplaceEmergencyContacts(ctx context.Context, employeeID uuid.UUID, contacts []models.EmployeeEmergencyContact) error
 	WithTx(tx *gorm.DB) EmployeeRepository
 	DB() *gorm.DB
 }
@@ -101,6 +105,10 @@ func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID)
 		Preload("User.Roles").
 		Preload("Manager").
 		Preload("Dependents", "is_deleted = ?", false).
+		Preload("EmergencyContacts", "is_deleted = ?", false).
+		Preload("EmployeeSkills", "is_deleted = ?", false).
+		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
+		Preload("LeaveQuota", "is_deleted = ?", false).
 		Where("id = ? AND is_deleted = ?", id, false).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -116,6 +124,10 @@ func (r *employeeRepository) FindByUserIDWithFull(ctx context.Context, userID uu
 		Preload("User.Roles").
 		Preload("Manager").
 		Preload("Dependents", "is_deleted = ?", false).
+		Preload("EmergencyContacts", "is_deleted = ?", false).
+		Preload("EmployeeSkills", "is_deleted = ?", false).
+		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
+		Preload("LeaveQuota", "is_deleted = ?", false).
 		Where("user_id = ? AND is_deleted = ?", userID, false).
 		First(&e).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -128,6 +140,11 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 	tx := r.db.WithContext(ctx).Model(&models.Employee{}).
 		Preload("User").
 		Preload("User.Roles").
+		Preload("Manager").
+		Preload("EmergencyContacts", "is_deleted = ?", false).
+		Preload("EmployeeSkills", "is_deleted = ?", false).
+		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
+		Preload("LeaveQuota", "is_deleted = ?", false).
 		Joins("JOIN users ON users.id = employees.user_id").
 		Where("employees.is_deleted = ?", false)
 
@@ -192,6 +209,32 @@ func (r *employeeRepository) UpdateFields(ctx context.Context, id uuid.UUID, fie
 	return r.db.WithContext(ctx).Model(&models.Employee{}).
 		Where("id = ? AND is_deleted = ?", id, false).
 		Updates(fields).Error
+}
+
+func (r *employeeRepository) ReplaceEmergencyContacts(ctx context.Context, employeeID uuid.UUID, contacts []models.EmployeeEmergencyContact) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Soft-delete the current live set.
+		if err := tx.Model(&models.EmployeeEmergencyContact{}).
+			Where("employee_id = ? AND is_deleted = ?", employeeID, false).
+			Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error; err != nil {
+			return err
+		}
+		if len(contacts) == 0 {
+			return nil
+		}
+		// Insert the new set fresh. Leave ID/CreatedAt/UpdatedAt zero so the
+		// DB defaults (gen_random_uuid(), NOW()) apply.
+		rows := make([]models.EmployeeEmergencyContact, 0, len(contacts))
+		for _, c := range contacts {
+			rows = append(rows, models.EmployeeEmergencyContact{
+				EmployeeID:   employeeID,
+				FullName:     c.FullName,
+				Relationship: c.Relationship,
+				PhoneNumber:  c.PhoneNumber,
+			})
+		}
+		return tx.Create(&rows).Error
+	})
 }
 
 // WithTx returns a repository bound to the given transaction handle.

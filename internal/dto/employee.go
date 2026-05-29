@@ -21,35 +21,58 @@ type RoleRead struct {
 	Permissions []string  `json:"permissions"`
 }
 
+// ---- Emergency contacts (1-N list — employees parity #4) ----
+
+// EmergencyContactRead is one emergency contact in a read response.
+type EmergencyContactRead struct {
+	ID           uuid.UUID `json:"id"`
+	FullName     string    `json:"full_name"`
+	Relationship string    `json:"relationship"`
+	PhoneNumber  string    `json:"phone_number"`
+}
+
+// EmergencyContactInput is one emergency contact in a create/update payload.
+// relationship/phone are optional (mirrors Python's defaulted sub-document);
+// full_name is required so we never persist a nameless contact.
+type EmergencyContactInput struct {
+	FullName     string `json:"full_name"    binding:"required,min=1,max=200"`
+	Relationship string `json:"relationship" binding:"omitempty,max=100"`
+	PhoneNumber  string `json:"phone_number" binding:"omitempty,max=50"`
+}
+
 // ---- Employee Read ----
 
 type EmployeeRead struct {
-	ID                       uuid.UUID  `json:"id"`
-	UserID                   uuid.UUID  `json:"user_id"`
-	Email                    string     `json:"email"`
-	FullName                 string     `json:"full_name"`
-	Phone                    *string    `json:"phone,omitempty"`
-	PersonalEmail            *string    `json:"personal_email,omitempty"`
-	Gender                   *string    `json:"gender,omitempty"`
-	DOB                      *time.Time `json:"dob,omitempty"`
-	Nationality              *string    `json:"nationality,omitempty"`
-	IDNumber                 *string    `json:"id_number,omitempty"`
-	IDIssueDate              *time.Time `json:"id_issue_date,omitempty"`
-	IDFrontImage             *string    `json:"id_front_image,omitempty"`
-	IDBackImage              *string    `json:"id_back_image,omitempty"`
-	PermanentAddress         *string    `json:"permanent_address,omitempty"`
-	CurrentAddress           *string    `json:"current_address,omitempty"`
-	Education                *string    `json:"education,omitempty"`
-	MaritalStatus            *string    `json:"marital_status,omitempty"`
-	EmergencyContactName     *string    `json:"emergency_contact_name,omitempty"`
-	EmergencyContactRelation *string    `json:"emergency_contact_relation,omitempty"`
-	EmergencyContactPhone    *string    `json:"emergency_contact_phone,omitempty"`
-	AvatarURL                *string    `json:"avatar_url,omitempty"`
+	ID               uuid.UUID  `json:"id"`
+	UserID           uuid.UUID  `json:"user_id"`
+	Email            string     `json:"email"`
+	FullName         string     `json:"full_name"`
+	Phone            *string    `json:"phone,omitempty"`
+	PersonalEmail    *string    `json:"personal_email,omitempty"`
+	Gender           *string    `json:"gender,omitempty"`
+	DOB              *time.Time `json:"dob,omitempty"`
+	Nationality      *string    `json:"nationality,omitempty"`
+	IDNumber         *string    `json:"id_number,omitempty"`
+	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
+	IDFrontImage     *string    `json:"id_front_image,omitempty"`
+	IDBackImage      *string    `json:"id_back_image,omitempty"`
+	PermanentAddress *string    `json:"permanent_address,omitempty"`
+	CurrentAddress   *string    `json:"current_address,omitempty"`
+	Education        *string    `json:"education,omitempty"`
+	MaritalStatus    *string    `json:"marital_status,omitempty"`
+	ExperienceYear   *int       `json:"experience_year,omitempty"`
+	CVURL            *string    `json:"cv_url,omitempty"`
+	AvatarURL        *string    `json:"avatar_url,omitempty"`
+
+	// Emergency contacts — 1-N list (employees parity #4). Always present
+	// (empty array when none) so the FE can render the section unconditionally.
+	EmergencyContacts []EmergencyContactRead `json:"emergency_contacts"`
 
 	// Work
 	Department *RefRead   `json:"department,omitempty"`
 	Position   *RefRead   `json:"position,omitempty"`
 	Manager    *RefRead   `json:"manager,omitempty"`
+	Skills     []RefRead  `json:"skills"`
 	JoinDate   *time.Time `json:"join_date,omitempty"`
 
 	// Contract / salary / bank (admin view only — service-level helper may strip for non-admin)
@@ -63,6 +86,12 @@ type EmployeeRead struct {
 	BankName         *string    `json:"bank_name,omitempty"`
 	BankHolderName   *string    `json:"bank_holder_name,omitempty"`
 	PaymentMethod    *string    `json:"payment_method,omitempty"`
+
+	// Leave quota (employees parity #5) — hydrated from employee_leave_quotas;
+	// falls back to the seeded defaults (12 / 6) when no row exists, so the
+	// FE always sees concrete numbers like the Python shape did.
+	AnnualLeaveQuota float64 `json:"annual_leave_quota"`
+	SickLeaveQuota   float64 `json:"sick_leave_quota"`
 
 	// Auth side
 	IsActive  bool       `json:"is_active"`
@@ -89,23 +118,25 @@ type EmployeeCreate struct {
 	IsActive *bool  `json:"is_active,omitempty"`
 
 	// HR personal info
-	FullName                 string     `json:"full_name" binding:"required,min=1,max=200"`
-	Phone                    *string    `json:"phone,omitempty"`
-	PersonalEmail            *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
-	Gender                   *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
-	DOB                      *time.Time `json:"dob,omitempty"`
-	Nationality              *string    `json:"nationality,omitempty"`
-	IDNumber                 *string    `json:"id_number,omitempty"`
-	IDIssueDate              *time.Time `json:"id_issue_date,omitempty"`
-	IDFrontImage             *string    `json:"id_front_image,omitempty"`
-	IDBackImage              *string    `json:"id_back_image,omitempty"`
-	PermanentAddress         *string    `json:"permanent_address,omitempty"`
-	CurrentAddress           *string    `json:"current_address,omitempty"`
-	Education                *string    `json:"education,omitempty"`
-	MaritalStatus            *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married divorced widowed"`
-	EmergencyContactName     *string    `json:"emergency_contact_name,omitempty"`
-	EmergencyContactRelation *string    `json:"emergency_contact_relation,omitempty"`
-	EmergencyContactPhone    *string    `json:"emergency_contact_phone,omitempty"`
+	FullName         string     `json:"full_name" binding:"required,min=1,max=200"`
+	Phone            *string    `json:"phone,omitempty"`
+	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
+	DOB              *time.Time `json:"dob,omitempty"`
+	Nationality      *string    `json:"nationality,omitempty"`
+	IDNumber         *string    `json:"id_number,omitempty"`
+	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
+	IDFrontImage     *string    `json:"id_front_image,omitempty"`
+	IDBackImage      *string    `json:"id_back_image,omitempty"`
+	PermanentAddress *string    `json:"permanent_address,omitempty"`
+	CurrentAddress   *string    `json:"current_address,omitempty"`
+	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
+	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
+	ExperienceYear   *int       `json:"experience_year,omitempty" binding:"omitempty,gte=0"`
+	CVURL            *string    `json:"cv_url,omitempty"`
+
+	// Emergency contacts — full replacement list at create (employees parity #4).
+	EmergencyContacts []EmergencyContactInput `json:"emergency_contacts,omitempty" binding:"omitempty,dive"`
 
 	// Work
 	DepartmentID *uuid.UUID `json:"department_id,omitempty"`
@@ -132,23 +163,26 @@ type EmployeeCreate struct {
 // ---- Employee Update (admin — anything allowed) ----
 
 type EmployeeUpdate struct {
-	FullName                 *string    `json:"full_name,omitempty"`
-	Phone                    *string    `json:"phone,omitempty"`
-	PersonalEmail            *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
-	Gender                   *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
-	DOB                      *time.Time `json:"dob,omitempty"`
-	Nationality              *string    `json:"nationality,omitempty"`
-	IDNumber                 *string    `json:"id_number,omitempty"`
-	IDIssueDate              *time.Time `json:"id_issue_date,omitempty"`
-	IDFrontImage             *string    `json:"id_front_image,omitempty"`
-	IDBackImage              *string    `json:"id_back_image,omitempty"`
-	PermanentAddress         *string    `json:"permanent_address,omitempty"`
-	CurrentAddress           *string    `json:"current_address,omitempty"`
-	Education                *string    `json:"education,omitempty"`
-	MaritalStatus            *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married divorced widowed"`
-	EmergencyContactName     *string    `json:"emergency_contact_name,omitempty"`
-	EmergencyContactRelation *string    `json:"emergency_contact_relation,omitempty"`
-	EmergencyContactPhone    *string    `json:"emergency_contact_phone,omitempty"`
+	FullName         *string    `json:"full_name,omitempty"`
+	Phone            *string    `json:"phone,omitempty"`
+	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
+	DOB              *time.Time `json:"dob,omitempty"`
+	Nationality      *string    `json:"nationality,omitempty"`
+	IDNumber         *string    `json:"id_number,omitempty"`
+	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
+	IDFrontImage     *string    `json:"id_front_image,omitempty"`
+	IDBackImage      *string    `json:"id_back_image,omitempty"`
+	PermanentAddress *string    `json:"permanent_address,omitempty"`
+	CurrentAddress   *string    `json:"current_address,omitempty"`
+	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
+	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
+	ExperienceYear   *int       `json:"experience_year,omitempty" binding:"omitempty,gte=0"`
+	CVURL            *string    `json:"cv_url,omitempty"`
+
+	// Emergency contacts — pointer-to-slice partial-PATCH semantics:
+	// nil/absent = leave unchanged, [] = clear all, non-empty = replace the set.
+	EmergencyContacts *[]EmergencyContactInput `json:"emergency_contacts,omitempty" binding:"omitempty,dive"`
 
 	DepartmentID *uuid.UUID `json:"department_id,omitempty"`
 	ClearDept    *bool      `json:"clear_department,omitempty"`
@@ -174,18 +208,26 @@ type EmployeeUpdate struct {
 
 // ---- Employee Self Update (RESTRICTED — server-side whitelist) ----
 //
+// Per audit decision #7 the self-editable set now includes the personal
+// identity fields full_name / gender / dob (matching Python's /users/me).
+//
 // IMPORTANT: This DTO MUST NOT contain any of: department_id, position_id, manager_id,
 // basic_salary, insurance_salary, contract_*, role_ids, is_active.
-// The service enforces the whitelist with a manual field-by-field copy.
+// The service enforces the whitelist with a manual field-by-field copy, so
+// even a future DTO widening cannot mutate those admin-only columns.
 type EmployeeSelfUpdate struct {
-	Phone                    *string `json:"phone,omitempty"`
-	PersonalEmail            *string `json:"personal_email,omitempty" binding:"omitempty,email"`
-	PermanentAddress         *string `json:"permanent_address,omitempty"`
-	CurrentAddress           *string `json:"current_address,omitempty"`
-	MaritalStatus            *string `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married divorced widowed"`
-	EmergencyContactName     *string `json:"emergency_contact_name,omitempty"`
-	EmergencyContactRelation *string `json:"emergency_contact_relation,omitempty"`
-	EmergencyContactPhone    *string `json:"emergency_contact_phone,omitempty"`
+	FullName         *string    `json:"full_name,omitempty"      binding:"omitempty,min=1,max=200"`
+	Gender           *string    `json:"gender,omitempty"         binding:"omitempty,oneof=male female other"`
+	DOB              *time.Time `json:"dob,omitempty"`
+	Phone            *string    `json:"phone,omitempty"`
+	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	PermanentAddress *string    `json:"permanent_address,omitempty"`
+	CurrentAddress   *string    `json:"current_address,omitempty"`
+	MaritalStatus    *string    `json:"marital_status,omitempty" binding:"omitempty,oneof=single married other"`
+
+	// Emergency contacts — self may manage their own list (pointer-to-slice:
+	// nil = leave unchanged, [] = clear all, non-empty = replace the set).
+	EmergencyContacts *[]EmergencyContactInput `json:"emergency_contacts,omitempty" binding:"omitempty,dive"`
 }
 
 // ---- Leave quota update (admin) ----

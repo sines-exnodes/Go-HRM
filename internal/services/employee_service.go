@@ -31,6 +31,20 @@ func boolToRenewal(b *bool) int {
 	return 1
 }
 
+// toEmergencyModels converts the DTO emergency-contact inputs to model rows
+// (trimmed), for the ReplaceEmergencyContacts repo call (employees parity #4).
+func toEmergencyModels(in []dto.EmergencyContactInput) []models.EmployeeEmergencyContact {
+	out := make([]models.EmployeeEmergencyContact, 0, len(in))
+	for _, c := range in {
+		out = append(out, models.EmployeeEmergencyContact{
+			FullName:     strings.TrimSpace(c.FullName),
+			Relationship: strings.TrimSpace(c.Relationship),
+			PhoneNumber:  strings.TrimSpace(c.PhoneNumber),
+		})
+	}
+	return out
+}
+
 // EmployeeService owns the HR-profile business logic. All repository fields
 // use the repository INTERFACE types for mockability.
 type EmployeeService struct {
@@ -122,6 +136,34 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 		})
 	}
 
+	// Emergency contacts — 1-N list (employees parity #4).
+	ec := make([]dto.EmergencyContactRead, 0, len(e.EmergencyContacts))
+	for _, c := range e.EmergencyContacts {
+		ec = append(ec, dto.EmergencyContactRead{
+			ID:           c.ID,
+			FullName:     c.FullName,
+			Relationship: c.Relationship,
+			PhoneNumber:  c.PhoneNumber,
+		})
+	}
+
+	// Skills embed (employees parity #8) — hydrated from employee_skills.Skill.
+	skills := make([]dto.RefRead, 0, len(e.EmployeeSkills))
+	for _, es := range e.EmployeeSkills {
+		if es.Skill != nil {
+			skills = append(skills, dto.RefRead{ID: es.Skill.ID, Name: es.Skill.Name})
+		}
+	}
+
+	// Leave quota (employees parity #5) — defaults mirror the seeded column
+	// defaults (12 / 6) when the employee has no quota row yet.
+	annualQuota := 12.0
+	sickQuota := 6.0
+	if e.LeaveQuota != nil {
+		annualQuota = e.LeaveQuota.AnnualLeaveQuota
+		sickQuota = e.LeaveQuota.SickLeaveQuota
+	}
+
 	// Reconciliation with the Phase 1 models.Employee declaration: several
 	// fields are non-pointer scalars on the model (ContractType string,
 	// ContractRenewal int, BasicSalary/InsuranceSalary float64, PaymentMethod
@@ -133,42 +175,45 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 	contractRenewal := e.ContractRenewal > 0
 
 	out := &dto.EmployeeRead{
-		ID:                       e.ID,
-		UserID:                   e.UserID,
-		FullName:                 e.FullName,
-		Phone:                    e.Phone,
-		PersonalEmail:            e.PersonalEmail,
-		Gender:                   e.Gender,
-		DOB:                      e.DOB,
-		Nationality:              e.Nationality,
-		IDNumber:                 e.IDNumber,
-		IDIssueDate:              e.IDIssueDate,
-		IDFrontImage:             e.IDFrontImage,
-		IDBackImage:              e.IDBackImage,
-		PermanentAddress:         e.PermanentAddress,
-		CurrentAddress:           e.CurrentAddress,
-		Education:                e.Education,
-		MaritalStatus:            e.MaritalStatus,
-		EmergencyContactName:     e.EmergencyContactName,
-		EmergencyContactRelation: e.EmergencyContactRelation,
-		EmergencyContactPhone:    e.EmergencyContactPhone,
-		AvatarURL:                e.AvatarURL,
-		Manager:                  mgr,
-		JoinDate:                 e.JoinDate,
-		ContractType:             &contractType,
-		ContractSignDate:         e.ContractSignDate,
-		ContractEndDate:          e.ContractEndDate,
-		ContractRenewal:          &contractRenewal,
-		BasicSalary:              &basicSalary,
-		InsuranceSalary:          &insuranceSalary,
-		BankAccount:              e.BankAccount,
-		BankName:                 e.BankName,
-		BankHolderName:           e.BankHolderName,
-		PaymentMethod:            &paymentMethod,
-		Roles:                    roles,
-		Dependents:               deps,
-		CreatedAt:                e.CreatedAt,
-		UpdatedAt:                e.UpdatedAt,
+		ID:                e.ID,
+		UserID:            e.UserID,
+		FullName:          e.FullName,
+		Phone:             e.Phone,
+		PersonalEmail:     e.PersonalEmail,
+		Gender:            e.Gender,
+		DOB:               e.DOB,
+		Nationality:       e.Nationality,
+		IDNumber:          e.IDNumber,
+		IDIssueDate:       e.IDIssueDate,
+		IDFrontImage:      e.IDFrontImage,
+		IDBackImage:       e.IDBackImage,
+		PermanentAddress:  e.PermanentAddress,
+		CurrentAddress:    e.CurrentAddress,
+		Education:         e.Education,
+		MaritalStatus:     e.MaritalStatus,
+		ExperienceYear:    e.ExperienceYear,
+		CVURL:             e.CVURL,
+		AvatarURL:         e.AvatarURL,
+		EmergencyContacts: ec,
+		Manager:           mgr,
+		Skills:            skills,
+		JoinDate:          e.JoinDate,
+		ContractType:      &contractType,
+		ContractSignDate:  e.ContractSignDate,
+		ContractEndDate:   e.ContractEndDate,
+		ContractRenewal:   &contractRenewal,
+		BasicSalary:       &basicSalary,
+		InsuranceSalary:   &insuranceSalary,
+		BankAccount:       e.BankAccount,
+		BankName:          e.BankName,
+		BankHolderName:    e.BankHolderName,
+		PaymentMethod:     &paymentMethod,
+		AnnualLeaveQuota:  annualQuota,
+		SickLeaveQuota:    sickQuota,
+		Roles:             roles,
+		Dependents:        deps,
+		CreatedAt:         e.CreatedAt,
+		UpdatedAt:         e.UpdatedAt,
 	}
 	if e.User != nil {
 		out.Email = e.User.Email
@@ -236,34 +281,33 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		// ContractRenewal is an int. Map verbatim, falling back to model
 		// defaults when the DTO pointer is nil.
 		e := &models.Employee{
-			UserID:                   u.ID,
-			FullName:                 strings.TrimSpace(in.FullName),
-			Phone:                    in.Phone,
-			PersonalEmail:            in.PersonalEmail,
-			Gender:                   in.Gender,
-			DOB:                      in.DOB,
-			Nationality:              in.Nationality,
-			IDNumber:                 in.IDNumber,
-			IDIssueDate:              in.IDIssueDate,
-			IDFrontImage:             in.IDFrontImage,
-			IDBackImage:              in.IDBackImage,
-			PermanentAddress:         in.PermanentAddress,
-			CurrentAddress:           in.CurrentAddress,
-			Education:                in.Education,
-			MaritalStatus:            in.MaritalStatus,
-			EmergencyContactName:     in.EmergencyContactName,
-			EmergencyContactRelation: in.EmergencyContactRelation,
-			EmergencyContactPhone:    in.EmergencyContactPhone,
-			DepartmentID:             in.DepartmentID,
-			PositionID:               in.PositionID,
-			ManagerID:                in.ManagerID,
-			JoinDate:                 in.JoinDate,
-			ContractSignDate:         in.ContractSignDate,
-			ContractEndDate:          in.ContractEndDate,
-			ContractRenewal:          boolToRenewal(in.ContractRenewal),
-			BankAccount:              in.BankAccount,
-			BankName:                 in.BankName,
-			BankHolderName:           in.BankHolderName,
+			UserID:           u.ID,
+			FullName:         strings.TrimSpace(in.FullName),
+			Phone:            in.Phone,
+			PersonalEmail:    in.PersonalEmail,
+			Gender:           in.Gender,
+			DOB:              in.DOB,
+			Nationality:      in.Nationality,
+			IDNumber:         in.IDNumber,
+			IDIssueDate:      in.IDIssueDate,
+			IDFrontImage:     in.IDFrontImage,
+			IDBackImage:      in.IDBackImage,
+			PermanentAddress: in.PermanentAddress,
+			CurrentAddress:   in.CurrentAddress,
+			Education:        in.Education,
+			MaritalStatus:    in.MaritalStatus,
+			ExperienceYear:   in.ExperienceYear,
+			CVURL:            in.CVURL,
+			DepartmentID:     in.DepartmentID,
+			PositionID:       in.PositionID,
+			ManagerID:        in.ManagerID,
+			JoinDate:         in.JoinDate,
+			ContractSignDate: in.ContractSignDate,
+			ContractEndDate:  in.ContractEndDate,
+			ContractRenewal:  boolToRenewal(in.ContractRenewal),
+			BankAccount:      in.BankAccount,
+			BankName:         in.BankName,
+			BankHolderName:   in.BankHolderName,
 		}
 		if in.ContractType != nil && strings.TrimSpace(*in.ContractType) != "" {
 			e.ContractType = strings.TrimSpace(*in.ContractType)
@@ -325,18 +369,30 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 	if txErr != nil {
 		return nil, txErr
 	}
+	// Persist emergency contacts (employees parity #4) once the user+employee
+	// row is committed. Empty slice = none.
+	if len(in.EmergencyContacts) > 0 {
+		if err := s.emps.ReplaceEmergencyContacts(ctx, createdEmp.ID, toEmergencyModels(in.EmergencyContacts)); err != nil {
+			return nil, err
+		}
+	}
 	return s.Get(ctx, createdEmp.ID)
 }
 
 // ---- Admin Update (anything allowed) ----
 
-func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.EmployeeUpdate) (*dto.EmployeeRead, error) {
+func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.EmployeeUpdate, callerUserID uuid.UUID) (*dto.EmployeeRead, error) {
 	e, err := s.emps.FindByIDWithFull(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.ErrNotFound("Employee")
 		}
 		return nil, err
+	}
+
+	// Cannot deactivate your own account (employees parity #12).
+	if in.IsActive != nil && !*in.IsActive && e.UserID == callerUserID {
+		return nil, apperrors.ErrBadRequest("You cannot deactivate your own account")
 	}
 
 	fields := map[string]any{}
@@ -357,9 +413,6 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	setIfNotNilStr("current_address", in.CurrentAddress)
 	setIfNotNilStr("education", in.Education)
 	setIfNotNilStr("marital_status", in.MaritalStatus)
-	setIfNotNilStr("emergency_contact_name", in.EmergencyContactName)
-	setIfNotNilStr("emergency_contact_relation", in.EmergencyContactRelation)
-	setIfNotNilStr("emergency_contact_phone", in.EmergencyContactPhone)
 	setIfNotNilStr("contract_type", in.ContractType)
 	setIfNotNilStr("bank_account", in.BankAccount)
 	setIfNotNilStr("bank_name", in.BankName)
@@ -389,6 +442,10 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	if in.InsuranceSalary != nil {
 		fields["insurance_salary"] = *in.InsuranceSalary
 	}
+	if in.ExperienceYear != nil {
+		fields["experience_year"] = *in.ExperienceYear
+	}
+	setIfNotNilStr("cv_url", in.CVURL)
 	// FK clearing wins over set.
 	if in.ClearDept != nil && *in.ClearDept {
 		fields["department_id"] = nil
@@ -430,6 +487,13 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	}); err != nil {
 		return nil, err
 	}
+	// Emergency contacts replace-set (employees parity #4):
+	// nil = leave unchanged, [] = clear all, non-empty = replace the set.
+	if in.EmergencyContacts != nil {
+		if err := s.emps.ReplaceEmergencyContacts(ctx, e.ID, toEmergencyModels(*in.EmergencyContacts)); err != nil {
+			return nil, err
+		}
+	}
 	return s.Get(ctx, id)
 }
 
@@ -449,6 +513,16 @@ func (s *EmployeeService) SelfUpdate(ctx context.Context, userID uuid.UUID, in d
 		return nil, err
 	}
 	allowed := map[string]any{}
+	// Identity fields — self-editable per audit decision #7.
+	if in.FullName != nil {
+		allowed["full_name"] = strings.TrimSpace(*in.FullName)
+	}
+	if in.Gender != nil {
+		allowed["gender"] = *in.Gender
+	}
+	if in.DOB != nil {
+		allowed["dob"] = *in.DOB
+	}
 	if in.Phone != nil {
 		allowed["phone"] = strings.TrimSpace(*in.Phone)
 	}
@@ -464,24 +538,22 @@ func (s *EmployeeService) SelfUpdate(ctx context.Context, userID uuid.UUID, in d
 	if in.MaritalStatus != nil {
 		allowed["marital_status"] = *in.MaritalStatus
 	}
-	if in.EmergencyContactName != nil {
-		allowed["emergency_contact_name"] = strings.TrimSpace(*in.EmergencyContactName)
-	}
-	if in.EmergencyContactRelation != nil {
-		allowed["emergency_contact_relation"] = strings.TrimSpace(*in.EmergencyContactRelation)
-	}
-	if in.EmergencyContactPhone != nil {
-		allowed["emergency_contact_phone"] = strings.TrimSpace(*in.EmergencyContactPhone)
-	}
 	if err := s.emps.UpdateFields(ctx, e.ID, allowed); err != nil {
 		return nil, err
+	}
+	// Emergency contacts replace-set — self may manage their own (#4 + #7):
+	// nil = leave unchanged, [] = clear all, non-empty = replace the set.
+	if in.EmergencyContacts != nil {
+		if err := s.emps.ReplaceEmergencyContacts(ctx, e.ID, toEmergencyModels(*in.EmergencyContacts)); err != nil {
+			return nil, err
+		}
 	}
 	return s.Get(ctx, e.ID)
 }
 
 // ---- Soft delete (cascading: soft-delete employee + deactivate user) ----
 
-func (s *EmployeeService) SoftDelete(ctx context.Context, id uuid.UUID) error {
+func (s *EmployeeService) SoftDelete(ctx context.Context, id uuid.UUID, callerUserID uuid.UUID) error {
 	e, err := s.emps.FindByIDWithFull(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -489,10 +561,23 @@ func (s *EmployeeService) SoftDelete(ctx context.Context, id uuid.UUID) error {
 		}
 		return err
 	}
+	// Cannot delete your own account (employees parity #12).
+	if e.UserID == callerUserID {
+		return apperrors.ErrBadRequest("You cannot delete your own account")
+	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.Employee{}).
 			Where("id = ?", e.ID).
 			Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error; err != nil {
+			return err
+		}
+		// Clear manager_id on direct reports so no live employee points at a
+		// now-deleted manager (employees parity #12). Use the map form (the
+		// codebase's proven FK-clear pattern) — Update("col", nil) can be
+		// dropped by GORM's zero-value handling.
+		if err := tx.Model(&models.Employee{}).
+			Where("manager_id = ? AND is_deleted = ?", e.ID, false).
+			Updates(map[string]any{"manager_id": nil}).Error; err != nil {
 			return err
 		}
 		return tx.Model(&models.User{}).
