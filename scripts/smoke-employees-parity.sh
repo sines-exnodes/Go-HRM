@@ -128,6 +128,29 @@ else
   echo "  ! skipped #6 limited-role checks (could not seed SmokeFieldViewer role via go)"
 fi
 
+echo "== #10 line-manager suite (validation + picker + direct-reports + rich brief) =="
+req POST "$BASE/employees" "{\"email\":\"smk-mgr-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Mgr $SFX\"}"
+MGR=$(jqv '.data.id')
+req POST "$BASE/employees" "{\"email\":\"smk-rep-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Rep $SFX\",\"manager_id\":\"$MGR\"}"
+REP=$(jqv '.data.id')
+eq 201 "$CODE" "#10 create employee with a valid manager (201)"
+req GET "$BASE/employees/$REP"
+eq "$MGR" "$(jqv '.data.manager.id')" "#10 read embeds rich manager brief"
+eq "true" "$(jqv '.data.manager.is_active')" "#10 manager brief carries is_active"
+req PATCH "$BASE/employees/$MGR" "{\"manager_id\":\"$MGR\"}"
+eq 400 "$CODE" "#10 self-as-manager rejected (400)"
+req PATCH "$BASE/employees/$MGR" "{\"manager_id\":\"$REP\"}"
+eq 400 "$CODE" "#10 cycle rejected (400)"
+req POST "$BASE/employees" "{\"email\":\"smk-bad-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Bad\",\"manager_id\":\"00000000-0000-0000-0000-000000000000\"}"
+eq 400 "$CODE" "#10 nonexistent manager rejected (400)"
+req GET "$BASE/employees/manager-candidates?for_employee_id=$MGR"
+eq 200 "$CODE" "#10 manager-candidates (200)"
+eq "false" "$(echo "$RESP" | jq --arg id "$MGR" '[.data[].id] | index($id) != null')" "#10 candidates exclude self"
+eq "false" "$(echo "$RESP" | jq --arg id "$REP" '[.data[].id] | index($id) != null')" "#10 candidates exclude subordinate"
+req GET "$BASE/employees/$MGR/direct-reports"
+eq 200 "$CODE" "#10 direct-reports (200)"
+eq "true" "$(echo "$RESP" | jq --arg id "$REP" '[.data[].id] | index($id) != null')" "#10 direct-reports includes the report"
+
 echo
 echo "==================== SMOKE SUMMARY ===================="
 echo "  PASS: $PASS    FAIL: $FAIL"

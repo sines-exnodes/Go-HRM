@@ -40,6 +40,47 @@ type EmergencyContactInput struct {
 	PhoneNumber  string `json:"phone_number" binding:"omitempty,max=50"`
 }
 
+// ---- Line manager (employees parity #10) ----
+
+// ManagerBrief is the resolved line-manager embedded on an employee read:
+// name + position/department names + activity flag (mirrors Python's
+// LineManagerRead). Position/Department are nil when unset.
+type ManagerBrief struct {
+	ID         uuid.UUID `json:"id"`
+	FullName   string    `json:"full_name"`
+	Position   *string   `json:"position,omitempty"`
+	Department *string   `json:"department,omitempty"`
+	IsActive   bool      `json:"is_active"`
+}
+
+// ManagerCandidateRead is a row in the line-manager picker.
+type ManagerCandidateRead struct {
+	ID         uuid.UUID `json:"id"`
+	FullName   string    `json:"full_name"`
+	Position   *string   `json:"position,omitempty"`
+	Department *string   `json:"department,omitempty"`
+	IsActive   bool      `json:"is_active"`
+}
+
+// DirectReportRead is a row in the "direct reports" card (includes inactive).
+type DirectReportRead struct {
+	ID         uuid.UUID `json:"id"`
+	FullName   string    `json:"full_name"`
+	AvatarURL  *string   `json:"avatar_url,omitempty"`
+	Position   *string   `json:"position,omitempty"`
+	Department *string   `json:"department,omitempty"`
+	IsActive   bool      `json:"is_active"`
+}
+
+// ManagerCandidateQuery binds the querystring for the picker endpoint.
+// ForEmployeeID is a string (parsed in the handler) — gin cannot bind a
+// uuid.UUID directly from a query param.
+type ManagerCandidateQuery struct {
+	ForEmployeeID string `form:"for_employee_id"`
+	Search        string `form:"search"`
+	Limit         int    `form:"limit,default=50" binding:"gte=1,lte=200"`
+}
+
 // ---- Employee Read ----
 
 type EmployeeRead struct {
@@ -69,11 +110,11 @@ type EmployeeRead struct {
 	EmergencyContacts []EmergencyContactRead `json:"emergency_contacts"`
 
 	// Work
-	Department *RefRead   `json:"department,omitempty"`
-	Position   *RefRead   `json:"position,omitempty"`
-	Manager    *RefRead   `json:"manager,omitempty"`
-	Skills     []RefRead  `json:"skills"`
-	JoinDate   *time.Time `json:"join_date,omitempty"`
+	Department *RefRead      `json:"department,omitempty"`
+	Position   *RefRead      `json:"position,omitempty"`
+	Manager    *ManagerBrief `json:"manager,omitempty"` // rich brief (employees parity #10)
+	Skills     []RefRead     `json:"skills"`
+	JoinDate   *time.Time    `json:"join_date,omitempty"`
 
 	// Contract / salary / bank (admin view only — service-level helper may strip for non-admin)
 	ContractType     *string    `json:"contract_type,omitempty"`

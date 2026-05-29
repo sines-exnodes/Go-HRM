@@ -354,6 +354,63 @@ func (h *EmployeeHandler) UpdateLeaveQuota(c *gin.Context) {
 	ok(c, http.StatusOK, view, "Leave quota updated")
 }
 
+// ManagerCandidates godoc
+// @Summary      Line-manager picker candidates (admin)
+// @Description  Active employees eligible as a line manager. Excludes the target (for_employee_id) and its transitive subordinate chain (cycle prevention); keeps a currently-assigned but deactivated manager visible.
+// @Tags         employees
+// @Security     BearerAuth
+// @Produce      json
+// @Param        for_employee_id query string false "exclude this employee + its subordinate chain"
+// @Param        search          query string false "match full_name / position / department"
+// @Param        limit           query int    false "max rows (default 50, max 200)"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/employees/manager-candidates [get]
+func (h *EmployeeHandler) ManagerCandidates(c *gin.Context) {
+	var q dto.ManagerCandidateQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	var forID *uuid.UUID
+	if q.ForEmployeeID != "" {
+		id, perr := uuid.Parse(q.ForEmployeeID)
+		if perr != nil {
+			_ = c.Error(apperrors.ErrBadRequest("invalid for_employee_id"))
+			return
+		}
+		forID = &id
+	}
+	rows, err := h.svc.ManagerCandidates(c.Request.Context(), forID, q.Search, q.Limit)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	ok(c, http.StatusOK, rows, "")
+}
+
+// DirectReports godoc
+// @Summary      Direct reports of an employee (admin)
+// @Description  All live employees whose line manager is {id} — includes both active and deactivated reports.
+// @Tags         employees
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id path string true "manager employee uuid"
+// @Success      200 {object} map[string]interface{}
+// @Router       /api/v1/employees/{id}/direct-reports [get]
+func (h *EmployeeHandler) DirectReports(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	rows, err := h.svc.DirectReports(c.Request.Context(), id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	ok(c, http.StatusOK, rows, "")
+}
+
 // ---- Self-service endpoints ----
 
 // GetMe godoc

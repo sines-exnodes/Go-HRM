@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -21,6 +22,12 @@ import (
 // employee when the admin does not supply explicit role_ids. It must match
 // the role name created by the seed service.
 const defaultEmployeeRoleName = "Employee"
+
+// managerTreeLockKey is a fixed key for the Postgres transaction-level advisory
+// lock that serializes line-manager reparenting (employees parity #10). All
+// reparent operations contend on this single key so the in-tx cycle re-check
+// always sees other reparents' committed state.
+const managerTreeLockKey int64 = 0x6D67727472 // "mgrtr"
 
 // boolToRenewal converts the DTO *bool contract-renewal flag to the model's
 // integer column (1 = renew, 0 = do not renew).
@@ -43,6 +50,25 @@ func toEmergencyModels(in []dto.EmergencyContactInput) []models.EmployeeEmergenc
 		})
 	}
 	return out
+}
+
+// positionName / departmentName resolve the preloaded Position/Department
+// names off an employee (nil when unset or not preloaded). Used for the rich
+// manager brief + line-manager picker/direct-report rows (employees parity #10).
+func positionName(e *models.Employee) *string {
+	if e != nil && e.Position != nil && e.Position.Name != "" {
+		n := e.Position.Name
+		return &n
+	}
+	return nil
+}
+
+func departmentName(e *models.Employee) *string {
+	if e != nil && e.Department != nil && e.Department.Name != "" {
+		n := e.Department.Name
+		return &n
+	}
+	return nil
 }
 
 // EmployeeFieldPerms captures the caller's field-level salary/banking
@@ -189,9 +215,17 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 			})
 		}
 	}
-	var mgr *dto.RefRead
+	var mgr *dto.ManagerBrief
 	if e.Manager != nil {
-		mgr = &dto.RefRead{ID: e.Manager.ID, Name: e.Manager.FullName}
+		mgr = &dto.ManagerBrief{
+			ID:         e.Manager.ID,
+			FullName:   e.Manager.FullName,
+			Position:   positionName(e.Manager),
+			Department: departmentName(e.Manager),
+		}
+		if e.Manager.User != nil {
+			mgr.IsActive = e.Manager.User.IsActive
+		}
 	}
 	deps := make([]dto.DependentRead, 0, len(e.Dependents))
 	for _, d := range e.Dependents {
@@ -316,6 +350,14 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 	}
 	if exists {
 		return nil, apperrors.ErrConflict("A user with this email already exists")
+	}
+	// Validate the line-manager assignment (employees parity #10). On create the
+	// employee does not exist yet, so only existence + active are checked (no
+	// cycle possible — nobody reports to a not-yet-created employee).
+	if in.ManagerID != nil {
+		if err := s.validateManagerAssignment(ctx, s.emps, *in.ManagerID, uuid.Nil); err != nil {
+			return nil, err
+		}
 	}
 	hash, err := utils.HashPassword(in.Password)
 	if err != nil {
@@ -466,6 +508,12 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 		return nil, apperrors.ErrBadRequest("You cannot deactivate your own account")
 	}
 
+	// Line-manager re-parent (employees parity #10). The authoritative
+	// validation runs INSIDE the write tx under an advisory lock (below) to
+	// close the cycle-check TOCTOU — a pre-tx check would race with a
+	// concurrent reparent and could let two requests each commit half a cycle.
+	setManager := (in.ClearManager == nil || !*in.ClearManager) && in.ManagerID != nil
+
 	fields := map[string]any{}
 	setIfNotNilStr := func(key string, v *string) {
 		if v != nil {
@@ -539,6 +587,17 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	// the employee row and its auth user in an inconsistent state. Mirrors
 	// the transaction in SoftDelete; writes go through tx directly.
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Reparenting: serialize via a tx advisory lock and re-validate against
+		// committed state so a concurrent reparent cannot slip a cycle past the
+		// check (employees parity #10 — closes the TOCTOU).
+		if setManager {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", managerTreeLockKey).Error; err != nil {
+				return err
+			}
+			if err := s.validateManagerAssignment(ctx, s.emps.WithTx(tx), *in.ManagerID, e.ID); err != nil {
+				return err
+			}
+		}
 		if len(fields) > 0 {
 			if err := tx.Model(&models.Employee{}).
 				Where("id = ? AND is_deleted = ?", e.ID, false).
@@ -739,4 +798,143 @@ func (s *EmployeeService) UpdateLeaveQuota(ctx context.Context, id uuid.UUID, in
 		return nil, err
 	}
 	return s.Get(ctx, id)
+}
+
+// ---- Line manager (employees parity #10) ----
+
+// validateManagerAssignment enforces that a proposed line manager exists, is
+// active, is not the target themselves, and is not within the target's
+// subordinate chain (cycle prevention). managerID == uuid.Nil is a no-op
+// (clearing the manager). targetID == uuid.Nil skips the self/cycle checks
+// (used on create, before the employee exists).
+// validateManagerAssignment runs against the supplied repo so it can be invoked
+// either against the base DB (fast pre-check) or against a tx-bound repo for the
+// authoritative in-transaction re-check (see Update's advisory-locked block).
+func (s *EmployeeService) validateManagerAssignment(ctx context.Context, repo repositories.EmployeeRepository, managerID, targetID uuid.UUID) error {
+	// Callers only invoke this when a manager id was actually supplied, so a
+	// zero/Nil id here is a bad client value (not "no manager") — let the
+	// existence check below reject it as a clean 400 rather than skipping.
+	mgr, err := repo.FindByIDWithUser(ctx, managerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperrors.ErrBadRequest("Selected line manager does not exist")
+		}
+		return err
+	}
+	if mgr.User == nil || !mgr.User.IsActive {
+		return apperrors.ErrBadRequest("Selected line manager is no longer active")
+	}
+	if targetID != uuid.Nil {
+		if managerID == targetID {
+			return apperrors.ErrBadRequest("Cannot set line manager to self")
+		}
+		chain, err := repo.SubordinateIDs(ctx, targetID)
+		if err != nil {
+			return err
+		}
+		if chain[managerID] {
+			return apperrors.ErrBadRequest("Cannot assign — the selected manager is in this employee's reporting chain (would create a cycle)")
+		}
+	}
+	return nil
+}
+
+// ManagerCandidates returns the line-manager picker options: active, non-deleted
+// employees, excluding the target and its transitive subordinate chain (cycle
+// prevention). When the target's currently-assigned manager is deactivated, it
+// is kept in the list so the admin can preserve the historical assignment.
+func (s *EmployeeService) ManagerCandidates(ctx context.Context, forEmployeeID *uuid.UUID, search string, limit int) ([]dto.ManagerCandidateRead, error) {
+	var exclude []uuid.UUID
+	var legacyManager *models.Employee
+	if forEmployeeID != nil {
+		target, err := s.emps.FindByIDWithUser(ctx, *forEmployeeID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if target != nil {
+			exclude = append(exclude, target.ID)
+			chain, err := s.emps.SubordinateIDs(ctx, target.ID)
+			if err != nil {
+				return nil, err
+			}
+			for id := range chain {
+				exclude = append(exclude, id)
+			}
+			if target.ManagerID != nil {
+				cm, err := s.emps.FindByIDWithOrg(ctx, *target.ManagerID)
+				if err == nil && cm.User != nil && !cm.User.IsActive {
+					legacyManager = cm
+				}
+			}
+		}
+	}
+	emps, err := s.emps.ListManagerCandidates(ctx, exclude, search, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.ManagerCandidateRead, 0, len(emps)+1)
+	seen := make(map[uuid.UUID]bool, len(emps))
+	for i := range emps {
+		seen[emps[i].ID] = true
+		out = append(out, toManagerCandidate(&emps[i]))
+	}
+	if legacyManager != nil && !seen[legacyManager.ID] {
+		out = append(out, toManagerCandidate(legacyManager))
+		// The appended legacy manager would otherwise sort last; re-sort so it
+		// lands in its alphabetical slot (case-insensitive, matching the
+		// LOWER(full_name) ordering used in the repo query).
+		sort.SliceStable(out, func(i, j int) bool {
+			return strings.ToLower(out[i].FullName) < strings.ToLower(out[j].FullName)
+		})
+	}
+	return out, nil
+}
+
+// DirectReports returns all live employees whose line manager is managerID
+// (active AND inactive), sorted by name.
+func (s *EmployeeService) DirectReports(ctx context.Context, managerID uuid.UUID) ([]dto.DirectReportRead, error) {
+	if _, err := s.emps.FindByID(ctx, managerID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrNotFound("Employee")
+		}
+		return nil, err
+	}
+	emps, err := s.emps.ListDirectReports(ctx, managerID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.DirectReportRead, 0, len(emps))
+	for i := range emps {
+		out = append(out, toDirectReport(&emps[i]))
+	}
+	return out, nil
+}
+
+func toManagerCandidate(e *models.Employee) dto.ManagerCandidateRead {
+	active := false
+	if e.User != nil {
+		active = e.User.IsActive
+	}
+	return dto.ManagerCandidateRead{
+		ID:         e.ID,
+		FullName:   e.FullName,
+		Position:   positionName(e),
+		Department: departmentName(e),
+		IsActive:   active,
+	}
+}
+
+func toDirectReport(e *models.Employee) dto.DirectReportRead {
+	active := false
+	if e.User != nil {
+		active = e.User.IsActive
+	}
+	return dto.DirectReportRead{
+		ID:         e.ID,
+		FullName:   e.FullName,
+		AvatarURL:  e.AvatarURL,
+		Position:   positionName(e),
+		Department: departmentName(e),
+		IsActive:   active,
+	}
 }
