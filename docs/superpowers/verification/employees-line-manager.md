@@ -41,4 +41,18 @@ nonexistent manager (400), manager-candidates (200) excluding self + subordinate
 
 The same gin limitation breaks the **existing** `GET /employees` list filters: `department_id`, `position_id`, `manager_id`, `role_id` are all `*uuid.UUID form:"…"` and **400** with `"[…] is not valid value for uuid.UUID"` whenever a value is supplied. This means audit decision #16 ("keep Go list filters") rests on filters that never worked with a value. Recommend a small follow-up: bind those as strings + parse (same fix pattern), or a custom gin binding. Tracked here for a separate PR.
 
-**Status: #10 verified end-to-end. Pushed for review; PR open awaits owner OK.**
+## 5. Adversarial review + fixes
+
+Ran a 4-lens adversarial review workflow (cycle-correctness / security / GORM-data / parity), each finding independently verified: **13 raised, 10 confirmed, 3 refuted** (the 3 refuted were correctly self-described as non-bugs: limit-bound is spec-sanctioned, clear-manager precedence is deterministic, manager-brief is_active is unreachable-nil).
+
+**Fixed in this branch:**
+- **Soft-delete scoping (4 findings, 1 med + 3 low):** all new preloads + search joins now use the `NotDeleted` scope — `Manager.User/Department/Position` (3 read paths), `FindByIDWithOrg`, `ListManagerCandidates`/`ListDirectReports` Department/Position, and the search `LEFT JOIN`s now require `is_deleted = false`. A soft-deleted org row can no longer leak into a manager brief / candidate / report row or drive a search match. Regression test: `TestLineManager_SoftDeletedManagerOrgNotLeaked`.
+- **Cycle-check TOCTOU (medium):** `validateManagerAssignment` now runs **inside** the Update write-tx under a Postgres transaction advisory lock (`pg_advisory_xact_lock`, key `managerTreeLockKey`), re-reading committed state. Concurrent reparents serialize, so two requests can no longer each commit half a cycle. (Create needs no cycle check — a not-yet-created employee has no reports.) The exists/active TOCTOU (low) is narrowed to the same in-tx window.
+- **Ordering (2 low):** `ListManagerCandidates` + `ListDirectReports` now `ORDER BY LOWER(full_name)` (matches the repo convention in department/skill/label/position repos); the kept-inactive legacy manager is re-sorted into its alphabetical slot after append.
+
+**Documented as intentional / deferred (no code change):**
+- **Search-before-limit (medium, parity):** Go applies the candidate `search` in SQL *before* `LIMIT`; Python applies it in memory *after* limiting a page. Go's behavior is the better picker UX (returns up to `limit` matching rows rather than search-pruning a truncated page) — kept intentionally; recorded here as a deliberate deviation.
+- **Employee's own `department`/`position` still nil on `EmployeeRead` (low):** a pre-existing Phase-3 gap (`toRead` never populated them); #10 only surfaces it by contrast (the manager brief now shows org names). Out of #10 scope — follow-up to preload + map the employee's own org refs.
+- **Pre-existing list-filter binding bug:** `GET /employees` uuid filters (`department_id`/`position_id`/`manager_id`/`role_id`) 400 on any value (same gin `*uuid.UUID` query-binding limitation). Tracked for a separate follow-up.
+
+**Status: #10 verified end-to-end, reviewed, and review findings addressed. Pushed; PR open awaits owner OK.**

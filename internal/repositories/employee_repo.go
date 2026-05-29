@@ -115,9 +115,9 @@ func (r *employeeRepository) FindByIDWithOrg(ctx context.Context, id uuid.UUID) 
 	var e models.Employee
 	err := r.db.WithContext(ctx).
 		Scopes(notDeleted).
-		Preload("User").
-		Preload("Department").
-		Preload("Position").
+		Preload("User", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		First(&e, "id = ?", id).Error
 	if err != nil {
 		return nil, err
@@ -134,9 +134,9 @@ func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID)
 		Preload("User").
 		Preload("User.Roles").
 		Preload("Manager").
-		Preload("Manager.User").
-		Preload("Manager.Department").
-		Preload("Manager.Position").
+		Preload("Manager.User", notDeleted).
+		Preload("Manager.Department", notDeleted).
+		Preload("Manager.Position", notDeleted).
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -156,9 +156,9 @@ func (r *employeeRepository) FindByUserIDWithFull(ctx context.Context, userID uu
 		Preload("User").
 		Preload("User.Roles").
 		Preload("Manager").
-		Preload("Manager.User").
-		Preload("Manager.Department").
-		Preload("Manager.Position").
+		Preload("Manager.User", notDeleted).
+		Preload("Manager.Department", notDeleted).
+		Preload("Manager.Position", notDeleted).
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -177,9 +177,9 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 		Preload("User").
 		Preload("User.Roles").
 		Preload("Manager").
-		Preload("Manager.User").
-		Preload("Manager.Department").
-		Preload("Manager.Position").
+		Preload("Manager.User", notDeleted).
+		Preload("Manager.Department", notDeleted).
+		Preload("Manager.Position", notDeleted).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
 		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
@@ -302,9 +302,9 @@ func (r *employeeRepository) SubordinateIDs(ctx context.Context, rootEmployeeID 
 
 func (r *employeeRepository) ListManagerCandidates(ctx context.Context, excludeIDs []uuid.UUID, search string, limit int) ([]models.Employee, error) {
 	q := r.db.WithContext(ctx).Model(&models.Employee{}).
-		Preload("User").
-		Preload("Department").
-		Preload("Position").
+		Preload("User", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Joins("JOIN users ON users.id = employees.user_id").
 		Where("employees.is_deleted = ? AND users.is_active = ?", false, true)
 	if len(excludeIDs) > 0 {
@@ -312,26 +312,28 @@ func (r *employeeRepository) ListManagerCandidates(ctx context.Context, excludeI
 	}
 	if search != "" {
 		p := utils.BuildILIKEPattern(search)
-		q = q.Joins("LEFT JOIN positions ON positions.id = employees.position_id").
-			Joins("LEFT JOIN departments ON departments.id = employees.department_id").
+		// LEFT JOIN only LIVE org rows so a soft-deleted position/department
+		// name cannot drive a search match (matches the NotDeleted convention).
+		q = q.Joins("LEFT JOIN positions ON positions.id = employees.position_id AND positions.is_deleted = false").
+			Joins("LEFT JOIN departments ON departments.id = employees.department_id AND departments.is_deleted = false").
 			Where("employees.full_name ILIKE ? OR positions.name ILIKE ? OR departments.name ILIKE ?", p, p, p)
 	}
 	if limit < 1 {
 		limit = 50
 	}
 	var emps []models.Employee
-	err := q.Order("employees.full_name ASC").Limit(limit).Find(&emps).Error
+	err := q.Order("LOWER(employees.full_name) ASC").Limit(limit).Find(&emps).Error
 	return emps, err
 }
 
 func (r *employeeRepository) ListDirectReports(ctx context.Context, managerID uuid.UUID) ([]models.Employee, error) {
 	var emps []models.Employee
 	err := r.db.WithContext(ctx).
-		Preload("User").
-		Preload("Department").
-		Preload("Position").
+		Preload("User", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Where("manager_id = ? AND is_deleted = ?", managerID, false).
-		Order("full_name ASC").
+		Order("LOWER(full_name) ASC").
 		Find(&emps).Error
 	return emps, err
 }

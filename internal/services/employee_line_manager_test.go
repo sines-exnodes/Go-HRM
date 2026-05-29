@@ -224,3 +224,31 @@ func TestLineManager_DirectReports_IncludesInactive(t *testing.T) {
 	assert.True(t, ok, "inactive report still listed")
 	assert.False(t, active[r2.ID], "inactive report flagged is_active=false")
 }
+
+// Regression for review finding #4: soft-deleted org rows must not leak into
+// the manager brief (the Manager.Department/Position preloads are NotDeleted-scoped).
+func TestLineManager_SoftDeletedManagerOrgNotLeaked(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	dept, pos := makeOrg(t, "Doomed Dept", "Doomed Pos")
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "leakboss@x.com", Password: "Pass12345", FullName: "Leak Boss",
+		DepartmentID: &dept, PositionID: &pos,
+	})
+	require.NoError(t, err)
+	rep, err := svc.Create(ctx, dto.EmployeeCreate{Email: "leakrep@x.com", Password: "Pass12345", FullName: "Leak Rep", ManagerID: uptr(mgr.ID)})
+	require.NoError(t, err)
+
+	// Soft-delete the manager's department + position out from under the brief.
+	require.NoError(t, testDB.Exec("UPDATE departments SET is_deleted = true WHERE id = ?", dept).Error)
+	require.NoError(t, testDB.Exec("UPDATE positions SET is_deleted = true WHERE id = ?", pos).Error)
+
+	got, err := svc.Get(ctx, rep.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.Manager)
+	assert.Nil(t, got.Manager.Department, "soft-deleted department must not leak into the manager brief")
+	assert.Nil(t, got.Manager.Position, "soft-deleted position must not leak into the manager brief")
+}

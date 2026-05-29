@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/google/uuid"
@@ -21,6 +22,12 @@ import (
 // employee when the admin does not supply explicit role_ids. It must match
 // the role name created by the seed service.
 const defaultEmployeeRoleName = "Employee"
+
+// managerTreeLockKey is a fixed key for the Postgres transaction-level advisory
+// lock that serializes line-manager reparenting (employees parity #10). All
+// reparent operations contend on this single key so the in-tx cycle re-check
+// always sees other reparents' committed state.
+const managerTreeLockKey int64 = 0x6D67727472 // "mgrtr"
 
 // boolToRenewal converts the DTO *bool contract-renewal flag to the model's
 // integer column (1 = renew, 0 = do not renew).
@@ -345,9 +352,10 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		return nil, apperrors.ErrConflict("A user with this email already exists")
 	}
 	// Validate the line-manager assignment (employees parity #10). On create the
-	// employee does not exist yet, so only existence + active are checked.
+	// employee does not exist yet, so only existence + active are checked (no
+	// cycle possible — nobody reports to a not-yet-created employee).
 	if in.ManagerID != nil {
-		if err := s.validateManagerAssignment(ctx, *in.ManagerID, uuid.Nil); err != nil {
+		if err := s.validateManagerAssignment(ctx, s.emps, *in.ManagerID, uuid.Nil); err != nil {
 			return nil, err
 		}
 	}
@@ -500,13 +508,11 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 		return nil, apperrors.ErrBadRequest("You cannot deactivate your own account")
 	}
 
-	// Validate line-manager assignment when setting (not clearing) it
-	// (employees parity #10): exists + active + no-self + no-cycle.
-	if (in.ClearManager == nil || !*in.ClearManager) && in.ManagerID != nil {
-		if err := s.validateManagerAssignment(ctx, *in.ManagerID, e.ID); err != nil {
-			return nil, err
-		}
-	}
+	// Line-manager re-parent (employees parity #10). The authoritative
+	// validation runs INSIDE the write tx under an advisory lock (below) to
+	// close the cycle-check TOCTOU — a pre-tx check would race with a
+	// concurrent reparent and could let two requests each commit half a cycle.
+	setManager := (in.ClearManager == nil || !*in.ClearManager) && in.ManagerID != nil
 
 	fields := map[string]any{}
 	setIfNotNilStr := func(key string, v *string) {
@@ -581,6 +587,17 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	// the employee row and its auth user in an inconsistent state. Mirrors
 	// the transaction in SoftDelete; writes go through tx directly.
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Reparenting: serialize via a tx advisory lock and re-validate against
+		// committed state so a concurrent reparent cannot slip a cycle past the
+		// check (employees parity #10 — closes the TOCTOU).
+		if setManager {
+			if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", managerTreeLockKey).Error; err != nil {
+				return err
+			}
+			if err := s.validateManagerAssignment(ctx, s.emps.WithTx(tx), *in.ManagerID, e.ID); err != nil {
+				return err
+			}
+		}
 		if len(fields) > 0 {
 			if err := tx.Model(&models.Employee{}).
 				Where("id = ? AND is_deleted = ?", e.ID, false).
@@ -790,11 +807,14 @@ func (s *EmployeeService) UpdateLeaveQuota(ctx context.Context, id uuid.UUID, in
 // subordinate chain (cycle prevention). managerID == uuid.Nil is a no-op
 // (clearing the manager). targetID == uuid.Nil skips the self/cycle checks
 // (used on create, before the employee exists).
-func (s *EmployeeService) validateManagerAssignment(ctx context.Context, managerID, targetID uuid.UUID) error {
+// validateManagerAssignment runs against the supplied repo so it can be invoked
+// either against the base DB (fast pre-check) or against a tx-bound repo for the
+// authoritative in-transaction re-check (see Update's advisory-locked block).
+func (s *EmployeeService) validateManagerAssignment(ctx context.Context, repo repositories.EmployeeRepository, managerID, targetID uuid.UUID) error {
 	// Callers only invoke this when a manager id was actually supplied, so a
 	// zero/Nil id here is a bad client value (not "no manager") — let the
 	// existence check below reject it as a clean 400 rather than skipping.
-	mgr, err := s.emps.FindByIDWithUser(ctx, managerID)
+	mgr, err := repo.FindByIDWithUser(ctx, managerID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperrors.ErrBadRequest("Selected line manager does not exist")
@@ -808,7 +828,7 @@ func (s *EmployeeService) validateManagerAssignment(ctx context.Context, manager
 		if managerID == targetID {
 			return apperrors.ErrBadRequest("Cannot set line manager to self")
 		}
-		chain, err := s.emps.SubordinateIDs(ctx, targetID)
+		chain, err := repo.SubordinateIDs(ctx, targetID)
 		if err != nil {
 			return err
 		}
@@ -860,6 +880,12 @@ func (s *EmployeeService) ManagerCandidates(ctx context.Context, forEmployeeID *
 	}
 	if legacyManager != nil && !seen[legacyManager.ID] {
 		out = append(out, toManagerCandidate(legacyManager))
+		// The appended legacy manager would otherwise sort last; re-sort so it
+		// lands in its alphabetical slot (case-insensitive, matching the
+		// LOWER(full_name) ordering used in the repo query).
+		sort.SliceStable(out, func(i, j int) bool {
+			return strings.ToLower(out[i].FullName) < strings.ToLower(out[j].FullName)
+		})
 	}
 	return out, nil
 }
