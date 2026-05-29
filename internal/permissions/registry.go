@@ -18,6 +18,14 @@ const (
 	PermUsersDelete      Permission = "users:delete"
 	PermUsersManageRoles Permission = "users:manage_roles"
 	PermUsersChangePwd   Permission = "users:change_password"
+	// Salary / banking are granular field-level perms (employees parity #6):
+	// *_view gates whether the section is returned on reads; *_manage gates
+	// whether it can be set on create/update. Account number is masked on
+	// reads even to view holders (unmasked only on the write echo).
+	PermUsersSalaryView    Permission = "users:salary_view"
+	PermUsersSalaryManage  Permission = "users:salary_manage"
+	PermUsersBankingView   Permission = "users:banking_view"
+	PermUsersBankingManage Permission = "users:banking_manage"
 
 	// Employees
 	PermEmployeesRead   Permission = "employees:read"
@@ -84,6 +92,7 @@ func AllPermissions() []Permission {
 		PermAuthLogin,
 		PermUsersRead, PermUsersCreate, PermUsersUpdate, PermUsersDelete,
 		PermUsersManageRoles, PermUsersChangePwd,
+		PermUsersSalaryView, PermUsersSalaryManage, PermUsersBankingView, PermUsersBankingManage,
 		PermEmployeesRead, PermEmployeesCreate, PermEmployeesUpdate, PermEmployeesDelete,
 		PermDependentsManage,
 		PermRolesRead, PermRolesCreate, PermRolesUpdate, PermRolesDelete,
@@ -145,6 +154,10 @@ var PermissionGroups = []PermissionGroup{
 			{PermUsersDelete, "Activate / Deactivate Users", "Enable or disable user accounts"},
 			{PermUsersManageRoles, "Manage User Roles", "Assign or remove roles from users"},
 			{PermUsersChangePwd, "Change User Password", "Reset passwords for other users"},
+			{PermUsersSalaryView, "View Salary", "See salary fields on the employee profile"},
+			{PermUsersSalaryManage, "Manage Salary", "Set/edit salary fields on the employee profile"},
+			{PermUsersBankingView, "View Banking", "See banking fields (account number masked) on the employee profile"},
+			{PermUsersBankingManage, "Manage Banking", "Set/edit banking fields on the employee profile"},
 		},
 	},
 	{

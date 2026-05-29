@@ -66,6 +66,10 @@ func defaultRoles() []roleSeed {
 				permissions.PermAuthLogin,
 				permissions.PermUsersRead, permissions.PermUsersCreate, permissions.PermUsersUpdate, permissions.PermUsersDelete,
 				permissions.PermUsersManageRoles, permissions.PermUsersChangePwd,
+				// Salary/banking field-level perms (employees parity #6) — Admin
+				// manages payroll, so holds both view and manage on each.
+				permissions.PermUsersSalaryView, permissions.PermUsersSalaryManage,
+				permissions.PermUsersBankingView, permissions.PermUsersBankingManage,
 				permissions.PermRolesRead, permissions.PermRolesCreate, permissions.PermRolesUpdate,
 				// Employee HR profile management — added in the full-verify fix
 				// (full-verify.md). Pre-existing seed gap: Admin could not GET /
@@ -96,6 +100,10 @@ func defaultRoles() []roleSeed {
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
 				permissions.PermUsersRead, permissions.PermUsersCreate, permissions.PermUsersUpdate, permissions.PermUsersChangePwd,
+				// Salary/banking field-level perms (employees parity #6) — HR
+				// manages payroll, so holds both view and manage on each.
+				permissions.PermUsersSalaryView, permissions.PermUsersSalaryManage,
+				permissions.PermUsersBankingView, permissions.PermUsersBankingManage,
 				permissions.PermRolesRead,
 				// Employee HR profile management — same fix as Admin (above).
 				// HR mirrors the rest of HR's perm shape: Read/Create/Update but
