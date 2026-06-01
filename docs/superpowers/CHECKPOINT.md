@@ -1,9 +1,9 @@
 # Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity in flight
 
 **Last updated:** 2026-05-29
-**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity** work ongoing: announcements (merged), employees (two PRs pushed, awaiting open).
-**Branch:** `main` — parity work on `feat/employees-parity` → `feat/employees-salary-banking`.
-**DB migration version:** **16** on `main`; **17** on `feat/employees-parity` (000017_employee_parity).
+**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); **employees parity COMPLETE** — A (#7), B salary/banking (#9), C line-manager (#10) all merged to `main`.
+**Branch:** `main`.
+**DB migration version:** **17** on `main` (000017_employee_parity).
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
 ## How to resume next session
@@ -37,33 +37,44 @@ PR #5 (`body`→`description`, `send_now`, brief mobile widget) + PR #6 (hybrid
 per-user targeting `target_audience:"custom"` + `recipient_ids[]`, CORS fix).
 Migrations 000013–000016, both on `main`. 13-decision audit.
 
-### Employees — PUSHED (PRs not yet opened)
+### Employees — DONE (merged)
 19-decision audit (Python `users` module ↔ Go `users`⟂`employees`⟂`dependents`).
-Two stacked branches off `main`@`bcb4c0b`:
+All three layers merged to `main`:
 
-- **`feat/employees-parity`** (PR A, `a377e44`) — emergency-contact list,
-  leave-quota/skills/cv on read, widened self-edit (name/gender/dob), self &
-  destructive guards, admin change-email, marital/education enum fixes.
-  **Migration 000017_employee_parity.**
-- **`feat/employees-salary-banking`** (PR B, stacked on A) — salary/banking
-  field-level perms (`users:salary_view/manage`, `users:banking_view/manage`)
-  + account-number masking + write-gate (decision #6). No migration.
+- **A `feat/employees-parity`** (PR #7) — emergency-contact list (new
+  `employee_emergency_contacts` table), leave-quota/skills/cv on read, widened
+  self-edit (name/gender/dob), self & destructive guards, admin change-email,
+  marital/education enums. **Migration 000017.**
+- **B `feat/employees-salary-banking`** (PR #9) — salary/banking field-level
+  perms (`users:{salary,banking}_{view,manage}`) + account masking + write-gate
+  (#6). No migration.
+- **C `feat/employees-line-manager`** (PR #10) — line-manager suite: assignment
+  validation (self / cycle via subordinate-BFS / inactive, **advisory-locked
+  in-tx re-check**), `GET /employees/manager-candidates`, `GET /employees/{id}/
+  direct-reports`, rich `manager` brief. No migration.
 
-Verified: [`verification/employees-parity-pr-a.md`](verification/employees-parity-pr-a.md)
-+ [`verification/employees-parity-pr-b.md`](verification/employees-parity-pr-b.md)
-(build/vet, full integration suite, migration up/down round-trip, live HTTP e2e).
+Verified: [`verification/employees-parity-pr-a.md`](verification/employees-parity-pr-a.md),
+[`-pr-b.md`](verification/employees-parity-pr-b.md),
+[`employees-line-manager.md`](verification/employees-line-manager.md) — build/vet,
+full integration suite, migration up/down round-trip, live HTTP smoke
+(`scripts/smoke-employees-parity.sh`, 34/34), + a 4-lens adversarial review on C
+(10 confirmed findings fixed).
 
-**3 decisions deferred** → [`handoff-2026-05-29-employee-parity.md`](handoff-2026-05-29-employee-parity.md):
-#10 line-manager suite (picker + direct-reports + cycle validation), #11 cv/
-id-card upload endpoints, #15 role-level assignment authority (N/A — Go RBAC
-has no role levels).
+**Still deferred / follow-ups** → [`handoff-2026-05-29-employee-parity.md`](handoff-2026-05-29-employee-parity.md):
+- **#11** cv/id-card upload endpoints (URLs accepted for now).
+- **#15** role-level assignment authority (N/A — Go RBAC has no role `level`).
+- **Found during C** (worth a small PR): (a) pre-existing `GET /employees` uuid
+  list-filters (`department_id`/`position_id`/`manager_id`/`role_id`) **400 on
+  any value** — gin can't bind `*uuid.UUID` from a query; bind as string +
+  `uuid.Parse` (see `mem:conventions`). (b) employee's **own** `department`/
+  `position` names not resolved on `EmployeeRead` (still null — the manager
+  brief resolves them, the self path doesn't; pre-existing Phase-3 gap).
 
-FE docs (on disk, uncommitted in the web repo `api_info_go/`): `employee.md`
-(new) + `me.md` (refreshed for the new `/employees/me` shape).
+FE: web repo PR **#5** (`feat/go-employees-parity` → main) carries the full FE
+wiring + `api_info_go/employee.md` + `me.md`. The web repo is self-managed.
 
-**Resume order:** open PR A → `main`, then rebase/merge PR B (it's stacked);
-commit the FE docs on the web side; then pick up the deferred items from the
-handoff. PR B currently contains A's commits via a merge of A into B.
+**Next:** employees parity is closed. Optional follow-ups: #11, #15, + the two
+above. Next migration is **000018**.
 
 ## Phase Summary (final)
 
