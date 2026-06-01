@@ -338,7 +338,7 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 
 		row := dto.AttendanceRowRead{
 			EmployeeID:        emp.ID,
-			EmployeeName:      emp.FullName,
+			EmployeeName:      emp.FullName(),
 			AvatarURL:         emp.AvatarURL,
 			Cells:             cells,
 			TotalLateMinutes:  totalLate,

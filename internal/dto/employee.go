@@ -89,7 +89,8 @@ type EmployeeRead struct {
 	ID               uuid.UUID  `json:"id"`
 	UserID           uuid.UUID  `json:"user_id"`
 	Email            string     `json:"email"`
-	FullName         string     `json:"full_name"`
+	FirstName        string     `json:"first_name"`
+	LastName         string     `json:"last_name"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty"`
 	Gender           *string    `json:"gender,omitempty"`
@@ -161,7 +162,8 @@ type EmployeeCreate struct {
 	IsActive *bool  `json:"is_active,omitempty"`
 
 	// HR personal info
-	FullName         string     `json:"full_name" binding:"required,min=1,max=200"`
+	FirstName        string     `json:"first_name" binding:"required,min=1,max=100"`
+	LastName         string     `json:"last_name"  binding:"required,min=1,max=100"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
 	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
@@ -209,7 +211,8 @@ type EmployeeCreate struct {
 // ---- Employee Update (admin — anything allowed) ----
 
 type EmployeeUpdate struct {
-	FullName         *string    `json:"full_name,omitempty"`
+	FirstName        *string    `json:"first_name,omitempty" binding:"omitempty,min=1,max=100"`
+	LastName         *string    `json:"last_name,omitempty"  binding:"omitempty,min=1,max=100"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
 	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
@@ -266,7 +269,8 @@ type EmployeeUpdate struct {
 // The service enforces the whitelist with a manual field-by-field copy, so
 // even a future DTO widening cannot mutate those admin-only columns.
 type EmployeeSelfUpdate struct {
-	FullName         *string    `json:"full_name,omitempty"      binding:"omitempty,min=1,max=200"`
+	FirstName        *string    `json:"first_name,omitempty"     binding:"omitempty,min=1,max=100"`
+	LastName         *string    `json:"last_name,omitempty"      binding:"omitempty,min=1,max=100"`
 	Gender           *string    `json:"gender,omitempty"         binding:"omitempty,oneof=male female other"`
 	DOB              *time.Time `json:"dob,omitempty"`
 	Phone            *string    `json:"phone,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -295,9 +296,15 @@ func (s *SeedService) seedSuperAdmin(ctx context.Context) error {
 		return err
 	}
 
-	adminName := s.cfg.SuperAdminName
-	if adminName == "" {
-		adminName = "Super Admin"
+	adminFirst, adminLast := "Super", "Admin"
+	if s.cfg.SuperAdminName != "" {
+		parts := strings.SplitN(strings.TrimSpace(s.cfg.SuperAdminName), " ", 2)
+		adminFirst = parts[0]
+		if len(parts) > 1 {
+			adminLast = strings.TrimSpace(parts[1])
+		} else {
+			adminLast = ""
+		}
 	}
 
 	existing, err := s.users.FindByEmailWithRolesAndEmployee(ctx, s.cfg.SuperAdminEmail)
@@ -357,7 +364,8 @@ func (s *SeedService) seedSuperAdmin(ctx context.Context) error {
 	today := time.Now().UTC()
 	emp := &models.Employee{
 		UserID:          userID,
-		FullName:        adminName,
+		FirstName:       adminFirst,
+		LastName:        adminLast,
 		ContractType:    "official",
 		ContractRenewal: 1,
 		PaymentMethod:   "bank_transfer",

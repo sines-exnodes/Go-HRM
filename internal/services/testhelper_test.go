@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -169,6 +170,18 @@ func makeUser(t *testing.T, email, password string, roles ...*models.Role) *mode
 	return u
 }
 
+// splitTestName splits a composed display name into first/last on the first
+// space (names are stored split since migration 000018). A single-token name
+// reuses the token for last_name so fixtures always have a non-empty last name.
+func splitTestName(name string) (first, last string) {
+	parts := strings.SplitN(strings.TrimSpace(name), " ", 2)
+	first = parts[0]
+	if len(parts) > 1 && strings.TrimSpace(parts[1]) != "" {
+		return first, strings.TrimSpace(parts[1])
+	}
+	return first, first
+}
+
 // makeEmployee inserts an Employee row linked to the given user, with
 // sensible defaults. fullName falls back to the user's email when empty.
 func makeEmployee(t *testing.T, forUser *models.User, fullName string) *models.Employee {
@@ -176,9 +189,11 @@ func makeEmployee(t *testing.T, forUser *models.User, fullName string) *models.E
 	if fullName == "" {
 		fullName = forUser.Email
 	}
+	first, last := splitTestName(fullName)
 	e := &models.Employee{
 		UserID:          forUser.ID,
-		FullName:        fullName,
+		FirstName:       first,
+		LastName:        last,
 		ContractType:    "official",
 		ContractRenewal: 1,
 		PaymentMethod:   "bank_transfer",
@@ -196,7 +211,8 @@ func makeEmployeeInDept(t *testing.T, deptID uuid.UUID, posID *uuid.UUID) *model
 	u := makeUser(t, fmt.Sprintf("emp-%s@example.com", uuid.NewString()[:8]), "pw-Aa123456")
 	e := &models.Employee{
 		UserID:          u.ID,
-		FullName:        "Dept Member",
+		FirstName:       "Dept",
+		LastName:        "Member",
 		ContractType:    "official",
 		ContractRenewal: 1,
 		PaymentMethod:   "bank_transfer",

@@ -30,7 +30,7 @@ func TestDependentService_CRUD(t *testing.T) {
 	ctx := context.Background()
 
 	emp, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "dep@example.com", Password: "Pass12345", FullName: "Owner",
+		Email: "dep@example.com", Password: "Pass12345", FirstName: "Owner", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -78,11 +78,11 @@ func TestDependentService_NonOwnerForbidden(t *testing.T) {
 	ctx := context.Background()
 
 	owner, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "owner@example.com", Password: "Pass12345", FullName: "Owner",
+		Email: "owner@example.com", Password: "Pass12345", FirstName: "Owner", LastName: "Test",
 	})
 	require.NoError(t, err)
 	stranger, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "stranger@example.com", Password: "Pass12345", FullName: "Stranger",
+		Email: "stranger@example.com", Password: "Pass12345", FirstName: "Stranger", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -110,7 +110,7 @@ func TestDependentService_OwnerEmployeeIDForDependent(t *testing.T) {
 	ctx := context.Background()
 
 	emp, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "ownerlookup@example.com", Password: "Pass12345", FullName: "OwnerLookup",
+		Email: "ownerlookup@example.com", Password: "Pass12345", FirstName: "OwnerLookup", LastName: "Test",
 	})
 	require.NoError(t, err)
 	dep, err := depSvc.Create(ctx, emp.ID, dto.DependentCreate{FullName: "Kid", Relationship: "child"})

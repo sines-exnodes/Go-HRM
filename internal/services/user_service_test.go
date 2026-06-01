@@ -34,7 +34,7 @@ func TestUserService_ChangePassword(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "pw@example.com", Password: "OldPass1234", FullName: "PW User",
+		Email: "pw@example.com", Password: "OldPass1234", FirstName: "PW", LastName: "User",
 	})
 	require.NoError(t, err)
 
@@ -68,12 +68,12 @@ func TestUserService_ChangeEmail(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "old@example.com", Password: "Pass12345", FullName: "Email User",
+		Email: "old@example.com", Password: "Pass12345", FirstName: "Email", LastName: "User",
 	})
 	require.NoError(t, err)
 	// A second user occupying a target email for the conflict case.
 	_, err = empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "taken@example.com", Password: "Pass12345", FullName: "Taken",
+		Email: "taken@example.com", Password: "Pass12345", FirstName: "Taken", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -111,7 +111,7 @@ func TestUserService_AssignRoles(t *testing.T) {
 
 	role := makeRole(t, "manager", []permissions.Permission{permissions.PermEmployeesRead}, false)
 	target, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "target@example.com", Password: "Pass12345", FullName: "Target",
+		Email: "target@example.com", Password: "Pass12345", FirstName: "Target", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func TestUserService_DeviceTokens(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "dt@example.com", Password: "Pass12345", FullName: "DT User",
+		Email: "dt@example.com", Password: "Pass12345", FirstName: "DT", LastName: "User",
 	})
 	require.NoError(t, err)
 
@@ -178,7 +178,7 @@ func TestUserService_GetMe_EmbedsEmployeeSummary(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "me@example.com", Password: "Pass12345", FullName: "Me User",
+		Email: "me@example.com", Password: "Pass12345", FirstName: "Me", LastName: "User",
 	})
 	require.NoError(t, err)
 
@@ -189,7 +189,8 @@ func TestUserService_GetMe_EmbedsEmployeeSummary(t *testing.T) {
 	out, err := userSvc.GetMe(ctx, u)
 	require.NoError(t, err)
 	require.NotNil(t, out.Employee)
-	assert.Equal(t, "Me User", out.Employee.FullName)
+	assert.Equal(t, "Me", out.Employee.FirstName)
+	assert.Equal(t, "User", out.Employee.LastName)
 	assert.Equal(t, "me@example.com", out.Email)
 	assert.True(t, out.NotificationsEnabled, "defaults to enabled when no settings row exists")
 }
@@ -202,7 +203,7 @@ func TestUserService_NotificationSettings_Toggle(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "ns@example.com", Password: "Pass12345", FullName: "NS",
+		Email: "ns@example.com", Password: "Pass12345", FirstName: "NS", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -231,11 +232,11 @@ func TestUserService_ListAndGet(t *testing.T) {
 
 	role := makeRole(t, "Employee", []permissions.Permission{permissions.PermAuthLogin}, true)
 	a, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "list-a@example.com", Password: "Pass12345", FullName: "List A", RoleIDs: []uuid.UUID{role.ID},
+		Email: "list-a@example.com", Password: "Pass12345", FirstName: "List", LastName: "A", RoleIDs: []uuid.UUID{role.ID},
 	})
 	require.NoError(t, err)
 	_, err = empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "list-b@example.com", Password: "Pass12345", FullName: "List B",
+		Email: "list-b@example.com", Password: "Pass12345", FirstName: "List", LastName: "B",
 	})
 	require.NoError(t, err)
 
@@ -257,7 +258,8 @@ func TestUserService_ListAndGet(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "list-a@example.com", got.Email)
 	require.NotNil(t, got.Employee)
-	assert.Equal(t, "List A", got.Employee.FullName)
+	assert.Equal(t, "List", got.Employee.FirstName)
+	assert.Equal(t, "A", got.Employee.LastName)
 	require.Len(t, got.Roles, 1)
 	assert.Equal(t, "Employee", got.Roles[0].Name)
 

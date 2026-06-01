@@ -209,7 +209,7 @@ func (s *LeaveService) populateRead(ctx context.Context, lr *models.LeaveRequest
 		// Soft-deleted/missing employee: leave the embedded refs empty.
 		return out, nil
 	}
-	out.Employee = &dto.LeaveRefRead{ID: emp.ID.String(), Name: emp.FullName}
+	out.Employee = &dto.LeaveRefRead{ID: emp.ID.String(), Name: emp.FullName()}
 	if emp.DepartmentID != nil {
 		if d, derr := s.depts.FindByID(ctx, *emp.DepartmentID, false); derr == nil && d != nil {
 			out.Department = &dto.LeaveRefRead{ID: d.ID.String(), Name: d.Name}

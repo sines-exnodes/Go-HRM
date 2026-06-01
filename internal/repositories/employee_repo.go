@@ -194,8 +194,8 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 	if q.Search != "" {
 		p := utils.BuildILIKEPattern(q.Search)
 		tx = tx.Where(
-			"employees.full_name ILIKE ? OR employees.phone ILIKE ? OR employees.personal_email ILIKE ? OR users.email ILIKE ?",
-			p, p, p, p,
+			"employees.first_name ILIKE ? OR employees.last_name ILIKE ? OR employees.phone ILIKE ? OR employees.personal_email ILIKE ? OR users.email ILIKE ?",
+			p, p, p, p, p,
 		)
 	}
 	if len(q.DepartmentIDs) > 0 {
@@ -230,7 +230,7 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 
 	var emps []models.Employee
 	if err := tx.
-		Order("employees.full_name ASC").
+		Order("employees.first_name ASC, employees.last_name ASC").
 		Offset((q.Page - 1) * q.PageSize).
 		Limit(q.PageSize).
 		Find(&emps).Error; err != nil {
@@ -320,13 +320,13 @@ func (r *employeeRepository) ListManagerCandidates(ctx context.Context, excludeI
 		// name cannot drive a search match (matches the NotDeleted convention).
 		q = q.Joins("LEFT JOIN positions ON positions.id = employees.position_id AND positions.is_deleted = false").
 			Joins("LEFT JOIN departments ON departments.id = employees.department_id AND departments.is_deleted = false").
-			Where("employees.full_name ILIKE ? OR positions.name ILIKE ? OR departments.name ILIKE ?", p, p, p)
+			Where("(employees.first_name ILIKE ? OR employees.last_name ILIKE ?) OR positions.name ILIKE ? OR departments.name ILIKE ?", p, p, p, p)
 	}
 	if limit < 1 {
 		limit = 50
 	}
 	var emps []models.Employee
-	err := q.Order("LOWER(employees.full_name) ASC").Limit(limit).Find(&emps).Error
+	err := q.Order("LOWER(employees.first_name) ASC, LOWER(employees.last_name) ASC").Limit(limit).Find(&emps).Error
 	return emps, err
 }
 
@@ -337,7 +337,7 @@ func (r *employeeRepository) ListDirectReports(ctx context.Context, managerID uu
 		Preload("Department", notDeleted).
 		Preload("Position", notDeleted).
 		Where("manager_id = ? AND is_deleted = ?", managerID, false).
-		Order("LOWER(full_name) ASC").
+		Order("LOWER(first_name) ASC, LOWER(last_name) ASC").
 		Find(&emps).Error
 	return emps, err
 }

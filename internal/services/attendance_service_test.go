@@ -441,7 +441,7 @@ func TestAttendance_List_DepartmentFilter(t *testing.T) {
 	require.NoError(t, testDB.Create(dept).Error)
 	u1 := makeUser(t, "withdept@example.com", "pw-Aa123456")
 	e1 := &models.Employee{
-		UserID: u1.ID, FullName: "WithDept",
+		UserID: u1.ID, FirstName: "WithDept", LastName: "Test",
 		ContractType: "official", ContractRenewal: 1, PaymentMethod: "bank_transfer",
 		DepartmentID: &dept.ID,
 	}

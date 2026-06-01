@@ -29,7 +29,8 @@ func toUserSummary(u *models.User) dto.UserSummary {
 	if u.Employee != nil {
 		emp = &dto.EmployeeSummary{
 			ID:           u.Employee.ID,
-			FullName:     u.Employee.FullName,
+			FirstName:    u.Employee.FirstName,
+			LastName:     u.Employee.LastName,
 			AvatarURL:    u.Employee.AvatarURL,
 			DepartmentID: u.Employee.DepartmentID,
 			PositionID:   u.Employee.PositionID,

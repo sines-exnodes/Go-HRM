@@ -259,7 +259,7 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 	if e.Manager != nil {
 		mgr = &dto.ManagerBrief{
 			ID:         e.Manager.ID,
-			FullName:   e.Manager.FullName,
+			FullName:   e.Manager.FullName(),
 			Position:   positionName(e.Manager),
 			Department: departmentName(e.Manager),
 		}
@@ -322,7 +322,8 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 	out := &dto.EmployeeRead{
 		ID:                e.ID,
 		UserID:            e.UserID,
-		FullName:          e.FullName,
+		FirstName:         e.FirstName,
+		LastName:          e.LastName,
 		Phone:             e.Phone,
 		PersonalEmail:     e.PersonalEmail,
 		Gender:            e.Gender,
@@ -372,7 +373,8 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 func (s *EmployeeService) toSummary(e *models.Employee) *dto.EmployeeSummary {
 	return &dto.EmployeeSummary{
 		ID:           e.ID,
-		FullName:     e.FullName,
+		FirstName:    e.FirstName,
+		LastName:     e.LastName,
 		AvatarURL:    e.AvatarURL,
 		DepartmentID: e.DepartmentID,
 		PositionID:   e.PositionID,
@@ -444,7 +446,8 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		// defaults when the DTO pointer is nil.
 		e := &models.Employee{
 			UserID:           u.ID,
-			FullName:         strings.TrimSpace(in.FullName),
+			FirstName:        strings.TrimSpace(in.FirstName),
+			LastName:         strings.TrimSpace(in.LastName),
 			Phone:            in.Phone,
 			PersonalEmail:    in.PersonalEmail,
 			Gender:           in.Gender,
@@ -584,7 +587,8 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 			fields[key] = strings.TrimSpace(*v)
 		}
 	}
-	setIfNotNilStr("full_name", in.FullName)
+	setIfNotNilStr("first_name", in.FirstName)
+	setIfNotNilStr("last_name", in.LastName)
 	setIfNotNilStr("phone", in.Phone)
 	setIfNotNilStr("personal_email", in.PersonalEmail)
 	setIfNotNilStr("gender", in.Gender)
@@ -713,8 +717,11 @@ func (s *EmployeeService) SelfUpdate(ctx context.Context, userID uuid.UUID, in d
 	}
 	allowed := map[string]any{}
 	// Identity fields — self-editable per audit decision #7.
-	if in.FullName != nil {
-		allowed["full_name"] = strings.TrimSpace(*in.FullName)
+	if in.FirstName != nil {
+		allowed["first_name"] = strings.TrimSpace(*in.FirstName)
+	}
+	if in.LastName != nil {
+		allowed["last_name"] = strings.TrimSpace(*in.LastName)
 	}
 	if in.Gender != nil {
 		allowed["gender"] = *in.Gender
@@ -951,7 +958,7 @@ func (s *EmployeeService) ManagerCandidates(ctx context.Context, forEmployeeID *
 		out = append(out, toManagerCandidate(legacyManager))
 		// The appended legacy manager would otherwise sort last; re-sort so it
 		// lands in its alphabetical slot (case-insensitive, matching the
-		// LOWER(full_name) ordering used in the repo query).
+		// LOWER(first_name), LOWER(last_name) ordering used in the repo query).
 		sort.SliceStable(out, func(i, j int) bool {
 			return strings.ToLower(out[i].FullName) < strings.ToLower(out[j].FullName)
 		})
@@ -986,7 +993,7 @@ func toManagerCandidate(e *models.Employee) dto.ManagerCandidateRead {
 	}
 	return dto.ManagerCandidateRead{
 		ID:         e.ID,
-		FullName:   e.FullName,
+		FullName:   e.FullName(),
 		Position:   positionName(e),
 		Department: departmentName(e),
 		IsActive:   active,
@@ -1000,7 +1007,7 @@ func toDirectReport(e *models.Employee) dto.DirectReportRead {
 	}
 	return dto.DirectReportRead{
 		ID:         e.ID,
-		FullName:   e.FullName,
+		FullName:   e.FullName(),
 		AvatarURL:  e.AvatarURL,
 		Position:   positionName(e),
 		Department: departmentName(e),

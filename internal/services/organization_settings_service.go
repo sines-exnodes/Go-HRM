@@ -125,7 +125,7 @@ func (s *OrganizationSettingsService) GetCompanyProfile(ctx context.Context) (*d
 	if cfg.CompanyAddressUpdatedBy != nil && s.emps != nil {
 		emp, err := s.emps.FindByID(ctx, *cfg.CompanyAddressUpdatedBy)
 		if err == nil && emp != nil {
-			name := emp.FullName
+			name := emp.FullName()
 			out.UpdatedByName = &name
 		}
 	}

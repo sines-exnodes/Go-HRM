@@ -153,7 +153,7 @@ func (s *AnnouncementService) populateRead(a *models.Announcement, hasViewed boo
 	if a.Author != nil {
 		out.Author = &dto.AnnouncementAuthorBrief{
 			ID:        a.Author.ID,
-			FullName:  a.Author.FullName,
+			FullName:  a.Author.FullName(),
 			AvatarURL: a.Author.AvatarURL,
 		}
 	}
@@ -181,7 +181,7 @@ func (s *AnnouncementService) populateRead(a *models.Announcement, hasViewed boo
 		}
 		out.TargetRecipients = append(out.TargetRecipients, dto.AnnouncementRecipientBrief{
 			ID:        tu.Employee.ID,
-			FullName:  tu.Employee.FullName,
+			FullName:  tu.Employee.FullName(),
 			AvatarURL: tu.Employee.AvatarURL,
 		})
 	}

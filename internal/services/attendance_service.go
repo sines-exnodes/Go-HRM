@@ -103,7 +103,7 @@ func (s *AttendanceService) toRead(ctx context.Context, a *models.Attendance) dt
 	if a.Employee != nil {
 		brief := &dto.AttendanceEmployeeBrief{
 			ID:        a.Employee.ID,
-			FullName:  a.Employee.FullName,
+			FullName:  a.Employee.FullName(),
 			AvatarURL: a.Employee.AvatarURL,
 		}
 		if a.Employee.DepartmentID != nil {
