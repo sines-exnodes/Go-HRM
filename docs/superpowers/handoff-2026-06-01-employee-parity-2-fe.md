@@ -134,6 +134,10 @@ inactive), alphabetical by name:
 
 ---
 
+## Payload gotcha — empty optional dates → `null` (not `""`)
+
+For an empty optional **date** field, send `null` or **omit the key** — never `""`. Go rejects an empty-string timestamp at JSON binding → **`400 bad_request`** (`parsing time "" … cannot parse "" as "2006"`) before any logic runs (no-op). Applies to `dob`, `id_issue_date`, `contract_sign_date`, `contract_end_date`, `join_date`. Empty **strings** for *text* fields (`cv_url`, addresses, `id_number`, `bank_*`) are fine. **FE rule:** before submit, coerce `""` → `null` for date (and number) fields. (Pre-existing contract behavior; surfaced during round-2 form integration.)
+
 ## Not in this round (still as before / deferred)
 
 - Avatar / CV / ID-card **image upload** endpoints — still accept URLs in the payload (`avatar_url`, `cv_url`, `id_front_image`, `id_back_image`); dedicated multipart upload endpoints remain deferred (avatar upload via `PATCH /employees/{id}/avatar` and `/employees/me/avatar` is unchanged).
