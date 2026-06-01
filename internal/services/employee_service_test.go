@@ -38,17 +38,34 @@ func (f *fakeUploader) PublicURL(key string) string {
 	return "https://fake.supabase.co/storage/v1/object/public/hrm-uploads/" + key
 }
 
-func newEmpSvc(db *gorm.DB) (*services.EmployeeService, *fakeUploader) {
+// empSvcDeps bundles the secondary returns from newEmpSvc. It embeds
+// *fakeUploader so existing callers that do `svc, up := newEmpSvc(...)` and
+// then access `up.uploadedURL` / `up.deleted` continue to compile unchanged.
+type empSvcDeps struct {
+	*fakeUploader
+	callerUserID uuid.UUID
+}
+
+func newEmpSvc(db *gorm.DB) (*services.EmployeeService, empSvcDeps) {
 	up := &fakeUploader{}
-	return services.NewEmployeeService(
+	empRepo := repositories.NewEmployeeRepository(db)
+	skillSvc := services.NewSkillService(
+		repositories.NewSkillRepository(db),
+		repositories.NewEmployeeSkillRepository(db),
+		empRepo,
+		up,
+	)
+	svc := services.NewEmployeeService(
 		db,
-		repositories.NewEmployeeRepository(db),
+		empRepo,
 		repositories.NewDependentRepository(db),
 		repositories.NewUserRepository(db),
 		repositories.NewRoleRepository(db),
 		repositories.NewLeaveQuotaRepository(db),
 		up,
-	), up
+		skillSvc,
+	)
+	return svc, empSvcDeps{fakeUploader: up, callerUserID: uuid.New()}
 }
 
 func TestEmployeeService_CreateAndGet(t *testing.T) {

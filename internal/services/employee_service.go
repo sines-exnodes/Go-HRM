@@ -158,6 +158,14 @@ func GuardBankingWrite(set bool, p EmployeeFieldPerms) error {
 	return nil
 }
 
+// skillAssigner is the slice of SkillService that EmployeeService needs to
+// apply inline skill_ids on create/update. Kept narrow for testability;
+// satisfied by *SkillService.
+type skillAssigner interface {
+	ValidateSkillIDs(ctx context.Context, skillIDs []uuid.UUID) ([]uuid.UUID, error)
+	ReplaceForEmployee(ctx context.Context, employeeID uuid.UUID, skillIDs []uuid.UUID) ([]dto.SkillRead, error)
+}
+
 // EmployeeService owns the HR-profile business logic. All repository fields
 // use the repository INTERFACE types for mockability.
 type EmployeeService struct {
@@ -168,6 +176,7 @@ type EmployeeService struct {
 	roles   repositories.RoleRepository
 	quota   repositories.LeaveQuotaRepository
 	uploads Uploader
+	skills  skillAssigner
 }
 
 func NewEmployeeService(
@@ -178,8 +187,9 @@ func NewEmployeeService(
 	roles repositories.RoleRepository,
 	quota repositories.LeaveQuotaRepository,
 	uploads Uploader,
+	skills skillAssigner,
 ) *EmployeeService {
-	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads}
+	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads, skills: skills}
 }
 
 // ---- Read ----
@@ -378,6 +388,11 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 	if err := validateExperienceYear(in.ExperienceYear); err != nil {
 		return nil, err
 	}
+	if len(in.SkillIDs) > 0 {
+		if _, err := s.skills.ValidateSkillIDs(ctx, in.SkillIDs); err != nil {
+			return nil, err
+		}
+	}
 	hash, err := utils.HashPassword(in.Password)
 	if err != nil {
 		return nil, apperrors.ErrBadRequest("failed to hash password")
@@ -505,6 +520,16 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 	// row is committed. Empty slice = none.
 	if len(in.EmergencyContacts) > 0 {
 		if err := s.emps.ReplaceEmergencyContacts(ctx, createdEmp.ID, toEmergencyModels(in.EmergencyContacts)); err != nil {
+			return nil, err
+		}
+	}
+	// Apply skills post-commit (same shape as emergency contacts). IDs were
+	// pre-validated before the tx, so the common bad-id case is already ruled
+	// out; a rare post-commit failure here (e.g. a concurrent skill delete)
+	// returns an error to the caller, who can retry via PUT /employees/:id/skills
+	// — the employee row stays, matching the emergency-contacts trade-off.
+	if len(in.SkillIDs) > 0 {
+		if _, err := s.skills.ReplaceForEmployee(ctx, createdEmp.ID, in.SkillIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -645,6 +670,11 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	// nil = leave unchanged, [] = clear all, non-empty = replace the set.
 	if in.EmergencyContacts != nil {
 		if err := s.emps.ReplaceEmergencyContacts(ctx, e.ID, toEmergencyModels(*in.EmergencyContacts)); err != nil {
+			return nil, err
+		}
+	}
+	if in.SkillIDs != nil {
+		if _, err := s.skills.ReplaceForEmployee(ctx, e.ID, *in.SkillIDs); err != nil {
 			return nil, err
 		}
 	}

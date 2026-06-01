@@ -346,19 +346,11 @@ func (s *SkillService) ListForEmployee(ctx context.Context, employeeID uuid.UUID
 	return out, nil
 }
 
-// ReplaceForEmployee atomically replaces the employee's skill set. Every
-// requested skill_id must reference a live skill row; the call fails
-// 400 BadRequest otherwise (no partial application).
-func (s *SkillService) ReplaceForEmployee(ctx context.Context, employeeID uuid.UUID, skillIDs []uuid.UUID) ([]dto.SkillRead, error) {
-	if _, err := s.emps.FindByID(ctx, employeeID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrNotFound("Employee")
-		}
-		return nil, err
-	}
-	// Pre-validate: every requested skill must exist and be live. We do
-	// this in the service rather than the repo so the error is a clean
-	// 400 BadRequest with the offending id, not a FK-violation 500.
+// ValidateSkillIDs de-duplicates the requested set and verifies every id
+// references a live skill. Returns the cleaned slice or a 400 with the
+// offending id — used both by ReplaceForEmployee and by inline assignment on
+// employee create/update.
+func (s *SkillService) ValidateSkillIDs(ctx context.Context, skillIDs []uuid.UUID) ([]uuid.UUID, error) {
 	seen := make(map[uuid.UUID]struct{}, len(skillIDs))
 	cleaned := make([]uuid.UUID, 0, len(skillIDs))
 	for _, sid := range skillIDs {
@@ -376,6 +368,23 @@ func (s *SkillService) ReplaceForEmployee(ctx context.Context, employeeID uuid.U
 			return nil, err
 		}
 		cleaned = append(cleaned, sid)
+	}
+	return cleaned, nil
+}
+
+// ReplaceForEmployee atomically replaces the employee's skill set. Every
+// requested skill_id must reference a live skill row; the call fails
+// 400 BadRequest otherwise (no partial application).
+func (s *SkillService) ReplaceForEmployee(ctx context.Context, employeeID uuid.UUID, skillIDs []uuid.UUID) ([]dto.SkillRead, error) {
+	if _, err := s.emps.FindByID(ctx, employeeID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrNotFound("Employee")
+		}
+		return nil, err
+	}
+	cleaned, err := s.ValidateSkillIDs(ctx, skillIDs)
+	if err != nil {
+		return nil, err
 	}
 	if err := s.empSkills.ReplaceForEmployee(ctx, employeeID, cleaned); err != nil {
 		return nil, err

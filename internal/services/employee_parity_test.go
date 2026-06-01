@@ -304,6 +304,51 @@ func TestUserParity_AdminPatch_RejectsSelfDeactivate(t *testing.T) {
 	require.NoError(t, userSvc.AdminPatch(ctx, other.UserID, dto.AdminUserPatch{IsActive: &no}, admin))
 }
 
+// Inline skill_ids on create + update (Python parity).
+func TestEmployeeParity_InlineSkillAssignment(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, deps := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	// Two skills in the catalog.
+	s1, s2 := uuid.New(), uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO skills (id, name, description) VALUES (?, ?, '')", s1, "Go").Error)
+	require.NoError(t, testDB.Exec("INSERT INTO skills (id, name, description) VALUES (?, ?, '')", s2, "SQL").Error)
+
+	// Create with skills inline.
+	v, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "skilled@x.com", Password: "Pass12345", FullName: "Skilled One",
+		SkillIDs: []uuid.UUID{s1, s2},
+	})
+	require.NoError(t, err)
+	require.Len(t, v.Skills, 2, "both skills must be assigned on create")
+
+	// Update -> replace down to one.
+	one := []uuid.UUID{s1}
+	v2, err := svc.Update(ctx, v.ID, dto.EmployeeUpdate{SkillIDs: &one}, deps.callerUserID)
+	require.NoError(t, err)
+	require.Len(t, v2.Skills, 1)
+	assert.Equal(t, "Go", v2.Skills[0].Name)
+
+	// Update with empty slice -> clear all.
+	empty := []uuid.UUID{}
+	v3, err := svc.Update(ctx, v.ID, dto.EmployeeUpdate{SkillIDs: &empty}, deps.callerUserID)
+	require.NoError(t, err)
+	require.Len(t, v3.Skills, 0)
+
+	// Invalid skill on create -> 400, no user created (skills are pre-validated
+	// before the user/employee tx, so a bad skill_id must not leave an orphan).
+	_, err = svc.Create(ctx, dto.EmployeeCreate{
+		Email: "bad@x.com", Password: "Pass12345", FullName: "Bad Skill",
+		SkillIDs: []uuid.UUID{uuid.New()},
+	})
+	require.Error(t, err)
+	var orphan int64
+	require.NoError(t, testDB.Raw("SELECT count(*) FROM users WHERE email = ?", "bad@x.com").Scan(&orphan).Error)
+	assert.Zero(t, orphan, "a bad skill_id must not create an orphan user")
+}
+
 // #13 — admin can change another user's email; the change stamps
 // email_changed_at, and uniqueness / no-op rules are enforced.
 func TestUserParity_AdminChangeEmail(t *testing.T) {

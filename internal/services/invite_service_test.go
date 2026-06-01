@@ -44,7 +44,13 @@ func newInviteSvc(t *testing.T) *services.InviteService {
 	empRepo := repositories.NewEmployeeRepository(testDB)
 	depRepo := repositories.NewDependentRepository(testDB)
 	quotaRepo := repositories.NewLeaveQuotaRepository(testDB)
-	empSvc := services.NewEmployeeService(testDB, empRepo, depRepo, testUserRepo, testRoleRepo, quotaRepo, nil)
+	skillSvc := services.NewSkillService(
+		repositories.NewSkillRepository(testDB),
+		repositories.NewEmployeeSkillRepository(testDB),
+		empRepo,
+		nil,
+	)
+	empSvc := services.NewEmployeeService(testDB, empRepo, depRepo, testUserRepo, testRoleRepo, quotaRepo, nil, skillSvc)
 	_ = services.NewUserService(testUserRepo, empRepo, tokenRepo, settingsRepo, empSvc)
 	return services.NewInviteService(
 		cfg,

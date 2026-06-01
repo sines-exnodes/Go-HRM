@@ -201,6 +201,9 @@ type EmployeeCreate struct {
 
 	// Roles assigned at creation
 	RoleIDs []uuid.UUID `json:"role_ids,omitempty"`
+
+	// Skills assigned at creation (inline — Python parity). Empty/absent = none.
+	SkillIDs []uuid.UUID `json:"skill_ids,omitempty"`
 }
 
 // ---- Employee Update (admin — anything allowed) ----
@@ -247,6 +250,10 @@ type EmployeeUpdate struct {
 	PaymentMethod    *string    `json:"payment_method,omitempty"`
 
 	IsActive *bool `json:"is_active,omitempty"` // toggles user.is_active
+
+	// Skills replace-set: nil/absent = leave unchanged, [] = clear all,
+	// non-empty = replace the whole set (inline — Python parity).
+	SkillIDs *[]uuid.UUID `json:"skill_ids,omitempty"`
 }
 
 // ---- Employee Self Update (RESTRICTED — server-side whitelist) ----
