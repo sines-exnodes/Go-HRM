@@ -1187,7 +1187,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "free text (full_name/phone/personal_email/user.email)",
+                        "description": "free text (first_name/last_name/phone/personal_email/user.email)",
                         "name": "search",
                         "in": "query"
                     },
@@ -1310,7 +1310,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "match full_name / position / department",
+                        "description": "match first_name / last_name / position / department",
                         "name": "search",
                         "in": "query"
                     },
@@ -4497,8 +4497,8 @@ const docTemplate = `{
                     }
                 },
                 "experience_year": {
-                    "type": "integer",
-                    "minimum": 0
+                    "description": "career-start year; range validated in the service (validateExperienceYear)",
+                    "type": "integer"
                 },
                 "first_name": {
                     "description": "HR personal info",
@@ -4750,8 +4750,8 @@ const docTemplate = `{
                     }
                 },
                 "experience_year": {
-                    "type": "integer",
-                    "minimum": 0
+                    "description": "career-start year; range validated in the service (validateExperienceYear)",
+                    "type": "integer"
                 },
                 "first_name": {
                     "type": "string",

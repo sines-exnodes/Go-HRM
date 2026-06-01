@@ -134,7 +134,7 @@ func readAvatar(c *gin.Context) ([]byte, string, string, error) {
 // @Produce      json
 // @Param        page          query int    false "page (default 1)"
 // @Param        page_size     query int    false "page size (default 20, max 100)"
-// @Param        search        query string false "free text (full_name/phone/personal_email/user.email)"
+// @Param        search        query string false "free text (first_name/last_name/phone/personal_email/user.email)"
 // @Param        department_id query []string false "department uuid(s) — repeatable, OR within filter"
 // @Param        position_id   query []string false "position uuid(s) — repeatable"
 // @Param        manager_id    query []string false "manager uuid(s) — repeatable"
@@ -365,7 +365,7 @@ func (h *EmployeeHandler) UpdateLeaveQuota(c *gin.Context) {
 // @Security     BearerAuth
 // @Produce      json
 // @Param        for_employee_id query string false "exclude this employee + its subordinate chain"
-// @Param        search          query string false "match full_name / position / department"
+// @Param        search          query string false "match first_name / last_name / position / department"
 // @Param        limit           query int    false "max rows (default 50, max 200)"
 // @Success      200 {object} map[string]interface{}
 // @Router       /api/v1/employees/manager-candidates [get]

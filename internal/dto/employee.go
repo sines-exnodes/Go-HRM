@@ -150,7 +150,7 @@ type EmployeeRead struct {
 // NOTE: EmployeeSummary is already declared in internal/dto/auth.go (created in
 // Phase 2 Tasks 1-7) and is reused here by UserMeRead. It is intentionally NOT
 // redeclared in this file to avoid a duplicate-type conflict; the auth.go shape
-// (ID / FullName / AvatarURL / DepartmentID / PositionID / ManagerID) satisfies
+// (ID / FirstName / LastName / AvatarURL / DepartmentID / PositionID / ManagerID) satisfies
 // both the auth login flow and GET /users/me.
 
 // ---- Employee Create (admin) — accepts both user creds and HR fields ----
@@ -177,7 +177,7 @@ type EmployeeCreate struct {
 	CurrentAddress   *string    `json:"current_address,omitempty"`
 	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
 	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
-	ExperienceYear   *int       `json:"experience_year,omitempty" binding:"omitempty,gte=0"`
+	ExperienceYear   *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
 	CVURL            *string    `json:"cv_url,omitempty"`
 
 	// Emergency contacts — full replacement list at create (employees parity #4).
@@ -226,7 +226,7 @@ type EmployeeUpdate struct {
 	CurrentAddress   *string    `json:"current_address,omitempty"`
 	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
 	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
-	ExperienceYear   *int       `json:"experience_year,omitempty" binding:"omitempty,gte=0"`
+	ExperienceYear   *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
 	CVURL            *string    `json:"cv_url,omitempty"`
 
 	// Emergency contacts — pointer-to-slice partial-PATCH semantics:
