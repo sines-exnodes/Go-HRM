@@ -136,7 +136,7 @@ func TestEmployeeParity_Read_ExposesExperienceAndCV(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	yrs := 5
+	yrs := 2018 // experience_year is a career-start YEAR (parity round 2), not a count
 	cv := "https://files.example.com/cv.pdf"
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
 		Email: "xp@example.com", Password: "Pass12345", FullName: "Experienced",
@@ -144,7 +144,7 @@ func TestEmployeeParity_Read_ExposesExperienceAndCV(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, view.ExperienceYear)
-	assert.Equal(t, 5, *view.ExperienceYear)
+	assert.Equal(t, 2018, *view.ExperienceYear)
 	require.NotNil(t, view.CVURL)
 	assert.Equal(t, cv, *view.CVURL)
 }

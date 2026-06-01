@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -36,6 +38,20 @@ func boolToRenewal(b *bool) int {
 		return 0
 	}
 	return 1
+}
+
+// validateExperienceYear enforces the BA contract (DR-001-005-02/03/04):
+// experience_year is a career-start (4-digit) year, must be > 1900 and not in
+// the future. nil = not provided = valid.
+func validateExperienceYear(y *int) error {
+	if y == nil {
+		return nil
+	}
+	cur := time.Now().UTC().Year()
+	if *y <= 1900 || *y > cur {
+		return apperrors.ErrBadRequest(fmt.Sprintf("experience_year must be a year between 1901 and %d", cur))
+	}
+	return nil
 }
 
 // toEmergencyModels converts the DTO emergency-contact inputs to model rows
@@ -359,6 +375,9 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 			return nil, err
 		}
 	}
+	if err := validateExperienceYear(in.ExperienceYear); err != nil {
+		return nil, err
+	}
 	hash, err := utils.HashPassword(in.Password)
 	if err != nil {
 		return nil, apperrors.ErrBadRequest("failed to hash password")
@@ -500,6 +519,11 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.ErrNotFound("Employee")
 		}
+		return nil, err
+	}
+
+	// Cheap input validation before any state-dependent guard.
+	if err := validateExperienceYear(in.ExperienceYear); err != nil {
 		return nil, err
 	}
 

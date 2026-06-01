@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -420,4 +421,56 @@ func TestEmployeeService_List_MultiSelectDepartmentFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total)
 	assert.Len(t, items, 2)
+}
+
+func TestEmployeeService_Create_RejectsBadExperienceYear(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	future := time.Now().UTC().Year() + 1
+	_, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "future@x.com", Password: "Pass12345", FullName: "Future Year",
+		ExperienceYear: &future,
+	})
+	require.Error(t, err, "a future experience_year must be rejected")
+
+	old := 1800
+	_, err = svc.Create(ctx, dto.EmployeeCreate{
+		Email: "old@x.com", Password: "Pass12345", FullName: "Too Old",
+		ExperienceYear: &old,
+	})
+	require.Error(t, err, "experience_year <= 1900 must be rejected")
+
+	good := 2018
+	v, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "good@x.com", Password: "Pass12345", FullName: "Good Year",
+		ExperienceYear: &good,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, v.ExperienceYear)
+	assert.Equal(t, 2018, *v.ExperienceYear)
+}
+
+func TestEmployeeService_Update_RejectsBadExperienceYear(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	v, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "upd-xp@x.com", Password: "Pass12345", FullName: "Upd Year",
+	})
+	require.NoError(t, err)
+
+	future := time.Now().UTC().Year() + 1
+	_, err = svc.Update(ctx, v.ID, dto.EmployeeUpdate{ExperienceYear: &future}, uuid.New())
+	require.Error(t, err, "Update must reject a future experience_year")
+
+	good := 2019
+	out, err := svc.Update(ctx, v.ID, dto.EmployeeUpdate{ExperienceYear: &good}, uuid.New())
+	require.NoError(t, err)
+	require.NotNil(t, out.ExperienceYear)
+	assert.Equal(t, 2019, *out.ExperienceYear)
 }
