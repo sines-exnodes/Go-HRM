@@ -125,9 +125,7 @@ func (r *employeeRepository) FindByIDWithOrg(ctx context.Context, id uuid.UUID) 
 	return &e, nil
 }
 
-// FindByIDWithFull preloads user, roles, manager, dependents.
-// Department/Position preloads are deferred to Phase 3 (those tables land
-// later), so they are intentionally not preloaded here.
+// FindByIDWithFull preloads user, roles, manager, department, position, dependents.
 func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID) (*models.Employee, error) {
 	var e models.Employee
 	err := r.db.WithContext(ctx).
@@ -137,6 +135,8 @@ func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID)
 		Preload("Manager.User", notDeleted).
 		Preload("Manager.Department", notDeleted).
 		Preload("Manager.Position", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -159,6 +159,8 @@ func (r *employeeRepository) FindByUserIDWithFull(ctx context.Context, userID uu
 		Preload("Manager.User", notDeleted).
 		Preload("Manager.Department", notDeleted).
 		Preload("Manager.Position", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -180,6 +182,8 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 		Preload("Manager.User", notDeleted).
 		Preload("Manager.Department", notDeleted).
 		Preload("Manager.Position", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
 		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).

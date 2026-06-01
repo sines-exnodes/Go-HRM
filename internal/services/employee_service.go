@@ -87,6 +87,20 @@ func departmentName(e *models.Employee) *string {
 	return nil
 }
 
+func departmentRef(e *models.Employee) *dto.RefRead {
+	if e != nil && e.Department != nil && e.Department.Name != "" {
+		return &dto.RefRead{ID: e.Department.ID, Name: e.Department.Name}
+	}
+	return nil
+}
+
+func positionRef(e *models.Employee) *dto.RefRead {
+	if e != nil && e.Position != nil && e.Position.Name != "" {
+		return &dto.RefRead{ID: e.Position.ID, Name: e.Position.Name}
+	}
+	return nil
+}
+
 // EmployeeFieldPerms captures the caller's field-level salary/banking
 // permissions (employees parity #6). The handler builds it from the caller's
 // roles; the wildcard "*" grants all four. *_view gates whether the section
@@ -350,7 +364,8 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 		out.Email = e.User.Email
 		out.IsActive = e.User.IsActive
 	}
-	// Department/Position refs preloaded in Phase 3; intentionally nil until then.
+	out.Department = departmentRef(e)
+	out.Position = positionRef(e)
 	return out
 }
 

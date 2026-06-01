@@ -491,3 +491,27 @@ func TestEmployeeService_Update_RejectsBadExperienceYear(t *testing.T) {
 	require.NotNil(t, out.ExperienceYear)
 	assert.Equal(t, 2019, *out.ExperienceYear)
 }
+
+func TestEmployeeService_Read_ResolvesDepartmentAndPosition(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	dID, pID := uuid.New(), uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO departments (id, name) VALUES (?, ?)", dID, "Engineering").Error)
+	require.NoError(t, testDB.Exec("INSERT INTO positions (id, name) VALUES (?, ?)", pID, "Senior Engineer").Error)
+
+	v, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "wp@x.com", Password: "Pass12345", FullName: "Work Profile",
+		DepartmentID: &dID, PositionID: &pID,
+	})
+	require.NoError(t, err)
+
+	got, err := svc.Get(ctx, v.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.Department, "department ref must be resolved on read")
+	assert.Equal(t, "Engineering", got.Department.Name)
+	require.NotNil(t, got.Position, "position ref must be resolved on read")
+	assert.Equal(t, "Senior Engineer", got.Position.Name)
+}
