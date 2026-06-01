@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
 )
 
 // ---- Shared refs ----
@@ -281,12 +283,53 @@ type LeaveQuotaUpdateRequest struct {
 // ---- List query ----
 
 type EmployeeListQuery struct {
-	Page         int        `form:"page,default=1"       binding:"gte=1"`
-	PageSize     int        `form:"page_size,default=20" binding:"gte=1,lte=100"`
-	Search       string     `form:"search"`
-	DepartmentID *uuid.UUID `form:"department_id"`
-	PositionID   *uuid.UUID `form:"position_id"`
-	ManagerID    *uuid.UUID `form:"manager_id"`
-	RoleID       *uuid.UUID `form:"role_id"`
-	IsActive     *bool      `form:"is_active"`
+	Page     int    `form:"page,default=1"       binding:"gte=1"`
+	PageSize int    `form:"page_size,default=20" binding:"gte=1,lte=100"`
+	Search   string `form:"search"`
+	IsActive *bool  `form:"is_active"`
+
+	// Raw repeated query params (HTTP boundary). gin binds repeated keys
+	// (?department_id=a&department_id=b) into these string slices; uuid.UUID
+	// cannot be bound directly from a query param (that was the 400 bug).
+	DepartmentIDsRaw []string `form:"department_id"`
+	PositionIDsRaw   []string `form:"position_id"`
+	ManagerIDsRaw    []string `form:"manager_id"`
+	RoleIDsRaw       []string `form:"role_id"`
+
+	// Parsed by the handler (ParseFilters); consumed by the repo. Not bound.
+	DepartmentIDs []uuid.UUID `form:"-"`
+	PositionIDs   []uuid.UUID `form:"-"`
+	ManagerIDs    []uuid.UUID `form:"-"`
+	RoleIDs       []uuid.UUID `form:"-"`
+}
+
+// ParseFilters converts the raw repeated-param strings into parsed UUID
+// slices, returning a 400 AppError on the first invalid value. Empty/absent
+// params yield empty slices (= no filter). Duplicate values are passed
+// through unchanged; PostgreSQL treats IN (X, X) as IN (X) so no dedup is
+// performed.
+func (q *EmployeeListQuery) ParseFilters() error {
+	parse := func(name string, raw []string, dst *[]uuid.UUID) error {
+		for _, s := range raw {
+			if s == "" {
+				continue
+			}
+			id, err := uuid.Parse(s)
+			if err != nil {
+				return apperrors.ErrBadRequest("invalid " + name)
+			}
+			*dst = append(*dst, id)
+		}
+		return nil
+	}
+	if err := parse("department_id", q.DepartmentIDsRaw, &q.DepartmentIDs); err != nil {
+		return err
+	}
+	if err := parse("position_id", q.PositionIDsRaw, &q.PositionIDs); err != nil {
+		return err
+	}
+	if err := parse("manager_id", q.ManagerIDsRaw, &q.ManagerIDs); err != nil {
+		return err
+	}
+	return parse("role_id", q.RoleIDsRaw, &q.RoleIDs)
 }

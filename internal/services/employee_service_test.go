@@ -369,3 +369,55 @@ func TestEmployeeService_UpdateAvatar_SelfReplacesAndDeletesOld(t *testing.T) {
 	assert.NotEqual(t, oldURL, *second.AvatarURL)
 	assert.Contains(t, up.deleted, oldURL, "previous avatar should be deleted on replace")
 }
+
+func TestEmployeeService_List_SingleValueDepartmentFilter(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	dID := uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO departments (id, name) VALUES (?, ?)", dID, "Solo").Error)
+	v, err := svc.Create(ctx, dto.EmployeeCreate{Email: "solo@x.com", Password: "Pass12345", FullName: "Solo One"})
+	require.NoError(t, err)
+	require.NoError(t, testDB.Exec("UPDATE employees SET department_id = ? WHERE id = ?", dID, v.ID).Error)
+	_, err = svc.Create(ctx, dto.EmployeeCreate{Email: "none@x.com", Password: "Pass12345", FullName: "No Dept"})
+	require.NoError(t, err)
+
+	items, total, err := svc.List(ctx, dto.EmployeeListQuery{Page: 1, PageSize: 20, DepartmentIDs: []uuid.UUID{dID}})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), total)
+	require.Len(t, items, 1)
+	assert.Equal(t, "Solo One", items[0].FullName)
+}
+
+func TestEmployeeService_List_MultiSelectDepartmentFilter(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	// Two real departments to satisfy the employees.department_id FK.
+	dA, dB := uuid.New(), uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO departments (id, name) VALUES (?, ?)", dA, "Alpha").Error)
+	require.NoError(t, testDB.Exec("INSERT INTO departments (id, name) VALUES (?, ?)", dB, "Beta").Error)
+
+	mk := func(email, name string, dept *uuid.UUID) {
+		v, err := svc.Create(ctx, dto.EmployeeCreate{Email: email, Password: "Pass12345", FullName: name})
+		require.NoError(t, err)
+		if dept != nil {
+			require.NoError(t, testDB.Exec("UPDATE employees SET department_id = ? WHERE id = ?", *dept, v.ID).Error)
+		}
+	}
+	mk("a@x.com", "Ann", &dA)
+	mk("b@x.com", "Bob", &dB)
+	mk("c@x.com", "Cara", nil) // unassigned department -> excluded by the filter
+
+	// Filter by BOTH departments -> OR within the filter -> 2 rows.
+	items, total, err := svc.List(ctx, dto.EmployeeListQuery{
+		Page: 1, PageSize: 20, DepartmentIDs: []uuid.UUID{dA, dB},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, items, 2)
+}

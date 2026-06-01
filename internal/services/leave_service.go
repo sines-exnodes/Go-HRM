@@ -695,14 +695,14 @@ func (s *LeaveService) List(ctx context.Context, q dto.LeaveListQuery) (dto.Pagi
 			if perr != nil {
 				return dto.PaginatedData[dto.LeaveRequestRead]{}, apperrors.ErrBadRequest("invalid department_id")
 			}
-			empQuery.DepartmentID = &deptID
+			empQuery.DepartmentIDs = []uuid.UUID{deptID}
 		}
 		if q.PositionID != "" {
 			posID, perr := uuid.Parse(q.PositionID)
 			if perr != nil {
 				return dto.PaginatedData[dto.LeaveRequestRead]{}, apperrors.ErrBadRequest("invalid position_id")
 			}
-			empQuery.PositionID = &posID
+			empQuery.PositionIDs = []uuid.UUID{posID}
 		}
 		emps, _, eerr := s.emps.List(ctx, empQuery)
 		if eerr != nil {

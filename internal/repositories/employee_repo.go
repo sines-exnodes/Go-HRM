@@ -194,22 +194,22 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 			p, p, p, p,
 		)
 	}
-	if q.DepartmentID != nil {
-		tx = tx.Where("employees.department_id = ?", *q.DepartmentID)
+	if len(q.DepartmentIDs) > 0 {
+		tx = tx.Where("employees.department_id IN ?", q.DepartmentIDs)
 	}
-	if q.PositionID != nil {
-		tx = tx.Where("employees.position_id = ?", *q.PositionID)
+	if len(q.PositionIDs) > 0 {
+		tx = tx.Where("employees.position_id IN ?", q.PositionIDs)
 	}
-	if q.ManagerID != nil {
-		tx = tx.Where("employees.manager_id = ?", *q.ManagerID)
+	if len(q.ManagerIDs) > 0 {
+		tx = tx.Where("employees.manager_id IN ?", q.ManagerIDs)
 	}
 	if q.IsActive != nil {
 		tx = tx.Where("users.is_active = ?", *q.IsActive)
 	}
-	if q.RoleID != nil {
+	if len(q.RoleIDs) > 0 {
 		tx = tx.Where(
-			"EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = employees.user_id AND ur.role_id = ? AND ur.is_deleted = false)",
-			*q.RoleID,
+			"EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = employees.user_id AND ur.role_id IN ? AND ur.is_deleted = false)",
+			q.RoleIDs,
 		)
 	}
 

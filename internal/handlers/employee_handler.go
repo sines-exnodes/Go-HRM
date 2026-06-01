@@ -135,10 +135,10 @@ func readAvatar(c *gin.Context) ([]byte, string, string, error) {
 // @Param        page          query int    false "page (default 1)"
 // @Param        page_size     query int    false "page size (default 20, max 100)"
 // @Param        search        query string false "free text (full_name/phone/personal_email/user.email)"
-// @Param        department_id query string false "department uuid"
-// @Param        position_id   query string false "position uuid"
-// @Param        manager_id    query string false "manager uuid"
-// @Param        role_id       query string false "role uuid"
+// @Param        department_id query []string false "department uuid(s) — repeatable, OR within filter"
+// @Param        position_id   query []string false "position uuid(s) — repeatable"
+// @Param        manager_id    query []string false "manager uuid(s) — repeatable"
+// @Param        role_id       query []string false "role uuid(s) — repeatable"
 // @Param        is_active     query bool   false "filter by user.is_active"
 // @Success      200 {object} map[string]interface{}
 // @Router       /api/v1/employees [get]
@@ -146,6 +146,10 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 	var q dto.EmployeeListQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := q.ParseFilters(); err != nil {
+		_ = c.Error(err)
 		return
 	}
 	items, total, err := h.svc.List(c.Request.Context(), q)

@@ -219,7 +219,7 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 			if err != nil {
 				return dto.AttendanceMatrixRead{}, apperrors.ErrBadRequest("invalid department_id")
 			}
-			empQuery.DepartmentID = &did
+			empQuery.DepartmentIDs = []uuid.UUID{did}
 		}
 		rows, _, err := s.emps.List(ctx, empQuery)
 		if err != nil {
