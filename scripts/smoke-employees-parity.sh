@@ -60,11 +60,11 @@ TOK=$(curl -s -X POST "$BASE/auth/login" -H 'Content-Type: application/json' \
 [ -n "$TOK" ] && [ "$TOK" != "null" ] && pass "admin login" || { fail "admin login"; exit 1; }
 
 echo "== #4/#8 create employee with emergency-contact list + experience_year + cv_url =="
-req POST "$BASE/employees" "{\"email\":\"smk-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Smoke $SFX\",\"experience_year\":7,\"cv_url\":\"https://x/cv.pdf\",\"basic_salary\":5000,\"bank_account\":\"190233445566\",\"bank_name\":\"ACB\",\"emergency_contacts\":[{\"full_name\":\"Mom\",\"relationship\":\"parent\",\"phone_number\":\"0900\"},{\"full_name\":\"Dad\"}]}"
+req POST "$BASE/employees" "{\"email\":\"smk-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Smoke\",\"last_name\":\"$SFX\",\"experience_year\":2018,\"cv_url\":\"https://x/cv.pdf\",\"basic_salary\":5000,\"bank_account\":\"190233445566\",\"bank_name\":\"ACB\",\"emergency_contacts\":[{\"full_name\":\"Mom\",\"relationship\":\"parent\",\"phone_number\":\"0900\"},{\"full_name\":\"Dad\"}]}"
 EMP=$(jqv '.data.id'); EMP_UID=$(jqv '.data.user_id')
 eq 201 "$CODE" "#4 create (201)"
 eq 2 "$(jqv '.data.emergency_contacts | length')" "#4 echo has 2 emergency contacts"
-eq 7 "$(jqv '.data.experience_year')" "#8 experience_year echoed"
+eq 2018 "$(jqv '.data.experience_year')" "#8 experience_year echoed as a year"
 eq "https://x/cv.pdf" "$(jqv '.data.cv_url')" "#8 cv_url echoed"
 eq "190233445566" "$(jqv '.data.bank_account')" "#6 write echo bank_account UNMASKED"
 
@@ -97,8 +97,8 @@ req PATCH "$BASE/users/$ADMIN_UID" '{"is_active":false}'
 eq 400 "$CODE" "#12 cannot deactivate own user (400)"
 
 echo "== #7 self-edit widened: name/gender/dob via /employees/me =="
-req PATCH "$BASE/employees/me" '{"full_name":"Renamed Admin","gender":"female"}'
-eq "Renamed Admin" "$(jqv '.data.full_name')" "#7 self can edit full_name"
+req PATCH "$BASE/employees/me" '{"first_name":"Renamed","last_name":"Admin","gender":"female"}'
+eq "Renamed" "$(jqv '.data.first_name')" "#7 self can edit first_name"
 eq "female" "$(jqv '.data.gender')" "#7 self can edit gender"
 
 echo "== #6 limited-role read-strip + write-gate (needs a no-salary role) =="
@@ -113,15 +113,15 @@ func main(){db,e:=sql.Open("postgres",os.Args[1]);if e!=nil{os.Exit(1)};defer db
 GOEOF
 RID=$(go run "$RGO" "$TEST_DB_URL" 2>/dev/null || true)
 if [ -n "$RID" ]; then
-  req POST "$BASE/employees" "{\"email\":\"smk-view-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Viewer $SFX\"}"
+  req POST "$BASE/employees" "{\"email\":\"smk-view-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Viewer\",\"last_name\":\"$SFX\"}"
   VUID=$(jqv '.data.user_id')
   req PUT "$BASE/users/$VUID/roles" "{\"role_ids\":[\"$RID\"]}"
   VTOK=$(curl -s -X POST "$BASE/auth/login" -H 'Content-Type: application/json' -d "{\"email\":\"smk-view-$SFX@x.com\",\"password\":\"Pass12345\"}" | jq -r '.data.access_token')
   req GET "$BASE/employees/$EMP" "" "$VTOK"
   eq "null" "$(jqv '.data.basic_salary')" "#6 viewer: salary STRIPPED"
   eq "null" "$(jqv '.data.bank_account')" "#6 viewer: banking STRIPPED"
-  [ "$(jqv '.data.full_name')" != "null" ] && pass "#6 viewer: non-salary fields still visible" || fail "#6 viewer non-salary fields"
-  req POST "$BASE/employees" "{\"email\":\"smk-z-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Z\",\"basic_salary\":1}" "$VTOK"
+  [ "$(jqv '.data.first_name')" != "null" ] && pass "#6 viewer: non-salary fields still visible" || fail "#6 viewer non-salary fields"
+  req POST "$BASE/employees" "{\"email\":\"smk-z-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Z\",\"last_name\":\"Test\",\"basic_salary\":1}" "$VTOK"
   eq 403 "$CODE" "#6 write-gate: salary without salary_manage (403)"
   [ "$(jqv '.message')" = "You do not have permission to set salary fields" ] && pass "#6 write-gate message is the field guard (not route gate)" || fail "#6 write-gate message" "(got '$(jqv '.message')')"
 else
@@ -129,9 +129,9 @@ else
 fi
 
 echo "== #10 line-manager suite (validation + picker + direct-reports + rich brief) =="
-req POST "$BASE/employees" "{\"email\":\"smk-mgr-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Mgr $SFX\"}"
+req POST "$BASE/employees" "{\"email\":\"smk-mgr-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Mgr\",\"last_name\":\"$SFX\"}"
 MGR=$(jqv '.data.id')
-req POST "$BASE/employees" "{\"email\":\"smk-rep-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Rep $SFX\",\"manager_id\":\"$MGR\"}"
+req POST "$BASE/employees" "{\"email\":\"smk-rep-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Rep\",\"last_name\":\"$SFX\",\"manager_id\":\"$MGR\"}"
 REP=$(jqv '.data.id')
 eq 201 "$CODE" "#10 create employee with a valid manager (201)"
 req GET "$BASE/employees/$REP"
@@ -141,7 +141,7 @@ req PATCH "$BASE/employees/$MGR" "{\"manager_id\":\"$MGR\"}"
 eq 400 "$CODE" "#10 self-as-manager rejected (400)"
 req PATCH "$BASE/employees/$MGR" "{\"manager_id\":\"$REP\"}"
 eq 400 "$CODE" "#10 cycle rejected (400)"
-req POST "$BASE/employees" "{\"email\":\"smk-bad-$SFX@x.com\",\"password\":\"Pass12345\",\"full_name\":\"Bad\",\"manager_id\":\"00000000-0000-0000-0000-000000000000\"}"
+req POST "$BASE/employees" "{\"email\":\"smk-bad-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Bad\",\"last_name\":\"Test\",\"manager_id\":\"00000000-0000-0000-0000-000000000000\"}"
 eq 400 "$CODE" "#10 nonexistent manager rejected (400)"
 req GET "$BASE/employees/manager-candidates?for_employee_id=$MGR"
 eq 200 "$CODE" "#10 manager-candidates (200)"
@@ -150,6 +150,29 @@ eq "false" "$(echo "$RESP" | jq --arg id "$REP" '[.data[].id] | index($id) != nu
 req GET "$BASE/employees/$MGR/direct-reports"
 eq 200 "$CODE" "#10 direct-reports (200)"
 eq "true" "$(echo "$RESP" | jq --arg id "$REP" '[.data[].id] | index($id) != null')" "#10 direct-reports includes the report"
+
+echo "== parity-2: inline skill_ids on create + multi-select department filter =="
+# POST /skills is multipart/form-data — use curl -F directly (req helper sends JSON).
+SKILL_RESP=$(curl -s -w $'\n%{http_code}' -X POST "$BASE/skills" \
+  -H "Authorization: Bearer $TOK" \
+  -F "name=SmokeSkill$SFX" -F "description=smoke")
+SKILL_CODE="${SKILL_RESP##*$'\n'}"; SKILL_BODY="${SKILL_RESP%$'\n'*}"
+SKILL_ID=$(echo "$SKILL_BODY" | jq -r '.data.id')
+eq 201 "$SKILL_CODE" "#parity2 create skill (201)"
+
+# Create employee with inline skill_ids; assert the skill is echoed back.
+req POST "$BASE/employees" "{\"email\":\"smk-sk-$SFX@x.com\",\"password\":\"Pass12345\",\"first_name\":\"Skilled\",\"last_name\":\"$SFX\",\"skill_ids\":[\"$SKILL_ID\"]}"
+EMP_SK=$(jqv '.data.id')
+eq 201 "$CODE" "#parity2 create employee with skill_ids (201)"
+eq 1 "$(jqv '.data.skills | length')" "#parity2 skill echoed on create (length=1)"
+
+# Multi-select department filter: GET /employees?department_id=<A>&department_id=<B>
+# Use EMP (from the main smoke employee) and EMP_SK dept IDs — both have no dept assigned,
+# so filter by two nil-safe UUIDs just proves the endpoint returns 200 with array params.
+DEPT_A="00000000-0000-0000-0000-000000000001"
+DEPT_B="00000000-0000-0000-0000-000000000002"
+req GET "$BASE/employees?department_id=$DEPT_A&department_id=$DEPT_B"
+eq 200 "$CODE" "#parity2 multi-select department_id filter returns 200"
 
 echo
 echo "==================== SMOKE SUMMARY ===================="

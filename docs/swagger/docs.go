@@ -1192,26 +1192,42 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "department uuid",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "department uuid(s) — repeatable, OR within filter",
                         "name": "department_id",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "position uuid",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "position uuid(s) — repeatable",
                         "name": "position_id",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "manager uuid",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "manager uuid(s) — repeatable",
                         "name": "manager_id",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "role uuid",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "role uuid(s) — repeatable",
                         "name": "role_id",
                         "in": "query"
                     },
@@ -4415,7 +4431,8 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
-                "full_name",
+                "first_name",
+                "last_name",
                 "password"
             ],
             "properties": {
@@ -4483,10 +4500,10 @@ const docTemplate = `{
                     "type": "integer",
                     "minimum": 0
                 },
-                "full_name": {
+                "first_name": {
                     "description": "HR personal info",
                     "type": "string",
-                    "maxLength": 200,
+                    "maxLength": 100,
                     "minLength": 1
                 },
                 "gender": {
@@ -4518,6 +4535,11 @@ const docTemplate = `{
                 },
                 "join_date": {
                     "type": "string"
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
                 },
                 "manager_id": {
                     "type": "string"
@@ -4558,6 +4580,13 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "skill_ids": {
+                    "description": "Skills assigned at creation (inline — Python parity). Empty/absent = none.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -4577,9 +4606,9 @@ const docTemplate = `{
                         "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput"
                     }
                 },
-                "full_name": {
+                "first_name": {
                     "type": "string",
-                    "maxLength": 200,
+                    "maxLength": 100,
                     "minLength": 1
                 },
                 "gender": {
@@ -4589,6 +4618,11 @@ const docTemplate = `{
                         "female",
                         "other"
                     ]
+                },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
                 },
                 "marital_status": {
                     "type": "string",
@@ -4632,10 +4666,13 @@ const docTemplate = `{
                 "department_id": {
                     "type": "string"
                 },
-                "full_name": {
+                "first_name": {
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "last_name": {
                     "type": "string"
                 },
                 "manager_id": {
@@ -4716,8 +4753,10 @@ const docTemplate = `{
                     "type": "integer",
                     "minimum": 0
                 },
-                "full_name": {
-                    "type": "string"
+                "first_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
                 },
                 "gender": {
                     "type": "string",
@@ -4750,6 +4789,11 @@ const docTemplate = `{
                 "join_date": {
                     "type": "string"
                 },
+                "last_name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
+                },
                 "manager_id": {
                     "type": "string"
                 },
@@ -4778,6 +4822,13 @@ const docTemplate = `{
                 },
                 "position_id": {
                     "type": "string"
+                },
+                "skill_ids": {
+                    "description": "Skills replace-set: nil/absent = leave unchanged, [] = clear all,\nnon-empty = replace the whole set (inline — Python parity).",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
