@@ -1,7 +1,7 @@
 # Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity in flight
 
 **Last updated:** 2026-06-01
-**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); employees parity A/B/C merged to `main`; **employees parity ROUND 2** complete on branch `feat/employees-parity-2` (7 commits, fully verified) — **pending merge**.
+**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); employees parity A/B/C merged to `main`; **employees parity ROUND 2** complete + pushed on branch `feat/employees-parity-2` (7 commits, fully verified) — **PR #12 open** (pending review/merge).
 **Branch:** `feat/employees-parity-2` (round-2 work; cut from `main`).
 **DB migration version:** **17** on `main`; **19** on `feat/employees-parity-2` (000018 name split, 000019 experience-year normalize).
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
@@ -71,7 +71,7 @@ full integration suite, migration up/down round-trip, live HTTP smoke
 FE: web repo PR **#5** (`feat/go-employees-parity` → main) carries the full FE
 wiring + `api_info_go/employee.md` + `me.md`. The web repo is self-managed.
 
-### Employees — ROUND 2 (`feat/employees-parity-2`) — DONE, pending merge
+### Employees — ROUND 2 (`feat/employees-parity-2`) — DONE · PR #12 open
 
 Parity round 2, 7 commits, grounded in a fresh 5-dimension Python parity audit.
 Verified: [`verification/employees-parity-2.md`](verification/employees-parity-2.md)
@@ -97,7 +97,11 @@ Latest taken migration **000019**; next is **000020**. Still deferred (unchanged
 #11 cv/id-card upload, #15 role levels (N/A); avatar/CV/ID-image upload endpoints;
 name-split FE wiring (web repo self-managed).
 
-**Next:** merge `feat/employees-parity-2` → `main` (after which `main` = migration 19).
+**Next:** [PR #12](https://github.com/sines-exnodes/Go-HRM/pull/12) open → merge to `main` after review (then `main` = migration 19).
+
+**Integration findings (during FE wiring, post-PR — both documented in web `api_info_go` + `handoff-2026-06-01-employee-parity-2-fe.md`):**
+- **Empty optional dates must be `null`/omitted, not `""`.** Optional `*time.Time` DTO fields (`dob`, `id_issue_date`, `contract_sign_date`, `contract_end_date`, `join_date`) reject an empty JSON string at binding → `400 bad_request` (`cannot parse "" as ...`) before any logic. FE coerces `"" → null` for date/number fields. Pre-existing contract behaviour, NOT a round-2 change.
+- **Stale-binary 500 after `migrate-up`.** The boot migration-assert (`internal/config/db.go` `AssertMigrationsUpToDate`) only blocks a DB *behind* the code (`applied < latest_on_disk`), NOT a DB *ahead* — so an old binary boots against a newer schema, then 500s on dropped columns (e.g. `full_name`). **After `make migrate-up`, rebuild + restart the API.** Optional hardening (not yet done): also fail when `applied > latest_on_disk`.
 
 ## Phase Summary (final)
 
