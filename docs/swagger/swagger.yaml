@@ -379,11 +379,11 @@ definitions:
           $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput'
         type: array
       experience_year:
-        minimum: 0
+        description: career-start year; range validated in the service (validateExperienceYear)
         type: integer
-      full_name:
+      first_name:
         description: HR personal info
-        maxLength: 200
+        maxLength: 100
         minLength: 1
         type: string
       gender:
@@ -406,6 +406,10 @@ definitions:
       is_active:
         type: boolean
       join_date:
+        type: string
+      last_name:
+        maxLength: 100
+        minLength: 1
         type: string
       manager_id:
         type: string
@@ -435,9 +439,16 @@ definitions:
         items:
           type: string
         type: array
+      skill_ids:
+        description: Skills assigned at creation (inline — Python parity). Empty/absent
+          = none.
+        items:
+          type: string
+        type: array
     required:
     - email
-    - full_name
+    - first_name
+    - last_name
     - password
     type: object
   github_com_exnodes_hrm-api_internal_dto.EmployeeSelfUpdate:
@@ -453,8 +464,8 @@ definitions:
         items:
           $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput'
         type: array
-      full_name:
-        maxLength: 200
+      first_name:
+        maxLength: 100
         minLength: 1
         type: string
       gender:
@@ -462,6 +473,10 @@ definitions:
         - male
         - female
         - other
+        type: string
+      last_name:
+        maxLength: 100
+        minLength: 1
         type: string
       marital_status:
         enum:
@@ -491,9 +506,11 @@ definitions:
         type: string
       department_id:
         type: string
-      full_name:
+      first_name:
         type: string
       id:
+        type: string
+      last_name:
         type: string
       manager_id:
         type: string
@@ -549,9 +566,11 @@ definitions:
           $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmergencyContactInput'
         type: array
       experience_year:
-        minimum: 0
+        description: career-start year; range validated in the service (validateExperienceYear)
         type: integer
-      full_name:
+      first_name:
+        maxLength: 100
+        minLength: 1
         type: string
       gender:
         enum:
@@ -575,6 +594,10 @@ definitions:
         type: boolean
       join_date:
         type: string
+      last_name:
+        maxLength: 100
+        minLength: 1
+        type: string
       manager_id:
         type: string
       marital_status:
@@ -595,6 +618,13 @@ definitions:
         type: string
       position_id:
         type: string
+      skill_ids:
+        description: |-
+          Skills replace-set: nil/absent = leave unchanged, [] = clear all,
+          non-empty = replace the whole set (inline — Python parity).
+        items:
+          type: string
+        type: array
     type: object
   github_com_exnodes_hrm-api_internal_dto.FcmTokenRequest:
     properties:
@@ -1759,26 +1789,38 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: free text (full_name/phone/personal_email/user.email)
+      - description: free text (first_name/last_name/phone/personal_email/user.email)
         in: query
         name: search
         type: string
-      - description: department uuid
+      - collectionFormat: csv
+        description: department uuid(s) — repeatable, OR within filter
         in: query
+        items:
+          type: string
         name: department_id
-        type: string
-      - description: position uuid
+        type: array
+      - collectionFormat: csv
+        description: position uuid(s) — repeatable
         in: query
+        items:
+          type: string
         name: position_id
-        type: string
-      - description: manager uuid
+        type: array
+      - collectionFormat: csv
+        description: manager uuid(s) — repeatable
         in: query
+        items:
+          type: string
         name: manager_id
-        type: string
-      - description: role uuid
+        type: array
+      - collectionFormat: csv
+        description: role uuid(s) — repeatable
         in: query
+        items:
+          type: string
         name: role_id
-        type: string
+        type: array
       - description: filter by user.is_active
         in: query
         name: is_active
@@ -2146,7 +2188,7 @@ paths:
         in: query
         name: for_employee_id
         type: string
-      - description: match full_name / position / department
+      - description: match first_name / last_name / position / department
         in: query
         name: search
         type: string

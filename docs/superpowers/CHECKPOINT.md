@@ -1,9 +1,9 @@
 # Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity in flight
 
-**Last updated:** 2026-05-29
-**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); **employees parity COMPLETE** — A (#7), B salary/banking (#9), C line-manager (#10) all merged to `main`.
-**Branch:** `main`.
-**DB migration version:** **17** on `main` (000017_employee_parity).
+**Last updated:** 2026-06-01
+**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); employees parity A/B/C merged to `main`; **employees parity ROUND 2** complete on branch `feat/employees-parity-2` (7 commits, fully verified) — **pending merge**.
+**Branch:** `feat/employees-parity-2` (round-2 work; cut from `main`).
+**DB migration version:** **17** on `main`; **19** on `feat/employees-parity-2` (000018 name split, 000019 experience-year normalize).
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
 ## How to resume next session
@@ -63,18 +63,41 @@ full integration suite, migration up/down round-trip, live HTTP smoke
 **Still deferred / follow-ups** → [`handoff-2026-05-29-employee-parity.md`](handoff-2026-05-29-employee-parity.md):
 - **#11** cv/id-card upload endpoints (URLs accepted for now).
 - **#15** role-level assignment authority (N/A — Go RBAC has no role `level`).
-- **Found during C** (worth a small PR): (a) pre-existing `GET /employees` uuid
-  list-filters (`department_id`/`position_id`/`manager_id`/`role_id`) **400 on
-  any value** — gin can't bind `*uuid.UUID` from a query; bind as string +
-  `uuid.Parse` (see `mem:conventions`). (b) employee's **own** `department`/
-  `position` names not resolved on `EmployeeRead` (still null — the manager
-  brief resolves them, the self path doesn't; pre-existing Phase-3 gap).
+- **Found during C — both RESOLVED in parity round 2** (`feat/employees-parity-2`):
+  (a) the `GET /employees` uuid list-filters now bind as repeated `[]string` →
+  `uuid.Parse` → SQL `IN` (also made multi-select per BA DR-001-005-01); (b) the
+  employee's **own** `department`/`position` names are now resolved on `EmployeeRead`.
 
 FE: web repo PR **#5** (`feat/go-employees-parity` → main) carries the full FE
 wiring + `api_info_go/employee.md` + `me.md`. The web repo is self-managed.
 
-**Next:** employees parity is closed. Optional follow-ups: #11, #15, + the two
-above. Next migration is **000018**.
+### Employees — ROUND 2 (`feat/employees-parity-2`) — DONE, pending merge
+
+Parity round 2, 7 commits, grounded in a fresh 5-dimension Python parity audit.
+Verified: [`verification/employees-parity-2.md`](verification/employees-parity-2.md)
+— build/vet, full integration suite **220 tests / 0 skip / 0 fail**, migration
+000018 + 000019 up/down round-trips, **live HTTP smoke 38/38**, DB spot-check;
+two-stage subagent review per task.
+
+- **Multi-select list filters** (`5ae3b6d`) — dept/position/role/manager repeated
+  params → `IN`; fixes the 400-on-any-value bug. **BA over Python** here (Python
+  single-values dept/position; BA DR-005-01 wants all multi-select).
+- **experience_year as a career-start year** (`ddf0d94`) — validate `>1900 &&
+  ≤ current year`; **migration 000019** normalizes legacy counts → years.
+- **Inline `skill_ids`** on Create/Update (`56f53ef`) — Python parity; standalone
+  `PUT /employees/:id/skills` kept.
+- **Own department/position resolved** on read (`b5bd158`) — Phase-3 gap closed.
+- **Name split** (`c52d66a`) — drop `full_name`, add `first_name`/`last_name`
+  (**migration 000018**); `Employee.FullName()` method composes the display name
+  for briefs. Confirmed by the Python audit (Python stores first/last separately).
+- **Swagger regen + smoke update** (`5c986d8`).
+- **Direct reports**: kept the standalone endpoint (Python parity — NOT embedded).
+
+Latest taken migration **000019**; next is **000020**. Still deferred (unchanged):
+#11 cv/id-card upload, #15 role levels (N/A); avatar/CV/ID-image upload endpoints;
+name-split FE wiring (web repo self-managed).
+
+**Next:** merge `feat/employees-parity-2` → `main` (after which `main` = migration 19).
 
 ## Phase Summary (final)
 
@@ -174,7 +197,7 @@ Phases 4–9: **review not yet requested.** Recommendation — one final bundled
 
 ## Local environment notes
 
-- **Postgres**: Docker container `ennam-ecom-postgres` at `localhost:5432`, user `ennam` / pass `ennam_dev_2026`, main DB `exnodes_hrm`, test DB `exnodes_hrm_test`. Both at migration version **12**.
+- **Postgres**: Docker at `localhost:5432`, user `postgres` / pass `devpassword` (verified working 2026-06-01; the earlier `ennam/ennam_dev_2026` note was stale). Main DB `exnodes_hrm`, test DB `exnodes_hrm_test`. The integration suite auto-migrates the test DB via `TestMain` (golang-migrate library); `migrate`/`psql`/`docker` CLIs are NOT on PATH here, so migration round-trips were verified via the library. `swag` lives in `GOPATH/bin` (Makefile references it by full path).
 - **Port 8080 conflict**: `ennam-kg-server` container holds host port 8080 in this dev environment. Phases 7-9 live verifications ran on `PORT=8082`. CI default stays 8080.
 - **Mailpit for SMTP verification**: `docker run -d --rm -p 11025:1025 -p 18025:8025 --name mailpit-phase09 axllent/mailpit`. UI at `http://localhost:18025`.
 - **FCM disabled in dev** — `FIREBASE_CREDENTIALS_PATH=""`. PushClient is the no-op logger. Production rollout: set the env var to a service-account JSON + `FIREBASE_PROJECT_ID`.

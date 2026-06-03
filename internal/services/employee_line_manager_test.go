@@ -36,7 +36,7 @@ func TestLineManager_RejectsSelfAssignment(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	e, err := svc.Create(ctx, dto.EmployeeCreate{Email: "self-mgr@x.com", Password: "Pass12345", FullName: "Self Mgr"})
+	e, err := svc.Create(ctx, dto.EmployeeCreate{Email: "self-mgr@x.com", Password: "Pass12345", FirstName: "Self", LastName: "Mgr"})
 	require.NoError(t, err)
 
 	_, err = svc.Update(ctx, e.ID, dto.EmployeeUpdate{ManagerID: uptr(e.ID)}, uuid.New())
@@ -53,11 +53,11 @@ func TestLineManager_RejectsCycle(t *testing.T) {
 	ctx := context.Background()
 
 	// Chain A <- B <- C  (B reports to A, C reports to B).
-	a, err := svc.Create(ctx, dto.EmployeeCreate{Email: "a@x.com", Password: "Pass12345", FullName: "A"})
+	a, err := svc.Create(ctx, dto.EmployeeCreate{Email: "a@x.com", Password: "Pass12345", FirstName: "A", LastName: "Test"})
 	require.NoError(t, err)
-	b, err := svc.Create(ctx, dto.EmployeeCreate{Email: "b@x.com", Password: "Pass12345", FullName: "B", ManagerID: uptr(a.ID)})
+	b, err := svc.Create(ctx, dto.EmployeeCreate{Email: "b@x.com", Password: "Pass12345", FirstName: "B", LastName: "Test", ManagerID: uptr(a.ID)})
 	require.NoError(t, err)
-	c, err := svc.Create(ctx, dto.EmployeeCreate{Email: "c@x.com", Password: "Pass12345", FullName: "C", ManagerID: uptr(b.ID)})
+	c, err := svc.Create(ctx, dto.EmployeeCreate{Email: "c@x.com", Password: "Pass12345", FirstName: "C", LastName: "Test", ManagerID: uptr(b.ID)})
 	require.NoError(t, err)
 
 	// Setting A's manager to C would create a cycle (C is in A's chain).
@@ -74,7 +74,7 @@ func TestLineManager_RejectsMissingManager(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	e, err := svc.Create(ctx, dto.EmployeeCreate{Email: "miss@x.com", Password: "Pass12345", FullName: "Miss"})
+	e, err := svc.Create(ctx, dto.EmployeeCreate{Email: "miss@x.com", Password: "Pass12345", FirstName: "Miss", LastName: "Test"})
 	require.NoError(t, err)
 
 	_, err = svc.Update(ctx, e.ID, dto.EmployeeUpdate{ManagerID: uptr(uuid.New())}, uuid.New())
@@ -90,9 +90,9 @@ func TestLineManager_RejectsInactiveManager(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "mgr@x.com", Password: "Pass12345", FullName: "Mgr"})
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "mgr@x.com", Password: "Pass12345", FirstName: "Mgr", LastName: "Test"})
 	require.NoError(t, err)
-	x, err := svc.Create(ctx, dto.EmployeeCreate{Email: "x@x.com", Password: "Pass12345", FullName: "X"})
+	x, err := svc.Create(ctx, dto.EmployeeCreate{Email: "x@x.com", Password: "Pass12345", FirstName: "X", LastName: "Test"})
 	require.NoError(t, err)
 
 	// Deactivate the manager (a different caller, so the self-guard doesn't trip).
@@ -108,7 +108,7 @@ func TestLineManager_RejectsInactiveManager(t *testing.T) {
 	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
 
 	// On create, too.
-	_, err = svc.Create(ctx, dto.EmployeeCreate{Email: "y@x.com", Password: "Pass12345", FullName: "Y", ManagerID: uptr(mgr.ID)})
+	_, err = svc.Create(ctx, dto.EmployeeCreate{Email: "y@x.com", Password: "Pass12345", FirstName: "Y", LastName: "Test", ManagerID: uptr(mgr.ID)})
 	require.Error(t, err)
 }
 
@@ -120,11 +120,11 @@ func TestLineManager_RichManagerBriefOnRead(t *testing.T) {
 
 	dept, pos := makeOrg(t, "Engineering", "Engineering Manager")
 	mgr, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "boss@x.com", Password: "Pass12345", FullName: "The Boss",
+		Email: "boss@x.com", Password: "Pass12345", FirstName: "The", LastName: "Boss",
 		DepartmentID: &dept, PositionID: &pos,
 	})
 	require.NoError(t, err)
-	rep, err := svc.Create(ctx, dto.EmployeeCreate{Email: "rep@x.com", Password: "Pass12345", FullName: "Report", ManagerID: uptr(mgr.ID)})
+	rep, err := svc.Create(ctx, dto.EmployeeCreate{Email: "rep@x.com", Password: "Pass12345", FirstName: "Report", LastName: "Test", ManagerID: uptr(mgr.ID)})
 	require.NoError(t, err)
 
 	got, err := svc.Get(ctx, rep.ID)
@@ -145,13 +145,13 @@ func TestLineManager_Candidates_ExcludesSelfAndSubordinates(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	a, err := svc.Create(ctx, dto.EmployeeCreate{Email: "ca@x.com", Password: "Pass12345", FullName: "Cand A"})
+	a, err := svc.Create(ctx, dto.EmployeeCreate{Email: "ca@x.com", Password: "Pass12345", FirstName: "Cand", LastName: "A"})
 	require.NoError(t, err)
-	b, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cb@x.com", Password: "Pass12345", FullName: "Cand B", ManagerID: uptr(a.ID)})
+	b, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cb@x.com", Password: "Pass12345", FirstName: "Cand", LastName: "B", ManagerID: uptr(a.ID)})
 	require.NoError(t, err)
-	c, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cc@x.com", Password: "Pass12345", FullName: "Cand C", ManagerID: uptr(b.ID)})
+	c, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cc@x.com", Password: "Pass12345", FirstName: "Cand", LastName: "C", ManagerID: uptr(b.ID)})
 	require.NoError(t, err)
-	d, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cd@x.com", Password: "Pass12345", FullName: "Cand D"}) // unrelated
+	d, err := svc.Create(ctx, dto.EmployeeCreate{Email: "cd@x.com", Password: "Pass12345", FirstName: "Cand", LastName: "D"}) // unrelated
 	require.NoError(t, err)
 
 	rows, err := svc.ManagerCandidates(ctx, uptr(a.ID), "", 50)
@@ -172,9 +172,9 @@ func TestLineManager_Candidates_KeepsInactiveCurrentManager(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "km@x.com", Password: "Pass12345", FullName: "Kept Mgr"})
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "km@x.com", Password: "Pass12345", FirstName: "Kept", LastName: "Mgr"})
 	require.NoError(t, err)
-	emp, err := svc.Create(ctx, dto.EmployeeCreate{Email: "ke@x.com", Password: "Pass12345", FullName: "Kept Emp", ManagerID: uptr(mgr.ID)})
+	emp, err := svc.Create(ctx, dto.EmployeeCreate{Email: "ke@x.com", Password: "Pass12345", FirstName: "Kept", LastName: "Emp", ManagerID: uptr(mgr.ID)})
 	require.NoError(t, err)
 
 	// Deactivate the assigned manager — normally excluded, but kept for this target.
@@ -200,11 +200,11 @@ func TestLineManager_DirectReports_IncludesInactive(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dm@x.com", Password: "Pass12345", FullName: "DR Mgr"})
+	mgr, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dm@x.com", Password: "Pass12345", FirstName: "DR", LastName: "Mgr"})
 	require.NoError(t, err)
-	r1, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dr1@x.com", Password: "Pass12345", FullName: "Report One", ManagerID: uptr(mgr.ID)})
+	r1, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dr1@x.com", Password: "Pass12345", FirstName: "Report", LastName: "One", ManagerID: uptr(mgr.ID)})
 	require.NoError(t, err)
-	r2, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dr2@x.com", Password: "Pass12345", FullName: "Report Two", ManagerID: uptr(mgr.ID)})
+	r2, err := svc.Create(ctx, dto.EmployeeCreate{Email: "dr2@x.com", Password: "Pass12345", FirstName: "Report", LastName: "Two", ManagerID: uptr(mgr.ID)})
 	require.NoError(t, err)
 
 	// Deactivate one report — it must still show up in the direct-reports list.
@@ -235,11 +235,11 @@ func TestLineManager_SoftDeletedManagerOrgNotLeaked(t *testing.T) {
 
 	dept, pos := makeOrg(t, "Doomed Dept", "Doomed Pos")
 	mgr, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "leakboss@x.com", Password: "Pass12345", FullName: "Leak Boss",
+		Email: "leakboss@x.com", Password: "Pass12345", FirstName: "Leak", LastName: "Boss",
 		DepartmentID: &dept, PositionID: &pos,
 	})
 	require.NoError(t, err)
-	rep, err := svc.Create(ctx, dto.EmployeeCreate{Email: "leakrep@x.com", Password: "Pass12345", FullName: "Leak Rep", ManagerID: uptr(mgr.ID)})
+	rep, err := svc.Create(ctx, dto.EmployeeCreate{Email: "leakrep@x.com", Password: "Pass12345", FirstName: "Leak", LastName: "Rep", ManagerID: uptr(mgr.ID)})
 	require.NoError(t, err)
 
 	// Soft-delete the manager's department + position out from under the brief.

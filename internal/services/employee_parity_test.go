@@ -27,7 +27,7 @@ func TestEmployeeParity_Create_WithEmergencyContacts(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "ec@example.com", Password: "Pass12345", FullName: "EC Owner",
+		Email: "ec@example.com", Password: "Pass12345", FirstName: "EC", LastName: "Owner",
 		EmergencyContacts: []dto.EmergencyContactInput{
 			{FullName: "Mom", Relationship: "parent", PhoneNumber: "0900000001"},
 			{FullName: "Dad", Relationship: "parent", PhoneNumber: "0900000002"},
@@ -54,7 +54,7 @@ func TestEmployeeParity_Update_ReplaceEmergencyContacts(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "ec2@example.com", Password: "Pass12345", FullName: "EC2",
+		Email: "ec2@example.com", Password: "Pass12345", FirstName: "EC2", LastName: "Test",
 		EmergencyContacts: []dto.EmergencyContactInput{{FullName: "Initial", Relationship: "spouse"}},
 	})
 	require.NoError(t, err)
@@ -86,7 +86,7 @@ func TestEmployeeParity_Read_HydratesLeaveQuota(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "q@example.com", Password: "Pass12345", FullName: "Quota",
+		Email: "q@example.com", Password: "Pass12345", FirstName: "Quota", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -113,7 +113,7 @@ func TestEmployeeParity_Read_EmbedsSkills(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "sk@example.com", Password: "Pass12345", FullName: "Skilled",
+		Email: "sk@example.com", Password: "Pass12345", FirstName: "Skilled", LastName: "Test",
 	})
 	require.NoError(t, err)
 
@@ -136,15 +136,15 @@ func TestEmployeeParity_Read_ExposesExperienceAndCV(t *testing.T) {
 	svc, _ := newEmpSvc(testDB)
 	ctx := context.Background()
 
-	yrs := 5
+	yrs := 2018 // experience_year is a career-start YEAR (parity round 2), not a count
 	cv := "https://files.example.com/cv.pdf"
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "xp@example.com", Password: "Pass12345", FullName: "Experienced",
+		Email: "xp@example.com", Password: "Pass12345", FirstName: "Experienced", LastName: "Test",
 		ExperienceYear: &yrs, CVURL: &cv,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, view.ExperienceYear)
-	assert.Equal(t, 5, *view.ExperienceYear)
+	assert.Equal(t, 2018, *view.ExperienceYear)
 	require.NotNil(t, view.CVURL)
 	assert.Equal(t, cv, *view.CVURL)
 }
@@ -159,19 +159,21 @@ func TestEmployeeParity_SelfUpdate_AllowsIdentityFields(t *testing.T) {
 
 	salary := 1000.0
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "id@example.com", Password: "Pass12345", FullName: "Before Name",
+		Email: "id@example.com", Password: "Pass12345", FirstName: "Before", LastName: "Name",
 		BasicSalary: &salary,
 	})
 	require.NoError(t, err)
 
-	name := "After Name"
+	first := "After"
+	last := "Name"
 	gender := "female"
 	dob := time.Date(1990, 1, 2, 0, 0, 0, 0, time.UTC)
 	out, err := svc.SelfUpdate(ctx, view.UserID, dto.EmployeeSelfUpdate{
-		FullName: &name, Gender: &gender, DOB: &dob,
+		FirstName: &first, LastName: &last, Gender: &gender, DOB: &dob,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "After Name", out.FullName, "self may rename per decision #7")
+	assert.Equal(t, "After", out.FirstName, "self may rename per decision #7")
+	assert.Equal(t, "Name", out.LastName, "self may rename per decision #7")
 	require.NotNil(t, out.Gender)
 	assert.Equal(t, "female", *out.Gender)
 	require.NotNil(t, out.DOB)
@@ -190,7 +192,7 @@ func TestEmployeeParity_SelfUpdate_ManagesOwnEmergencyContacts(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "ecself@example.com", Password: "Pass12345", FullName: "EC Self",
+		Email: "ecself@example.com", Password: "Pass12345", FirstName: "EC", LastName: "Self",
 	})
 	require.NoError(t, err)
 
@@ -209,7 +211,7 @@ func TestEmployeeParity_SoftDelete_RejectsSelf(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "selfdel@example.com", Password: "Pass12345", FullName: "Self Del",
+		Email: "selfdel@example.com", Password: "Pass12345", FirstName: "Self", LastName: "Del",
 	})
 	require.NoError(t, err)
 
@@ -232,11 +234,11 @@ func TestEmployeeParity_SoftDelete_ClearsSubordinateManager(t *testing.T) {
 	ctx := context.Background()
 
 	mgr, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "boss@example.com", Password: "Pass12345", FullName: "Boss",
+		Email: "boss@example.com", Password: "Pass12345", FirstName: "Boss", LastName: "Test",
 	})
 	require.NoError(t, err)
 	sub, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "report@example.com", Password: "Pass12345", FullName: "Report",
+		Email: "report@example.com", Password: "Pass12345", FirstName: "Report", LastName: "Test",
 		ManagerID: &mgr.ID,
 	})
 	require.NoError(t, err)
@@ -258,7 +260,7 @@ func TestEmployeeParity_Update_RejectsSelfDeactivate(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := svc.Create(ctx, dto.EmployeeCreate{
-		Email: "selfdeact@example.com", Password: "Pass12345", FullName: "Self Deact",
+		Email: "selfdeact@example.com", Password: "Pass12345", FirstName: "Self", LastName: "Deact",
 	})
 	require.NoError(t, err)
 
@@ -283,7 +285,7 @@ func TestUserParity_AdminPatch_RejectsSelfDeactivate(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "adminself@example.com", Password: "Pass12345", FullName: "Admin Self",
+		Email: "adminself@example.com", Password: "Pass12345", FirstName: "Admin", LastName: "Self",
 	})
 	require.NoError(t, err)
 	admin, err := repositories.NewUserRepository(testDB).FindByIDWithRoles(ctx, view.UserID)
@@ -298,10 +300,55 @@ func TestUserParity_AdminPatch_RejectsSelfDeactivate(t *testing.T) {
 
 	// Deactivating a different user is allowed.
 	other, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "otheruser@example.com", Password: "Pass12345", FullName: "Other",
+		Email: "otheruser@example.com", Password: "Pass12345", FirstName: "Other", LastName: "Test",
 	})
 	require.NoError(t, err)
 	require.NoError(t, userSvc.AdminPatch(ctx, other.UserID, dto.AdminUserPatch{IsActive: &no}, admin))
+}
+
+// Inline skill_ids on create + update (Python parity).
+func TestEmployeeParity_InlineSkillAssignment(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, deps := newEmpSvc(testDB)
+	ctx := context.Background()
+
+	// Two skills in the catalog.
+	s1, s2 := uuid.New(), uuid.New()
+	require.NoError(t, testDB.Exec("INSERT INTO skills (id, name, description) VALUES (?, ?, '')", s1, "Go").Error)
+	require.NoError(t, testDB.Exec("INSERT INTO skills (id, name, description) VALUES (?, ?, '')", s2, "SQL").Error)
+
+	// Create with skills inline.
+	v, err := svc.Create(ctx, dto.EmployeeCreate{
+		Email: "skilled@x.com", Password: "Pass12345", FirstName: "Skilled", LastName: "One",
+		SkillIDs: []uuid.UUID{s1, s2},
+	})
+	require.NoError(t, err)
+	require.Len(t, v.Skills, 2, "both skills must be assigned on create")
+
+	// Update -> replace down to one.
+	one := []uuid.UUID{s1}
+	v2, err := svc.Update(ctx, v.ID, dto.EmployeeUpdate{SkillIDs: &one}, deps.callerUserID)
+	require.NoError(t, err)
+	require.Len(t, v2.Skills, 1)
+	assert.Equal(t, "Go", v2.Skills[0].Name)
+
+	// Update with empty slice -> clear all.
+	empty := []uuid.UUID{}
+	v3, err := svc.Update(ctx, v.ID, dto.EmployeeUpdate{SkillIDs: &empty}, deps.callerUserID)
+	require.NoError(t, err)
+	require.Len(t, v3.Skills, 0)
+
+	// Invalid skill on create -> 400, no user created (skills are pre-validated
+	// before the user/employee tx, so a bad skill_id must not leave an orphan).
+	_, err = svc.Create(ctx, dto.EmployeeCreate{
+		Email: "bad@x.com", Password: "Pass12345", FirstName: "Bad", LastName: "Skill",
+		SkillIDs: []uuid.UUID{uuid.New()},
+	})
+	require.Error(t, err)
+	var orphan int64
+	require.NoError(t, testDB.Raw("SELECT count(*) FROM users WHERE email = ?", "bad@x.com").Scan(&orphan).Error)
+	assert.Zero(t, orphan, "a bad skill_id must not create an orphan user")
 }
 
 // #13 — admin can change another user's email; the change stamps
@@ -314,11 +361,11 @@ func TestUserParity_AdminChangeEmail(t *testing.T) {
 	ctx := context.Background()
 
 	view, err := empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "old2@example.com", Password: "Pass12345", FullName: "Old Email",
+		Email: "old2@example.com", Password: "Pass12345", FirstName: "Old", LastName: "Email",
 	})
 	require.NoError(t, err)
 	_, err = empSvc.Create(ctx, dto.EmployeeCreate{
-		Email: "taken2@example.com", Password: "Pass12345", FullName: "Taken",
+		Email: "taken2@example.com", Password: "Pass12345", FirstName: "Taken", LastName: "Test",
 	})
 	require.NoError(t, err)
 

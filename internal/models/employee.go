@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,7 +13,8 @@ type Employee struct {
 	UserID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
 
 	// Personal info
-	FullName         string     `gorm:"type:text;not null" json:"full_name"`
+	FirstName        string     `gorm:"type:text;not null;default:''" json:"first_name"`
+	LastName         string     `gorm:"type:text;not null;default:''" json:"last_name"`
 	Phone            *string    `gorm:"type:text" json:"phone,omitempty"`
 	PersonalEmail    *string    `gorm:"type:citext" json:"personal_email,omitempty"`
 	Gender           *string    `gorm:"type:text" json:"gender,omitempty"`
@@ -68,3 +70,10 @@ type Employee struct {
 }
 
 func (Employee) TableName() string { return "employees" }
+
+// FullName composes the display name from the split columns. Used by the
+// briefs/summaries that expose a single full_name (line manager, direct
+// report, candidate, attendance, announcement author, invite inviter).
+func (e *Employee) FullName() string {
+	return strings.TrimSpace(e.FirstName + " " + e.LastName)
+}

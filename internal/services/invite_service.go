@@ -119,7 +119,7 @@ func (s *InviteService) toRead(inv *models.Invite) dto.InviteRead {
 	if inv.Inviter != nil {
 		out.Inviter = &dto.InviteInviterBrief{
 			ID:       inv.Inviter.ID,
-			FullName: inv.Inviter.FullName,
+			FullName: inv.Inviter.FullName(),
 		}
 	}
 	return out
@@ -369,10 +369,18 @@ func (s *InviteService) Accept(ctx context.Context, in dto.InviteAccept) (*dto.I
 		fullName = strings.Split(inv.Email, "@")[0]
 	}
 
+	// Split the composed invite name into first/last for the create DTO
+	// (names are stored split since migration 000018). A single-token invite
+	// name yields an empty last_name — accepted here because empSvc.Create is
+	// an internal call (the min=1 last-name bind only fires on the HTTP create
+	// endpoint) and the last_name column defaults to an empty string (NOT NULL).
+	firstName, lastName := splitFullName(fullName)
+
 	created, err := s.empSvc.Create(ctx, dto.EmployeeCreate{
 		Email:        inv.Email,
 		Password:     in.Password,
-		FullName:     fullName,
+		FirstName:    firstName,
+		LastName:     lastName,
 		DepartmentID: inv.DepartmentID,
 		PositionID:   inv.PositionID,
 	})
@@ -398,7 +406,21 @@ func (s *InviteService) Accept(ctx context.Context, in dto.InviteAccept) (*dto.I
 	return &dto.InviteAcceptResult{
 		UserID:   created.UserID,
 		Email:    created.Email,
-		FullName: created.FullName,
+		FullName: strings.TrimSpace(created.FirstName + " " + created.LastName),
 		Message:  "Account created — you can now log in",
 	}, nil
+}
+
+// splitFullName splits a composed display name into first/last on the first
+// space (names are stored split since migration 000018). A single-token name
+// yields an empty last_name — a faithful mononym representation, valid because
+// the last_name column defaults to an empty string (NOT NULL) and this is the
+// internal create path.
+func splitFullName(name string) (first, last string) {
+	parts := strings.SplitN(strings.TrimSpace(name), " ", 2)
+	first = parts[0]
+	if len(parts) > 1 && strings.TrimSpace(parts[1]) != "" {
+		return first, strings.TrimSpace(parts[1])
+	}
+	return first, ""
 }

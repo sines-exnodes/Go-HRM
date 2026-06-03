@@ -125,9 +125,7 @@ func (r *employeeRepository) FindByIDWithOrg(ctx context.Context, id uuid.UUID) 
 	return &e, nil
 }
 
-// FindByIDWithFull preloads user, roles, manager, dependents.
-// Department/Position preloads are deferred to Phase 3 (those tables land
-// later), so they are intentionally not preloaded here.
+// FindByIDWithFull preloads user, roles, manager, department, position, dependents.
 func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID) (*models.Employee, error) {
 	var e models.Employee
 	err := r.db.WithContext(ctx).
@@ -137,6 +135,8 @@ func (r *employeeRepository) FindByIDWithFull(ctx context.Context, id uuid.UUID)
 		Preload("Manager.User", notDeleted).
 		Preload("Manager.Department", notDeleted).
 		Preload("Manager.Position", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -159,6 +159,8 @@ func (r *employeeRepository) FindByUserIDWithFull(ctx context.Context, userID uu
 		Preload("Manager.User", notDeleted).
 		Preload("Manager.Department", notDeleted).
 		Preload("Manager.Position", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Preload("Dependents", "is_deleted = ?", false).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
@@ -180,6 +182,8 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 		Preload("Manager.User", notDeleted).
 		Preload("Manager.Department", notDeleted).
 		Preload("Manager.Position", notDeleted).
+		Preload("Department", notDeleted).
+		Preload("Position", notDeleted).
 		Preload("EmergencyContacts", "is_deleted = ?", false).
 		Preload("EmployeeSkills", "is_deleted = ?", false).
 		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
@@ -190,26 +194,26 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 	if q.Search != "" {
 		p := utils.BuildILIKEPattern(q.Search)
 		tx = tx.Where(
-			"employees.full_name ILIKE ? OR employees.phone ILIKE ? OR employees.personal_email ILIKE ? OR users.email ILIKE ?",
-			p, p, p, p,
+			"employees.first_name ILIKE ? OR employees.last_name ILIKE ? OR employees.phone ILIKE ? OR employees.personal_email ILIKE ? OR users.email ILIKE ?",
+			p, p, p, p, p,
 		)
 	}
-	if q.DepartmentID != nil {
-		tx = tx.Where("employees.department_id = ?", *q.DepartmentID)
+	if len(q.DepartmentIDs) > 0 {
+		tx = tx.Where("employees.department_id IN ?", q.DepartmentIDs)
 	}
-	if q.PositionID != nil {
-		tx = tx.Where("employees.position_id = ?", *q.PositionID)
+	if len(q.PositionIDs) > 0 {
+		tx = tx.Where("employees.position_id IN ?", q.PositionIDs)
 	}
-	if q.ManagerID != nil {
-		tx = tx.Where("employees.manager_id = ?", *q.ManagerID)
+	if len(q.ManagerIDs) > 0 {
+		tx = tx.Where("employees.manager_id IN ?", q.ManagerIDs)
 	}
 	if q.IsActive != nil {
 		tx = tx.Where("users.is_active = ?", *q.IsActive)
 	}
-	if q.RoleID != nil {
+	if len(q.RoleIDs) > 0 {
 		tx = tx.Where(
-			"EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = employees.user_id AND ur.role_id = ? AND ur.is_deleted = false)",
-			*q.RoleID,
+			"EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id = employees.user_id AND ur.role_id IN ? AND ur.is_deleted = false)",
+			q.RoleIDs,
 		)
 	}
 
@@ -226,7 +230,7 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 
 	var emps []models.Employee
 	if err := tx.
-		Order("employees.full_name ASC").
+		Order("employees.first_name ASC, employees.last_name ASC").
 		Offset((q.Page - 1) * q.PageSize).
 		Limit(q.PageSize).
 		Find(&emps).Error; err != nil {
@@ -316,13 +320,13 @@ func (r *employeeRepository) ListManagerCandidates(ctx context.Context, excludeI
 		// name cannot drive a search match (matches the NotDeleted convention).
 		q = q.Joins("LEFT JOIN positions ON positions.id = employees.position_id AND positions.is_deleted = false").
 			Joins("LEFT JOIN departments ON departments.id = employees.department_id AND departments.is_deleted = false").
-			Where("employees.full_name ILIKE ? OR positions.name ILIKE ? OR departments.name ILIKE ?", p, p, p)
+			Where("(employees.first_name ILIKE ? OR employees.last_name ILIKE ?) OR positions.name ILIKE ? OR departments.name ILIKE ?", p, p, p, p)
 	}
 	if limit < 1 {
 		limit = 50
 	}
 	var emps []models.Employee
-	err := q.Order("LOWER(employees.full_name) ASC").Limit(limit).Find(&emps).Error
+	err := q.Order("LOWER(employees.first_name) ASC, LOWER(employees.last_name) ASC").Limit(limit).Find(&emps).Error
 	return emps, err
 }
 
@@ -333,7 +337,7 @@ func (r *employeeRepository) ListDirectReports(ctx context.Context, managerID uu
 		Preload("Department", notDeleted).
 		Preload("Position", notDeleted).
 		Where("manager_id = ? AND is_deleted = ?", managerID, false).
-		Order("LOWER(full_name) ASC").
+		Order("LOWER(first_name) ASC, LOWER(last_name) ASC").
 		Find(&emps).Error
 	return emps, err
 }

@@ -209,7 +209,7 @@ func (s *LeaveService) populateRead(ctx context.Context, lr *models.LeaveRequest
 		// Soft-deleted/missing employee: leave the embedded refs empty.
 		return out, nil
 	}
-	out.Employee = &dto.LeaveRefRead{ID: emp.ID.String(), Name: emp.FullName}
+	out.Employee = &dto.LeaveRefRead{ID: emp.ID.String(), Name: emp.FullName()}
 	if emp.DepartmentID != nil {
 		if d, derr := s.depts.FindByID(ctx, *emp.DepartmentID, false); derr == nil && d != nil {
 			out.Department = &dto.LeaveRefRead{ID: d.ID.String(), Name: d.Name}
@@ -695,14 +695,14 @@ func (s *LeaveService) List(ctx context.Context, q dto.LeaveListQuery) (dto.Pagi
 			if perr != nil {
 				return dto.PaginatedData[dto.LeaveRequestRead]{}, apperrors.ErrBadRequest("invalid department_id")
 			}
-			empQuery.DepartmentID = &deptID
+			empQuery.DepartmentIDs = []uuid.UUID{deptID}
 		}
 		if q.PositionID != "" {
 			posID, perr := uuid.Parse(q.PositionID)
 			if perr != nil {
 				return dto.PaginatedData[dto.LeaveRequestRead]{}, apperrors.ErrBadRequest("invalid position_id")
 			}
-			empQuery.PositionID = &posID
+			empQuery.PositionIDs = []uuid.UUID{posID}
 		}
 		emps, _, eerr := s.emps.List(ctx, empQuery)
 		if eerr != nil {

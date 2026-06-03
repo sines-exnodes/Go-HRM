@@ -85,12 +85,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("upload service: %v", err)
 	}
-	empSvc := services.NewEmployeeService(db, employeeRepo, dependentRepo, userRepo, roleRepo, quotaRepo, uploadSvc)
+	skillSvc := services.NewSkillService(skillRepo, employeeSkillRepo, employeeRepo, uploadSvc)
+	empSvc := services.NewEmployeeService(db, employeeRepo, dependentRepo, userRepo, roleRepo, quotaRepo, uploadSvc, skillSvc)
 	depSvc := services.NewDependentService(dependentRepo, employeeRepo)
 	userSvc := services.NewUserService(userRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
 	departmentSvc := services.NewDepartmentService(departmentRepo)
 	positionSvc := services.NewPositionService(positionRepo)
-	skillSvc := services.NewSkillService(skillRepo, employeeSkillRepo, employeeRepo, uploadSvc)
 	labelSvc := services.NewLabelService(labelRepo)
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo)

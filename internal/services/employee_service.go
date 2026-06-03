@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -38,6 +40,20 @@ func boolToRenewal(b *bool) int {
 	return 1
 }
 
+// validateExperienceYear enforces the BA contract (DR-001-005-02/03/04):
+// experience_year is a career-start (4-digit) year, must be > 1900 and not in
+// the future. nil = not provided = valid.
+func validateExperienceYear(y *int) error {
+	if y == nil {
+		return nil
+	}
+	cur := time.Now().UTC().Year()
+	if *y <= 1900 || *y > cur {
+		return apperrors.ErrBadRequest(fmt.Sprintf("experience_year must be a year between 1901 and %d", cur))
+	}
+	return nil
+}
+
 // toEmergencyModels converts the DTO emergency-contact inputs to model rows
 // (trimmed), for the ReplaceEmergencyContacts repo call (employees parity #4).
 func toEmergencyModels(in []dto.EmergencyContactInput) []models.EmployeeEmergencyContact {
@@ -67,6 +83,20 @@ func departmentName(e *models.Employee) *string {
 	if e != nil && e.Department != nil && e.Department.Name != "" {
 		n := e.Department.Name
 		return &n
+	}
+	return nil
+}
+
+func departmentRef(e *models.Employee) *dto.RefRead {
+	if e != nil && e.Department != nil && e.Department.Name != "" {
+		return &dto.RefRead{ID: e.Department.ID, Name: e.Department.Name}
+	}
+	return nil
+}
+
+func positionRef(e *models.Employee) *dto.RefRead {
+	if e != nil && e.Position != nil && e.Position.Name != "" {
+		return &dto.RefRead{ID: e.Position.ID, Name: e.Position.Name}
 	}
 	return nil
 }
@@ -142,6 +172,14 @@ func GuardBankingWrite(set bool, p EmployeeFieldPerms) error {
 	return nil
 }
 
+// skillAssigner is the slice of SkillService that EmployeeService needs to
+// apply inline skill_ids on create/update. Kept narrow for testability;
+// satisfied by *SkillService.
+type skillAssigner interface {
+	ValidateSkillIDs(ctx context.Context, skillIDs []uuid.UUID) ([]uuid.UUID, error)
+	ReplaceForEmployee(ctx context.Context, employeeID uuid.UUID, skillIDs []uuid.UUID) ([]dto.SkillRead, error)
+}
+
 // EmployeeService owns the HR-profile business logic. All repository fields
 // use the repository INTERFACE types for mockability.
 type EmployeeService struct {
@@ -152,6 +190,7 @@ type EmployeeService struct {
 	roles   repositories.RoleRepository
 	quota   repositories.LeaveQuotaRepository
 	uploads Uploader
+	skills  skillAssigner
 }
 
 func NewEmployeeService(
@@ -162,8 +201,9 @@ func NewEmployeeService(
 	roles repositories.RoleRepository,
 	quota repositories.LeaveQuotaRepository,
 	uploads Uploader,
+	skills skillAssigner,
 ) *EmployeeService {
-	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads}
+	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads, skills: skills}
 }
 
 // ---- Read ----
@@ -219,7 +259,7 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 	if e.Manager != nil {
 		mgr = &dto.ManagerBrief{
 			ID:         e.Manager.ID,
-			FullName:   e.Manager.FullName,
+			FullName:   e.Manager.FullName(),
 			Position:   positionName(e.Manager),
 			Department: departmentName(e.Manager),
 		}
@@ -282,7 +322,8 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 	out := &dto.EmployeeRead{
 		ID:                e.ID,
 		UserID:            e.UserID,
-		FullName:          e.FullName,
+		FirstName:         e.FirstName,
+		LastName:          e.LastName,
 		Phone:             e.Phone,
 		PersonalEmail:     e.PersonalEmail,
 		Gender:            e.Gender,
@@ -324,14 +365,16 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 		out.Email = e.User.Email
 		out.IsActive = e.User.IsActive
 	}
-	// Department/Position refs preloaded in Phase 3; intentionally nil until then.
+	out.Department = departmentRef(e)
+	out.Position = positionRef(e)
 	return out
 }
 
 func (s *EmployeeService) toSummary(e *models.Employee) *dto.EmployeeSummary {
 	return &dto.EmployeeSummary{
 		ID:           e.ID,
-		FullName:     e.FullName,
+		FirstName:    e.FirstName,
+		LastName:     e.LastName,
 		AvatarURL:    e.AvatarURL,
 		DepartmentID: e.DepartmentID,
 		PositionID:   e.PositionID,
@@ -356,6 +399,14 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 	// cycle possible — nobody reports to a not-yet-created employee).
 	if in.ManagerID != nil {
 		if err := s.validateManagerAssignment(ctx, s.emps, *in.ManagerID, uuid.Nil); err != nil {
+			return nil, err
+		}
+	}
+	if err := validateExperienceYear(in.ExperienceYear); err != nil {
+		return nil, err
+	}
+	if len(in.SkillIDs) > 0 {
+		if _, err := s.skills.ValidateSkillIDs(ctx, in.SkillIDs); err != nil {
 			return nil, err
 		}
 	}
@@ -395,7 +446,8 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 		// defaults when the DTO pointer is nil.
 		e := &models.Employee{
 			UserID:           u.ID,
-			FullName:         strings.TrimSpace(in.FullName),
+			FirstName:        strings.TrimSpace(in.FirstName),
+			LastName:         strings.TrimSpace(in.LastName),
 			Phone:            in.Phone,
 			PersonalEmail:    in.PersonalEmail,
 			Gender:           in.Gender,
@@ -489,6 +541,16 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 			return nil, err
 		}
 	}
+	// Apply skills post-commit (same shape as emergency contacts). IDs were
+	// pre-validated before the tx, so the common bad-id case is already ruled
+	// out; a rare post-commit failure here (e.g. a concurrent skill delete)
+	// returns an error to the caller, who can retry via PUT /employees/:id/skills
+	// — the employee row stays, matching the emergency-contacts trade-off.
+	if len(in.SkillIDs) > 0 {
+		if _, err := s.skills.ReplaceForEmployee(ctx, createdEmp.ID, in.SkillIDs); err != nil {
+			return nil, err
+		}
+	}
 	return s.Get(ctx, createdEmp.ID)
 }
 
@@ -500,6 +562,11 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperrors.ErrNotFound("Employee")
 		}
+		return nil, err
+	}
+
+	// Cheap input validation before any state-dependent guard.
+	if err := validateExperienceYear(in.ExperienceYear); err != nil {
 		return nil, err
 	}
 
@@ -520,7 +587,8 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 			fields[key] = strings.TrimSpace(*v)
 		}
 	}
-	setIfNotNilStr("full_name", in.FullName)
+	setIfNotNilStr("first_name", in.FirstName)
+	setIfNotNilStr("last_name", in.LastName)
 	setIfNotNilStr("phone", in.Phone)
 	setIfNotNilStr("personal_email", in.PersonalEmail)
 	setIfNotNilStr("gender", in.Gender)
@@ -624,6 +692,11 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 			return nil, err
 		}
 	}
+	if in.SkillIDs != nil {
+		if _, err := s.skills.ReplaceForEmployee(ctx, e.ID, *in.SkillIDs); err != nil {
+			return nil, err
+		}
+	}
 	return s.Get(ctx, id)
 }
 
@@ -644,8 +717,11 @@ func (s *EmployeeService) SelfUpdate(ctx context.Context, userID uuid.UUID, in d
 	}
 	allowed := map[string]any{}
 	// Identity fields — self-editable per audit decision #7.
-	if in.FullName != nil {
-		allowed["full_name"] = strings.TrimSpace(*in.FullName)
+	if in.FirstName != nil {
+		allowed["first_name"] = strings.TrimSpace(*in.FirstName)
+	}
+	if in.LastName != nil {
+		allowed["last_name"] = strings.TrimSpace(*in.LastName)
 	}
 	if in.Gender != nil {
 		allowed["gender"] = *in.Gender
@@ -882,7 +958,7 @@ func (s *EmployeeService) ManagerCandidates(ctx context.Context, forEmployeeID *
 		out = append(out, toManagerCandidate(legacyManager))
 		// The appended legacy manager would otherwise sort last; re-sort so it
 		// lands in its alphabetical slot (case-insensitive, matching the
-		// LOWER(full_name) ordering used in the repo query).
+		// LOWER(first_name), LOWER(last_name) ordering used in the repo query).
 		sort.SliceStable(out, func(i, j int) bool {
 			return strings.ToLower(out[i].FullName) < strings.ToLower(out[j].FullName)
 		})
@@ -917,7 +993,7 @@ func toManagerCandidate(e *models.Employee) dto.ManagerCandidateRead {
 	}
 	return dto.ManagerCandidateRead{
 		ID:         e.ID,
-		FullName:   e.FullName,
+		FullName:   e.FullName(),
 		Position:   positionName(e),
 		Department: departmentName(e),
 		IsActive:   active,
@@ -931,7 +1007,7 @@ func toDirectReport(e *models.Employee) dto.DirectReportRead {
 	}
 	return dto.DirectReportRead{
 		ID:         e.ID,
-		FullName:   e.FullName,
+		FullName:   e.FullName(),
 		AvatarURL:  e.AvatarURL,
 		Position:   positionName(e),
 		Department: departmentName(e),

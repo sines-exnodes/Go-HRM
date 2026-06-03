@@ -46,8 +46,8 @@ func TestAuthService_Login_Success(t *testing.T) {
 	if result.User == nil || result.User.Employee == nil {
 		t.Fatal("expected user with preloaded employee")
 	}
-	if result.User.Employee.FullName != "Alice Tester" {
-		t.Errorf("employee.full_name: got %q", result.User.Employee.FullName)
+	if result.User.Employee.FirstName != "Alice" || result.User.Employee.LastName != "Tester" {
+		t.Errorf("employee name: got %q/%q", result.User.Employee.FirstName, result.User.Employee.LastName)
 	}
 	claims, err := utils.VerifyToken(result.Tokens.AccessToken, jwtSecret)
 	if err != nil {

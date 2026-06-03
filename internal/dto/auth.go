@@ -21,7 +21,8 @@ type RefreshRequest struct {
 // The full Employee resource lives under /api/v1/employees.
 type EmployeeSummary struct {
 	ID           uuid.UUID  `json:"id"`
-	FullName     string     `json:"full_name"`
+	FirstName    string     `json:"first_name"`
+	LastName     string     `json:"last_name"`
 	AvatarURL    *string    `json:"avatar_url,omitempty"`
 	DepartmentID *uuid.UUID `json:"department_id,omitempty"`
 	PositionID   *uuid.UUID `json:"position_id,omitempty"`

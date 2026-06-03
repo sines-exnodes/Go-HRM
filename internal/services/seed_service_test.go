@@ -73,8 +73,8 @@ func TestSeedService_FreshDatabase_CreatesSystemRolesAndAdmin(t *testing.T) {
 	if u.Employee == nil {
 		t.Fatal("admin user must have a matching employee row")
 	}
-	if u.Employee.FullName != "Super Admin" {
-		t.Errorf("employee.full_name: want %q, got %q", "Super Admin", u.Employee.FullName)
+	if u.Employee.FirstName != "Super" || u.Employee.LastName != "Admin" {
+		t.Errorf("employee name: want %q/%q, got %q/%q", "Super", "Admin", u.Employee.FirstName, u.Employee.LastName)
 	}
 	if u.Employee.ContractType != "official" {
 		t.Errorf("employee.contract_type: want %q, got %q", "official", u.Employee.ContractType)

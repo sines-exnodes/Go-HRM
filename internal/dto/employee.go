@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
 )
 
 // ---- Shared refs ----
@@ -87,7 +89,8 @@ type EmployeeRead struct {
 	ID               uuid.UUID  `json:"id"`
 	UserID           uuid.UUID  `json:"user_id"`
 	Email            string     `json:"email"`
-	FullName         string     `json:"full_name"`
+	FirstName        string     `json:"first_name"`
+	LastName         string     `json:"last_name"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty"`
 	Gender           *string    `json:"gender,omitempty"`
@@ -147,7 +150,7 @@ type EmployeeRead struct {
 // NOTE: EmployeeSummary is already declared in internal/dto/auth.go (created in
 // Phase 2 Tasks 1-7) and is reused here by UserMeRead. It is intentionally NOT
 // redeclared in this file to avoid a duplicate-type conflict; the auth.go shape
-// (ID / FullName / AvatarURL / DepartmentID / PositionID / ManagerID) satisfies
+// (ID / FirstName / LastName / AvatarURL / DepartmentID / PositionID / ManagerID) satisfies
 // both the auth login flow and GET /users/me.
 
 // ---- Employee Create (admin) — accepts both user creds and HR fields ----
@@ -159,7 +162,8 @@ type EmployeeCreate struct {
 	IsActive *bool  `json:"is_active,omitempty"`
 
 	// HR personal info
-	FullName         string     `json:"full_name" binding:"required,min=1,max=200"`
+	FirstName        string     `json:"first_name" binding:"required,min=1,max=100"`
+	LastName         string     `json:"last_name"  binding:"required,min=1,max=100"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
 	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
@@ -173,7 +177,7 @@ type EmployeeCreate struct {
 	CurrentAddress   *string    `json:"current_address,omitempty"`
 	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
 	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
-	ExperienceYear   *int       `json:"experience_year,omitempty" binding:"omitempty,gte=0"`
+	ExperienceYear   *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
 	CVURL            *string    `json:"cv_url,omitempty"`
 
 	// Emergency contacts — full replacement list at create (employees parity #4).
@@ -199,12 +203,16 @@ type EmployeeCreate struct {
 
 	// Roles assigned at creation
 	RoleIDs []uuid.UUID `json:"role_ids,omitempty"`
+
+	// Skills assigned at creation (inline — Python parity). Empty/absent = none.
+	SkillIDs []uuid.UUID `json:"skill_ids,omitempty"`
 }
 
 // ---- Employee Update (admin — anything allowed) ----
 
 type EmployeeUpdate struct {
-	FullName         *string    `json:"full_name,omitempty"`
+	FirstName        *string    `json:"first_name,omitempty" binding:"omitempty,min=1,max=100"`
+	LastName         *string    `json:"last_name,omitempty"  binding:"omitempty,min=1,max=100"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
 	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
@@ -218,7 +226,7 @@ type EmployeeUpdate struct {
 	CurrentAddress   *string    `json:"current_address,omitempty"`
 	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
 	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
-	ExperienceYear   *int       `json:"experience_year,omitempty" binding:"omitempty,gte=0"`
+	ExperienceYear   *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
 	CVURL            *string    `json:"cv_url,omitempty"`
 
 	// Emergency contacts — pointer-to-slice partial-PATCH semantics:
@@ -245,6 +253,10 @@ type EmployeeUpdate struct {
 	PaymentMethod    *string    `json:"payment_method,omitempty"`
 
 	IsActive *bool `json:"is_active,omitempty"` // toggles user.is_active
+
+	// Skills replace-set: nil/absent = leave unchanged, [] = clear all,
+	// non-empty = replace the whole set (inline — Python parity).
+	SkillIDs *[]uuid.UUID `json:"skill_ids,omitempty"`
 }
 
 // ---- Employee Self Update (RESTRICTED — server-side whitelist) ----
@@ -257,7 +269,8 @@ type EmployeeUpdate struct {
 // The service enforces the whitelist with a manual field-by-field copy, so
 // even a future DTO widening cannot mutate those admin-only columns.
 type EmployeeSelfUpdate struct {
-	FullName         *string    `json:"full_name,omitempty"      binding:"omitempty,min=1,max=200"`
+	FirstName        *string    `json:"first_name,omitempty"     binding:"omitempty,min=1,max=100"`
+	LastName         *string    `json:"last_name,omitempty"      binding:"omitempty,min=1,max=100"`
 	Gender           *string    `json:"gender,omitempty"         binding:"omitempty,oneof=male female other"`
 	DOB              *time.Time `json:"dob,omitempty"`
 	Phone            *string    `json:"phone,omitempty"`
@@ -281,12 +294,53 @@ type LeaveQuotaUpdateRequest struct {
 // ---- List query ----
 
 type EmployeeListQuery struct {
-	Page         int        `form:"page,default=1"       binding:"gte=1"`
-	PageSize     int        `form:"page_size,default=20" binding:"gte=1,lte=100"`
-	Search       string     `form:"search"`
-	DepartmentID *uuid.UUID `form:"department_id"`
-	PositionID   *uuid.UUID `form:"position_id"`
-	ManagerID    *uuid.UUID `form:"manager_id"`
-	RoleID       *uuid.UUID `form:"role_id"`
-	IsActive     *bool      `form:"is_active"`
+	Page     int    `form:"page,default=1"       binding:"gte=1"`
+	PageSize int    `form:"page_size,default=20" binding:"gte=1,lte=100"`
+	Search   string `form:"search"`
+	IsActive *bool  `form:"is_active"`
+
+	// Raw repeated query params (HTTP boundary). gin binds repeated keys
+	// (?department_id=a&department_id=b) into these string slices; uuid.UUID
+	// cannot be bound directly from a query param (that was the 400 bug).
+	DepartmentIDsRaw []string `form:"department_id"`
+	PositionIDsRaw   []string `form:"position_id"`
+	ManagerIDsRaw    []string `form:"manager_id"`
+	RoleIDsRaw       []string `form:"role_id"`
+
+	// Parsed by the handler (ParseFilters); consumed by the repo. Not bound.
+	DepartmentIDs []uuid.UUID `form:"-"`
+	PositionIDs   []uuid.UUID `form:"-"`
+	ManagerIDs    []uuid.UUID `form:"-"`
+	RoleIDs       []uuid.UUID `form:"-"`
+}
+
+// ParseFilters converts the raw repeated-param strings into parsed UUID
+// slices, returning a 400 AppError on the first invalid value. Empty/absent
+// params yield empty slices (= no filter). Duplicate values are passed
+// through unchanged; PostgreSQL treats IN (X, X) as IN (X) so no dedup is
+// performed.
+func (q *EmployeeListQuery) ParseFilters() error {
+	parse := func(name string, raw []string, dst *[]uuid.UUID) error {
+		for _, s := range raw {
+			if s == "" {
+				continue
+			}
+			id, err := uuid.Parse(s)
+			if err != nil {
+				return apperrors.ErrBadRequest("invalid " + name)
+			}
+			*dst = append(*dst, id)
+		}
+		return nil
+	}
+	if err := parse("department_id", q.DepartmentIDsRaw, &q.DepartmentIDs); err != nil {
+		return err
+	}
+	if err := parse("position_id", q.PositionIDsRaw, &q.PositionIDs); err != nil {
+		return err
+	}
+	if err := parse("manager_id", q.ManagerIDsRaw, &q.ManagerIDs); err != nil {
+		return err
+	}
+	return parse("role_id", q.RoleIDsRaw, &q.RoleIDs)
 }
