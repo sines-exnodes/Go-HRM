@@ -88,7 +88,7 @@ func main() {
 	skillSvc := services.NewSkillService(skillRepo, employeeSkillRepo, employeeRepo, uploadSvc)
 	empSvc := services.NewEmployeeService(db, employeeRepo, dependentRepo, userRepo, roleRepo, quotaRepo, uploadSvc, skillSvc)
 	depSvc := services.NewDependentService(dependentRepo, employeeRepo)
-	userSvc := services.NewUserService(userRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
+	userSvc := services.NewUserService(userRepo, roleRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
 	departmentSvc := services.NewDepartmentService(departmentRepo)
 	positionSvc := services.NewPositionService(positionRepo)
 	labelSvc := services.NewLabelService(labelRepo)
