@@ -55,6 +55,9 @@ func (r *roleRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Ro
 	return &role, nil
 }
 
+// FindByName returns (nil, gorm.ErrRecordNotFound) when no live role matches
+// (case-insensitive). Callers must branch on errors.Is(err, gorm.ErrRecordNotFound),
+// NOT on a nil result — this differs from department_repo.FindByName which returns (nil, nil).
 func (r *roleRepository) FindByName(ctx context.Context, name string) (*models.Role, error) {
 	var role models.Role
 	err := r.db.WithContext(ctx).Scopes(notDeleted).

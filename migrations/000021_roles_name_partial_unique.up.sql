@@ -9,6 +9,7 @@
 ALTER TABLE roles DROP CONSTRAINT roles_name_key;
 
 -- Partial unique index: uniqueness enforced only among live (non-deleted) rows.
-CREATE UNIQUE INDEX idx_roles_name_active
-    ON roles (name)
+-- LOWER(name) enforces case-insensitive uniqueness at the DB layer (mirrors uq_skills_name_lower_live).
+CREATE UNIQUE INDEX uq_roles_name_active
+    ON roles (LOWER(name))
     WHERE is_deleted = FALSE;
