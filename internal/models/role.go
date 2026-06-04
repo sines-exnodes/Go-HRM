@@ -44,6 +44,7 @@ type Role struct {
 	BaseModel
 	Name        string      `gorm:"type:text;not null;uniqueIndex" json:"name"`
 	Description string      `gorm:"type:text;not null;default:''" json:"description"`
+	Level       int         `gorm:"not null;default:100" json:"level"`
 	IsSystem    bool        `gorm:"not null;default:false" json:"is_system"`
 	Permissions StringSlice `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"permissions"`
 }
