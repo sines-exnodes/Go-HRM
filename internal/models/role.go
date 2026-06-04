@@ -42,7 +42,7 @@ func (s *StringSlice) Scan(src interface{}) error {
 // Role maps to the roles table.
 type Role struct {
 	BaseModel
-	Name        string      `gorm:"type:text;not null;uniqueIndex" json:"name"`
+	Name        string      `gorm:"type:text;not null" json:"name"`
 	Description string      `gorm:"type:text;not null;default:''" json:"description"`
 	Level       int         `gorm:"not null;default:100" json:"level"`
 	IsSystem    bool        `gorm:"not null;default:false" json:"is_system"`

@@ -57,7 +57,9 @@ func (r *roleRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.Ro
 
 func (r *roleRepository) FindByName(ctx context.Context, name string) (*models.Role, error) {
 	var role models.Role
-	err := r.db.WithContext(ctx).Scopes(notDeleted).First(&role, "name = ?", name).Error
+	err := r.db.WithContext(ctx).Scopes(notDeleted).
+		Where("LOWER(name) = LOWER(?)", strings.TrimSpace(name)).
+		First(&role).Error
 	if err != nil {
 		return nil, err
 	}
