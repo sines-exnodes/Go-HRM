@@ -15,7 +15,9 @@ type RefRead struct {
 	Name string    `json:"name"`
 }
 
-type RoleRead struct {
+// RoleRef is the brief role embed used inside EmployeeRead and UserMeRead/
+// UserAdminRead. For the full role API shape see dto.RoleRead in role.go.
+type RoleRef struct {
 	ID          uuid.UUID `json:"id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
@@ -138,10 +140,10 @@ type EmployeeRead struct {
 	SickLeaveQuota   float64 `json:"sick_leave_quota"`
 
 	// Auth side
-	IsActive  bool       `json:"is_active"`
-	Roles     []RoleRead `json:"roles"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	IsActive  bool      `json:"is_active"`
+	Roles     []RoleRef `json:"roles"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Optional embed for nested dependent reads on /employees/me
 	Dependents []DependentRead `json:"dependents,omitempty"`

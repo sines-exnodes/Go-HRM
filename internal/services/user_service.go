@@ -38,9 +38,9 @@ func NewUserService(
 // ---- GET /users/me ----
 
 func (s *UserService) GetMe(ctx context.Context, u *models.User) (*dto.UserMeRead, error) {
-	roles := make([]dto.RoleRead, 0, len(u.Roles))
+	roles := make([]dto.RoleRef, 0, len(u.Roles))
 	for _, r := range u.Roles {
-		roles = append(roles, dto.RoleRead{
+		roles = append(roles, dto.RoleRef{
 			ID:          r.ID,
 			Name:        r.Name,
 			Description: r.Description,
@@ -83,9 +83,9 @@ func (s *UserService) GetMe(ctx context.Context, u *models.User) (*dto.UserMeRea
 // toAdminRead maps a user (with Roles preloaded and Employee optionally
 // preloaded) to the admin read shape, embedding the employee summary.
 func (s *UserService) toAdminRead(u *models.User) *dto.UserAdminRead {
-	roles := make([]dto.RoleRead, 0, len(u.Roles))
+	roles := make([]dto.RoleRef, 0, len(u.Roles))
 	for _, r := range u.Roles {
-		roles = append(roles, dto.RoleRead{
+		roles = append(roles, dto.RoleRef{
 			ID:          r.ID,
 			Name:        r.Name,
 			Description: r.Description,
