@@ -1,9 +1,9 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity in flight
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (employees + announcements landed)
 
-**Last updated:** 2026-06-01
-**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); employees parity A/B/C merged to `main`; **employees parity ROUND 2** complete on branch `feat/employees-parity-2` (7 commits, fully verified) — **pending merge**.
-**Branch:** `feat/employees-parity-2` (round-2 work; cut from `main`).
-**DB migration version:** **17** on `main`; **19** on `feat/employees-parity-2` (000018 name split, 000019 experience-year normalize).
+**Last updated:** 2026-06-04
+**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); employees parity A/B/C merged to `main`; **employees parity ROUND 2 merged to `main`** via **PR #12** (`de83970`, 7 commits, fully verified). No parity branch in flight.
+**Branch:** `main`.
+**DB migration version:** **19** on `main` (through `000019_employee_experience_year_to_start_year`; 000018 name split, 000019 experience-year normalize). Next free: **000020**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
 ## How to resume next session
@@ -18,7 +18,7 @@ descending value):
 5. **Production env wiring** — set `FIREBASE_CREDENTIALS_PATH` + real SMTP host for invite emails.
 6. **Phase 9 password-reset flow** — reuse `EmailService` + add a `password-reset.html` template if BA confirms scope.
 
-If a Phase 10 is added later: REVISION NOTES pattern remains the way to draft it. Latest taken migration = **000017**; next is **000018**.
+If a Phase 10 is added later: REVISION NOTES pattern remains the way to draft it. Latest taken migration = **000019**; next is **000020**.
 
 ### Resume entry points
 
@@ -71,7 +71,7 @@ full integration suite, migration up/down round-trip, live HTTP smoke
 FE: web repo PR **#5** (`feat/go-employees-parity` → main) carries the full FE
 wiring + `api_info_go/employee.md` + `me.md`. The web repo is self-managed.
 
-### Employees — ROUND 2 (`feat/employees-parity-2`) — DONE, pending merge
+### Employees — ROUND 2 — DONE (merged to `main`, PR #12 / `de83970`)
 
 Parity round 2, 7 commits, grounded in a fresh 5-dimension Python parity audit.
 Verified: [`verification/employees-parity-2.md`](verification/employees-parity-2.md)
@@ -97,7 +97,7 @@ Latest taken migration **000019**; next is **000020**. Still deferred (unchanged
 #11 cv/id-card upload, #15 role levels (N/A); avatar/CV/ID-image upload endpoints;
 name-split FE wiring (web repo self-managed).
 
-**Next:** merge `feat/employees-parity-2` → `main` (after which `main` = migration 19).
+**Done:** merged to `main` via PR #12 (`de83970`) on 2026-06-04 — `main` is now at migration 19. No parity branch remains in flight.
 
 ## Phase Summary (final)
 
