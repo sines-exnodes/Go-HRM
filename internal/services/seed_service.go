@@ -50,6 +50,7 @@ func NewSeedService(
 type roleSeed struct {
 	Name        string
 	Description string
+	Level       int
 	Permissions []permissions.Permission
 }
 
@@ -58,11 +59,13 @@ func defaultRoles() []roleSeed {
 		{
 			Name:        "Super Admin",
 			Description: "Full system access with all permissions",
+			Level:       100,
 			Permissions: []permissions.Permission{permissions.PermAll},
 		},
 		{
 			Name:        "Admin",
 			Description: "Administrative access for user and role management",
+			Level:       90,
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
 				permissions.PermUsersRead, permissions.PermUsersCreate, permissions.PermUsersUpdate, permissions.PermUsersDelete,
@@ -98,6 +101,7 @@ func defaultRoles() []roleSeed {
 		{
 			Name:        "HR Manager",
 			Description: "Human resources management access",
+			Level:       80,
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
 				permissions.PermUsersRead, permissions.PermUsersCreate, permissions.PermUsersUpdate, permissions.PermUsersChangePwd,
@@ -128,6 +132,7 @@ func defaultRoles() []roleSeed {
 		{
 			Name:        "Manager",
 			Description: "Team management access with user visibility",
+			Level:       50,
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
 				permissions.PermUsersRead,
@@ -142,6 +147,7 @@ func defaultRoles() []roleSeed {
 		{
 			Name:        "Employee",
 			Description: "Basic employee access (own profile only)",
+			Level:       10,
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
 				// Self-service on own leave requests: Read+Create were already
@@ -253,6 +259,7 @@ func (s *SeedService) seedRoles(ctx context.Context) error {
 				Name:        rs.Name,
 				Description: rs.Description,
 				IsSystem:    true,
+				Level:       rs.Level,
 				Permissions: desired,
 			}
 			if err := s.roles.Create(ctx, r); err != nil {

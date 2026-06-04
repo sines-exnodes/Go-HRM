@@ -91,6 +91,7 @@ func main() {
 	userSvc := services.NewUserService(userRepo, roleRepo, employeeRepo, tokenRepo, settingsRepo, empSvc)
 	departmentSvc := services.NewDepartmentService(departmentRepo)
 	positionSvc := services.NewPositionService(positionRepo)
+	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo)
@@ -126,7 +127,7 @@ func main() {
 
 	// ---- handlers ----
 	authH := handlers.NewAuthHandler(authSvc)
-	roleH := handlers.NewRoleHandler()
+	roleH := handlers.NewRoleHandler(roleSvc)
 	empH := handlers.NewEmployeeHandler(empSvc)
 	depH := handlers.NewDependentHandler(depSvc)
 	userH := handlers.NewUserHandler(userSvc)
@@ -184,7 +185,15 @@ func main() {
 		authed.Use(middleware.JWT(userRepo, cfg.JWTSecret))
 
 		authed.POST("/auth/logout", authH.Logout)
-		authed.GET("/roles/permissions", roleH.ListPermissions)
+
+		// ---- /roles ----
+		roles := authed.Group("/roles")
+		roles.GET("/permissions", middleware.RequirePerms(authSvc, permissions.PermRolesRead), roleH.ListPermissions)
+		roles.GET("", middleware.RequirePerms(authSvc, permissions.PermRolesRead), roleH.List)
+		roles.POST("", middleware.RequirePerms(authSvc, permissions.PermRolesCreate), roleH.Create)
+		roles.GET(":id", middleware.RequirePerms(authSvc, permissions.PermRolesRead), roleH.Get)
+		roles.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermRolesUpdate), roleH.Update)
+		roles.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermRolesDelete), roleH.Delete)
 
 		// ---- /users/me* self-service (auth only) ----
 		authed.GET("/users/me", userH.GetMe)
