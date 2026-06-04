@@ -99,6 +99,32 @@ name-split FE wiring (web repo self-managed).
 
 **Done:** merged to `main` via PR #12 (`de83970`) on 2026-06-04 — `main` is now at migration 19. No parity branch remains in flight.
 
+### Roles & Permissions — AUDIT DONE, decisions LOCKED (no code yet)
+
+Parity audit committed: [`specs/2026-06-04-roles-permissions-parity-audit.md`](specs/2026-06-04-roles-permissions-parity-audit.md).
+**Headline gap:** Go has *no role-management API* — only `GET /roles/permissions`
+(catalog); roles are seed-only. Python has full CRUD (list ×2, get, create, update,
+delete) + a role-`level` authority hierarchy. Perm constants `roles:*` already
+exist + are seeded; only handlers/service/repo are missing.
+
+**Locked decisions (2026-06-04):**
+- **D1 ADD role `level` (1–100) + assignment-authority** — full Python parity.
+  **This reopens previously-deferred #15** ("role-level authority N/A"): it is NOW
+  IN SCOPE. Needs **migration 000020** (`level int NOT NULL DEFAULT 100` on
+  `roles` + seed-level backfill). Port Python's `check_role_assignment_authority`
+  into `user_service.AssignRoles`. Proposed seed levels: Super Admin 100 / Admin 90
+  / HR Manager 80 / Manager 50 / Employee 10 (confirm at impl).
+- **D2 soft delete** (Go `NotDeleted` convention; name freed via live partial-unique
+  index) — satisfies BA "hard delete, name reusable" observably.
+- **D3 sort by `level` ascending** (Python parity).
+- Also: add list/get/create/update/delete handlers; one list endpoint returning full
+  `permissions[]` + `permission_count`; gate `GET /roles/permissions` behind
+  `roles:read`; is_system rename/level/delete guards; role-name regex + perm-string
+  validation. Registry delta (`approve_team`/`approve_all`) left to leave-requests pass.
+
+**Next:** implementation (work breakdown in §6 of the audit). Latest taken migration
+**000019**; roles `level` will be **000020**.
+
 ## Phase Summary (final)
 
 | # | Module | Migration | Verification | Commits |
@@ -178,9 +204,14 @@ verified via Mailpit). Highlights:
 | `14e872e` | T19-T22 | E2E verification log (Mailpit pipeline + DB spot-check) |
 | _this_ | T18 | README + CHECKPOINT close (migration complete) |
 
-## TOOLING NOTE (unchanged)
+## TOOLING NOTE
 
-Subagent dispatch (`Agent` with `subagent_type`) is **structurally unavailable** in the VSCode-extension SDK runtime. Inline by project-owner (commit-per-task) carried all 10 phases.
+~~Subagent dispatch (`Agent` with `subagent_type`) is structurally unavailable in
+the VSCode-extension SDK runtime.~~ **STALE — corrected 2026-06-04.** Subagent
+dispatch now works in this runtime (verified with a read-only probe). The roles &
+permissions parity work is being executed subagent-driven (fresh subagent per task
++ review between). Phases 0–10 + earlier parity were done inline by the
+project-owner (commit-per-task); that remains a valid fallback.
 
 ## Code review status
 
