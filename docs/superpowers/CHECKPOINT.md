@@ -99,31 +99,39 @@ name-split FE wiring (web repo self-managed).
 
 **Done:** merged to `main` via PR #12 (`de83970`) on 2026-06-04 — `main` is now at migration 19. No parity branch remains in flight.
 
-### Roles & Permissions — AUDIT DONE, decisions LOCKED (no code yet)
+### Roles & Permissions — DONE (implemented + verified on `feat/roles-permissions-parity`, not yet merged)
 
-Parity audit committed: [`specs/2026-06-04-roles-permissions-parity-audit.md`](specs/2026-06-04-roles-permissions-parity-audit.md).
-**Headline gap:** Go has *no role-management API* — only `GET /roles/permissions`
-(catalog); roles are seed-only. Python has full CRUD (list ×2, get, create, update,
-delete) + a role-`level` authority hierarchy. Perm constants `roles:*` already
-exist + are seeded; only handlers/service/repo are missing.
+Parity audit: [`specs/2026-06-04-roles-permissions-parity-audit.md`](specs/2026-06-04-roles-permissions-parity-audit.md).
+Plan: [`plans/2026-06-04-roles-permissions-parity.md`](plans/2026-06-04-roles-permissions-parity.md).
+Verification: [`verification/roles-permissions-parity.md`](verification/roles-permissions-parity.md).
+**Closed the headline gap:** Go had *no role-management API* (catalog only). Now has
+full CRUD (list/get/create/update/delete) + a role-`level` authority hierarchy.
 
-**Locked decisions (2026-06-04):**
-- **D1 ADD role `level` (1–100) + assignment-authority** — full Python parity.
-  **This reopens previously-deferred #15** ("role-level authority N/A"): it is NOW
-  IN SCOPE. Needs **migration 000020** (`level int NOT NULL DEFAULT 100` on
-  `roles` + seed-level backfill). Port Python's `check_role_assignment_authority`
-  into `user_service.AssignRoles`. Proposed seed levels: Super Admin 100 / Admin 90
-  / HR Manager 80 / Manager 50 / Employee 10 (confirm at impl).
-- **D2 soft delete** (Go `NotDeleted` convention; name freed via live partial-unique
-  index) — satisfies BA "hard delete, name reusable" observably.
-- **D3 sort by `level` ascending** (Python parity).
-- Also: add list/get/create/update/delete handlers; one list endpoint returning full
-  `permissions[]` + `permission_count`; gate `GET /roles/permissions` behind
-  `roles:read`; is_system rename/level/delete guards; role-name regex + perm-string
-  validation. Registry delta (`approve_team`/`approve_all`) left to leave-requests pass.
+Implemented subagent-driven (fresh implementer per task + two-stage review).
+Verified: build/vet, **full repo test suite 0 fail / 0 skip** (services 172s),
+**live HTTP smoke 16/16** (incl. level-authority 403 over HTTP + soft-delete name
+reuse + catalog gate-403), DB spot-check. **Migrations 000020 (role `level`) +
+000021 (`uq_roles_name_active ON roles(LOWER(name)) WHERE is_deleted=FALSE`).**
+Latest taken migration **000021**; next free **000022**.
 
-**Next:** implementation (work breakdown in §6 of the audit). Latest taken migration
-**000019**; roles `level` will be **000020**.
+**Locked decisions — all delivered:**
+- **D1 role `level` (1–100) + assignment-authority** — done. **Reopened-and-RESOLVED
+  deferred #15.** Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 /
+  Manager 50 / Employee 10. `user_service.AssignRoles` enforces "assigner may only
+  grant roles ≤ their own max level" (ported from Python `check_role_assignment_authority`).
+- **D2 soft delete, name freed** — partial-unique on `LOWER(name)` allows reuse.
+- **D3 sort by `level` ASC** (then name).
+- Also delivered: gate `GET /roles/permissions` behind `roles:read`; one list endpoint
+  with full `permissions[]` + `permission_count`; is_system rename/level/delete guards;
+  role-name regex + perm-string validation. Registry delta (`approve_team`/`approve_all`)
+  left to the leave-requests pass (out of scope, as audited).
+
+Also fixed: test harness migration source made cross-platform (iofs) so the suite
+runs on Windows (commit `6d58ad4`).
+
+**Next:** final whole-branch review, then merge (PR) — see finishing-a-development-branch.
+The brief role embed in user/employee responses was renamed `dto.RoleRead`→`dto.RoleRef`
+(JSON wire format unchanged) to free `RoleRead` for the full role API shape.
 
 ## Phase Summary (final)
 
