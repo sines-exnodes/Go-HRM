@@ -129,9 +129,12 @@ Latest taken migration **000021**; next free **000022**.
 Also fixed: test harness migration source made cross-platform (iofs) so the suite
 runs on Windows (commit `6d58ad4`).
 
-**Next:** final whole-branch review, then merge (PR) — see finishing-a-development-branch.
+**Status:** final whole-branch review APPROVED; **PR [#14](https://github.com/sines-exnodes/Go-HRM/pull/14) open** (`feat/roles-permissions-parity` → `main`) — awaiting merge.
 The brief role embed in user/employee responses was renamed `dto.RoleRead`→`dto.RoleRef`
 (JSON wire format unchanged) to free `RoleRead` for the full role API shape.
+**Dev env:** `exnodes_hrm` migrated to **000021**; `:8080` app container now runs the branch via the
+dev compose override (Air hot-reload, source-mounted) — `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app`.
+FE fix (web repo): `role.api.ts` list/create dropped the trailing slash (`/api/v1/roles/`→`/api/v1/roles`) that caused a CORS-less 301.
 
 ## Phase Summary (final)
 
