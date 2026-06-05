@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 // their repository INTERFACE types; tokens/settings are concrete structs.
 type UserService struct {
 	users    repositories.UserRepository
+	roles    repositories.RoleRepository
 	emps     repositories.EmployeeRepository
 	tokens   *repositories.DeviceTokenRepository
 	settings *repositories.NotificationSettingsRepository
@@ -27,20 +29,21 @@ type UserService struct {
 
 func NewUserService(
 	users repositories.UserRepository,
+	roles repositories.RoleRepository,
 	emps repositories.EmployeeRepository,
 	tokens *repositories.DeviceTokenRepository,
 	settings *repositories.NotificationSettingsRepository,
 	empSvc *EmployeeService,
 ) *UserService {
-	return &UserService{users: users, emps: emps, tokens: tokens, settings: settings, empSvc: empSvc}
+	return &UserService{users: users, roles: roles, emps: emps, tokens: tokens, settings: settings, empSvc: empSvc}
 }
 
 // ---- GET /users/me ----
 
 func (s *UserService) GetMe(ctx context.Context, u *models.User) (*dto.UserMeRead, error) {
-	roles := make([]dto.RoleRead, 0, len(u.Roles))
+	roles := make([]dto.RoleRef, 0, len(u.Roles))
 	for _, r := range u.Roles {
-		roles = append(roles, dto.RoleRead{
+		roles = append(roles, dto.RoleRef{
 			ID:          r.ID,
 			Name:        r.Name,
 			Description: r.Description,
@@ -83,9 +86,9 @@ func (s *UserService) GetMe(ctx context.Context, u *models.User) (*dto.UserMeRea
 // toAdminRead maps a user (with Roles preloaded and Employee optionally
 // preloaded) to the admin read shape, embedding the employee summary.
 func (s *UserService) toAdminRead(u *models.User) *dto.UserAdminRead {
-	roles := make([]dto.RoleRead, 0, len(u.Roles))
+	roles := make([]dto.RoleRef, 0, len(u.Roles))
 	for _, r := range u.Roles {
-		roles = append(roles, dto.RoleRead{
+		roles = append(roles, dto.RoleRef{
 			ID:          r.ID,
 			Name:        r.Name,
 			Description: r.Description,
@@ -208,7 +211,37 @@ func (s *UserService) AssignRoles(ctx context.Context, id uuid.UUID, roleIDs []u
 	if admin.ID == id {
 		return apperrors.ErrBadRequest("You cannot change your own role")
 	}
+	if err := s.checkRoleAssignmentAuthority(ctx, admin, roleIDs); err != nil {
+		return err
+	}
 	return s.users.AssignRoles(ctx, id, roleIDs)
+}
+
+// checkRoleAssignmentAuthority ports the Python rule (app/services/role.py):
+// an assigner may only grant roles whose level is <= the assigner's own max
+// role level. admin.Roles is preloaded by the JWT middleware on the request
+// path; tests must pass a *models.User whose Roles slice is populated.
+func (s *UserService) checkRoleAssignmentAuthority(ctx context.Context, admin *models.User, roleIDs []uuid.UUID) error {
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	assignerMax := 0
+	for _, r := range admin.Roles {
+		if r.Level > assignerMax {
+			assignerMax = r.Level
+		}
+	}
+	targetRoles, err := s.roles.FindByIDs(ctx, roleIDs)
+	if err != nil {
+		return err
+	}
+	for _, r := range targetRoles {
+		if r.Level > assignerMax {
+			return apperrors.ErrForbidden(fmt.Sprintf(
+				"Cannot assign role '%s' (level %d): exceeds your authority level (%d)", r.Name, r.Level, assignerMax))
+		}
+	}
+	return nil
 }
 
 // ---- Admin user patch (toggle is_active) ----

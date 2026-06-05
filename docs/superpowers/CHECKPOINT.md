@@ -99,6 +99,43 @@ name-split FE wiring (web repo self-managed).
 
 **Done:** merged to `main` via PR #12 (`de83970`) on 2026-06-04 — `main` is now at migration 19. No parity branch remains in flight.
 
+### Roles & Permissions — DONE (implemented + verified on `feat/roles-permissions-parity`, not yet merged)
+
+Parity audit: [`specs/2026-06-04-roles-permissions-parity-audit.md`](specs/2026-06-04-roles-permissions-parity-audit.md).
+Plan: [`plans/2026-06-04-roles-permissions-parity.md`](plans/2026-06-04-roles-permissions-parity.md).
+Verification: [`verification/roles-permissions-parity.md`](verification/roles-permissions-parity.md).
+**Closed the headline gap:** Go had *no role-management API* (catalog only). Now has
+full CRUD (list/get/create/update/delete) + a role-`level` authority hierarchy.
+
+Implemented subagent-driven (fresh implementer per task + two-stage review).
+Verified: build/vet, **full repo test suite 0 fail / 0 skip** (services 172s),
+**live HTTP smoke 16/16** (incl. level-authority 403 over HTTP + soft-delete name
+reuse + catalog gate-403), DB spot-check. **Migrations 000020 (role `level`) +
+000021 (`uq_roles_name_active ON roles(LOWER(name)) WHERE is_deleted=FALSE`).**
+Latest taken migration **000021**; next free **000022**.
+
+**Locked decisions — all delivered:**
+- **D1 role `level` (1–100) + assignment-authority** — done. **Reopened-and-RESOLVED
+  deferred #15.** Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 /
+  Manager 50 / Employee 10. `user_service.AssignRoles` enforces "assigner may only
+  grant roles ≤ their own max level" (ported from Python `check_role_assignment_authority`).
+- **D2 soft delete, name freed** — partial-unique on `LOWER(name)` allows reuse.
+- **D3 sort by `level` ASC** (then name).
+- Also delivered: gate `GET /roles/permissions` behind `roles:read`; one list endpoint
+  with full `permissions[]` + `permission_count`; is_system rename/level/delete guards;
+  role-name regex + perm-string validation. Registry delta (`approve_team`/`approve_all`)
+  left to the leave-requests pass (out of scope, as audited).
+
+Also fixed: test harness migration source made cross-platform (iofs) so the suite
+runs on Windows (commit `6d58ad4`).
+
+**Status:** final whole-branch review APPROVED; **PR [#14](https://github.com/sines-exnodes/Go-HRM/pull/14) open** (`feat/roles-permissions-parity` → `main`) — awaiting merge.
+The brief role embed in user/employee responses was renamed `dto.RoleRead`→`dto.RoleRef`
+(JSON wire format unchanged) to free `RoleRead` for the full role API shape.
+**Dev env:** `exnodes_hrm` migrated to **000021**; `:8080` app container now runs the branch via the
+dev compose override (Air hot-reload, source-mounted) — `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d app`.
+FE fix (web repo): `role.api.ts` list/create dropped the trailing slash (`/api/v1/roles/`→`/api/v1/roles`) that caused a CORS-less 301.
+
 ## Phase Summary (final)
 
 | # | Module | Migration | Verification | Commits |
@@ -178,9 +215,14 @@ verified via Mailpit). Highlights:
 | `14e872e` | T19-T22 | E2E verification log (Mailpit pipeline + DB spot-check) |
 | _this_ | T18 | README + CHECKPOINT close (migration complete) |
 
-## TOOLING NOTE (unchanged)
+## TOOLING NOTE
 
-Subagent dispatch (`Agent` with `subagent_type`) is **structurally unavailable** in the VSCode-extension SDK runtime. Inline by project-owner (commit-per-task) carried all 10 phases.
+~~Subagent dispatch (`Agent` with `subagent_type`) is structurally unavailable in
+the VSCode-extension SDK runtime.~~ **STALE — corrected 2026-06-04.** Subagent
+dispatch now works in this runtime (verified with a read-only probe). The roles &
+permissions parity work is being executed subagent-driven (fresh subagent per task
++ review between). Phases 0–10 + earlier parity were done inline by the
+project-owner (commit-per-task); that remains a valid fallback.
 
 ## Code review status
 

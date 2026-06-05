@@ -834,6 +834,27 @@ definitions:
     required:
     - role_ids
     type: object
+  github_com_exnodes_hrm-api_internal_dto.RoleCreate:
+    properties:
+      description:
+        maxLength: 1000
+        type: string
+      level:
+        maximum: 100
+        minimum: 1
+        type: integer
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    required:
+    - level
+    - name
+    type: object
   github_com_exnodes_hrm-api_internal_dto.RoleSummary:
     properties:
       id:
@@ -841,6 +862,24 @@ definitions:
       is_system:
         type: boolean
       name:
+        type: string
+      permissions:
+        items:
+          type: string
+        type: array
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.RoleUpdate:
+    properties:
+      description:
+        maxLength: 1000
+        type: string
+      level:
+        maximum: 100
+        minimum: 1
+        type: integer
+      name:
+        maxLength: 100
+        minLength: 1
         type: string
       permissions:
         items:
@@ -3039,10 +3078,134 @@ paths:
       summary: Update position
       tags:
       - positions
+  /api/v1/roles:
+    get:
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Substring match on name (ILIKE)
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List roles (paginated, name search)
+      tags:
+      - Roles
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Role payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create role
+      tags:
+      - Roles
+  /api/v1/roles/{id}:
+    delete:
+      description: |-
+        Soft-deletes the role (name becomes reusable). Rejected with 400
+        for system roles and 409 if any user is still assigned.
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a non-system role
+      tags:
+      - Roles
+    get:
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get role by ID
+      tags:
+      - Roles
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update role (PATCH semantics)
+      tags:
+      - Roles
   /api/v1/roles/permissions:
     get:
-      description: Returns the structured permission catalog. Requires authentication
-        only (no specific permission).
+      description: Returns the structured permission catalog. Requires roles:read.
       produces:
       - application/json
       responses:
@@ -3050,10 +3213,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-array_github_com_exnodes_hrm-api_internal_permissions_PermissionGroup'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
       security:
       - BearerAuth: []
       summary: List grouped permissions (for the role-creation picker)

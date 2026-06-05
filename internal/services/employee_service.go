@@ -243,10 +243,10 @@ func (s *EmployeeService) List(ctx context.Context, q dto.EmployeeListQuery) ([]
 }
 
 func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
-	roles := make([]dto.RoleRead, 0)
+	roles := make([]dto.RoleRef, 0)
 	if e.User != nil {
 		for _, r := range e.User.Roles {
-			roles = append(roles, dto.RoleRead{
+			roles = append(roles, dto.RoleRef{
 				ID:          r.ID,
 				Name:        r.Name,
 				Description: r.Description,

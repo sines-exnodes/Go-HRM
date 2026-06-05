@@ -14,7 +14,7 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/google/uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -56,7 +56,7 @@ func TestMain(m *testing.M) {
 	// Apply migrations from migrations/ relative to repo root.
 	_, thisFile, _, _ := runtime.Caller(0)
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
-	migDir := "file://" + filepath.Join(repoRoot, "migrations")
+	migrationsDir := filepath.Join(repoRoot, "migrations")
 
 	sqlDB, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -65,14 +65,26 @@ func TestMain(m *testing.M) {
 	}
 	sqlDB.SetConnMaxLifetime(time.Minute)
 
-	mg, err := migrate.New(migDir, dsn)
+	// Build the migrator from an in-process iofs source. A "file://" URL built
+	// from an absolute Windows path (e.g. file://E:\...) is not parseable by
+	// golang-migrate; iofs + os.DirFS sidesteps URL parsing entirely and works
+	// the same on every platform.
+	newMigrator := func() (*migrate.Migrate, error) {
+		src, serr := iofs.New(os.DirFS(migrationsDir), ".")
+		if serr != nil {
+			return nil, serr
+		}
+		return migrate.NewWithSourceInstance("iofs", src, dsn)
+	}
+
+	mg, err := newMigrator()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "migrate.New: %v\n", err)
 		os.Exit(2)
 	}
 	// Reset to a clean state.
 	_ = mg.Drop()
-	mg2, err := migrate.New(migDir, dsn)
+	mg2, err := newMigrator()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "migrate.New(2): %v\n", err)
 		os.Exit(2)

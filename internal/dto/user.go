@@ -11,7 +11,7 @@ type UserMeRead struct {
 	ID                   uuid.UUID        `json:"id"`
 	Email                string           `json:"email"`
 	IsActive             bool             `json:"is_active"`
-	Roles                []RoleRead       `json:"roles"`
+	Roles                []RoleRef        `json:"roles"`
 	NotificationsEnabled bool             `json:"notifications_enabled"`
 	Employee             *EmployeeSummary `json:"employee,omitempty"`
 	CreatedAt            time.Time        `json:"created_at"`
@@ -24,7 +24,7 @@ type UserAdminRead struct {
 	ID        uuid.UUID        `json:"id"`
 	Email     string           `json:"email"`
 	IsActive  bool             `json:"is_active"`
-	Roles     []RoleRead       `json:"roles"`
+	Roles     []RoleRef        `json:"roles"`
 	Employee  *EmployeeSummary `json:"employee,omitempty"`
 	CreatedAt time.Time        `json:"created_at"`
 	UpdatedAt time.Time        `json:"updated_at"`

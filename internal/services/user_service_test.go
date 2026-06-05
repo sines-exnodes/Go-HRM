@@ -19,6 +19,7 @@ import (
 func newUserSvc(db *gorm.DB, empSvc *services.EmployeeService) *services.UserService {
 	return services.NewUserService(
 		repositories.NewUserRepository(db),
+		repositories.NewRoleRepository(db),
 		repositories.NewEmployeeRepository(db),
 		repositories.NewDeviceTokenRepository(db),
 		repositories.NewNotificationSettingsRepository(db),
@@ -109,23 +110,28 @@ func TestUserService_AssignRoles(t *testing.T) {
 	userSvc := newUserSvc(testDB, empSvc)
 	ctx := context.Background()
 
-	role := makeRole(t, "manager", []permissions.Permission{permissions.PermEmployeesRead}, false)
+	role := makeRole(t, "manager", []permissions.Permission{permissions.PermEmployeesRead}, false) // level 100 (DB default)
 	target, err := empSvc.Create(ctx, dto.EmployeeCreate{
 		Email: "target@example.com", Password: "Pass12345", FirstName: "Target", LastName: "Test",
 	})
 	require.NoError(t, err)
 
 	userRepo := repositories.NewUserRepository(testDB)
-	admin := makeUser(t, "admin2@example.com", "Pass12345")
+	adminRole := makeRole(t, "admin-authority", []permissions.Permission{permissions.PermUsersManageRoles}, false) // level 100
+	adminBare := makeUser(t, "admin2@example.com", "Pass12345", adminRole)
 
-	// Admin cannot change own role.
-	err = userSvc.AssignRoles(ctx, admin.ID, []uuid.UUID{role.ID}, admin)
+	// Self-change guard fires before authority — a bare struct is fine here.
+	err = userSvc.AssignRoles(ctx, adminBare.ID, []uuid.UUID{role.ID}, adminBare)
 	require.Error(t, err)
 	var ae *apperrors.AppError
 	require.ErrorAs(t, err, &ae)
 	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
 
-	// Assign to a different user OK.
+	// Authority check needs admin.Roles populated → reload with roles.
+	admin, err := userRepo.FindByIDWithRoles(ctx, adminBare.ID)
+	require.NoError(t, err)
+
+	// Assign to a different user OK (admin level 100 >= role level 100).
 	require.NoError(t, userSvc.AssignRoles(ctx, target.UserID, []uuid.UUID{role.ID}, admin))
 	u, err := userRepo.FindByIDWithRoles(ctx, target.UserID)
 	require.NoError(t, err)
@@ -269,4 +275,38 @@ func TestUserService_ListAndGet(t *testing.T) {
 	var appErr *apperrors.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, 404, appErr.HTTP)
+}
+
+func TestUserService_AssignRoles_LevelAuthority(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	empSvc, _ := newEmpSvc(testDB)
+	userSvc := newUserSvc(testDB, empSvc)
+	ctx := context.Background()
+	userRepo := repositories.NewUserRepository(testDB)
+
+	mid := makeRole(t, "Mid", []permissions.Permission{permissions.PermUsersManageRoles}, false)
+	mid.Level = 50
+	require.NoError(t, testRoleRepo.Update(ctx, mid))
+	high := makeRole(t, "High", []permissions.Permission{permissions.PermAuthLogin}, false)
+	high.Level = 90
+	require.NoError(t, testRoleRepo.Update(ctx, high))
+	low := makeRole(t, "Low", []permissions.Permission{permissions.PermAuthLogin}, false)
+	low.Level = 10
+	require.NoError(t, testRoleRepo.Update(ctx, low))
+
+	adminBare := makeUser(t, "assigner@example.com", "Pass12345", mid)
+	admin, err := userRepo.FindByIDWithRoles(ctx, adminBare.ID)
+	require.NoError(t, err)
+	target := makeUser(t, "lvl-target@example.com", "Pass12345", low)
+
+	// Granting a level-90 role exceeds the assigner's level-50 authority.
+	err = userSvc.AssignRoles(ctx, target.ID, []uuid.UUID{high.ID}, admin)
+	require.Error(t, err)
+	var ae *apperrors.AppError
+	require.ErrorAs(t, err, &ae)
+	assert.Equal(t, apperrors.CodeForbidden, ae.Code)
+
+	// Granting a level-10 role is within authority.
+	require.NoError(t, userSvc.AssignRoles(ctx, target.ID, []uuid.UUID{low.ID}, admin))
 }
