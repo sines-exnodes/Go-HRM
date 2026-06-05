@@ -22,10 +22,10 @@ func NewSkillHandler(svc *services.SkillService) *SkillHandler {
 	return &SkillHandler{svc: svc}
 }
 
-// maxSkillIconBytes mirrors skill_service.skillIconMaxBytes (5MB). Kept
-// duplicated here so the handler can reject oversized uploads before the
-// service is even called.
-const maxSkillIconBytes = 5 * 1024 * 1024
+// maxSkillIconBytes mirrors skill_service.skillIconMaxBytes (2MB, per BA
+// DR-008-003-02). Kept duplicated here so the handler can reject oversized
+// uploads before the service is even called.
+const maxSkillIconBytes = 2 * 1024 * 1024
 
 // readSkillIcon extracts the optional `icon` multipart file from the
 // request. Returns (nil, nil) when the form field is absent — that is
@@ -45,7 +45,7 @@ func readSkillIcon(c *gin.Context) (*services.SkillIconUpload, error) {
 		return nil, nil
 	}
 	if fh.Size > maxSkillIconBytes {
-		return nil, apperrors.ErrBadRequest("Icon must not exceed 5MB")
+		return nil, apperrors.ErrBadRequest("Icon must not exceed 2MB")
 	}
 	f, err := fh.Open()
 	if err != nil {
@@ -57,7 +57,7 @@ func readSkillIcon(c *gin.Context) (*services.SkillIconUpload, error) {
 		return nil, apperrors.ErrBadRequest("cannot read icon")
 	}
 	if len(content) > maxSkillIconBytes {
-		return nil, apperrors.ErrBadRequest("Icon must not exceed 5MB")
+		return nil, apperrors.ErrBadRequest("Icon must not exceed 2MB")
 	}
 	ext := strings.ToLower(filepath.Ext(fh.Filename))
 	return &services.SkillIconUpload{
@@ -100,7 +100,7 @@ func (h *SkillHandler) List(c *gin.Context) {
 // @Produce      json
 // @Param        name        formData  string  true   "Skill name (1..100, regex [a-zA-Z0-9 &.+#/()-])"
 // @Param        description formData  string  false  "Skill description (<=500)"
-// @Param        icon        formData  file    false  "Optional icon (image, <=5MB)"
+// @Param        icon        formData  file    false  "Optional icon (image, <=2MB)"
 // @Success      201  {object}  map[string]interface{}
 // @Router       /api/v1/skills [post]
 func (h *SkillHandler) Create(c *gin.Context) {
@@ -161,7 +161,7 @@ func (h *SkillHandler) Get(c *gin.Context) {
 // @Param        id          path      string  true   "Skill UUID"
 // @Param        name        formData  string  false  "New name"
 // @Param        description formData  string  false  "New description"
-// @Param        icon        formData  file    false  "New icon (image, <=5MB)"
+// @Param        icon        formData  file    false  "New icon (image, <=2MB)"
 // @Success      200  {object}  map[string]interface{}
 // @Router       /api/v1/skills/{id} [patch]
 func (h *SkillHandler) Update(c *gin.Context) {

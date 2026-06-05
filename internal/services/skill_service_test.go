@@ -274,6 +274,43 @@ func TestSkillService_Delete_OKWhenUnassigned(t *testing.T) {
 	require.Error(t, err, "soft-deleted skill must not be returned by FindByID")
 }
 
+func TestSkillService_Delete_RemovesIconFromStorage(t *testing.T) {
+	// Parity with the Python source + BA DR-008-003-04 SR-08/AC-14: deleting a
+	// skill must also remove its icon object from storage (best-effort). The
+	// stub uploader's delete counter proves the cleanup ran.
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+	up := &stubUploader{}
+	svc, _, _ := newSkillSvc(t, up)
+
+	s, err := svc.Create(ctx, dto.SkillCreate{Name: "WithIcon"}, &services.SkillIconUpload{Content: pngBytes, Ext: ".png"})
+	require.NoError(t, err)
+	require.NotNil(t, s.IconURL)
+	require.Equal(t, int32(0), atomic.LoadInt32(&up.deleted))
+
+	require.NoError(t, svc.Delete(ctx, s.ID))
+	require.Equal(t, int32(1), atomic.LoadInt32(&up.deleted), "skill icon must be deleted from storage on delete")
+}
+
+func TestSkillService_Create_IconTooLarge_Rejected(t *testing.T) {
+	// BA DR-008-003-02 AC-09/SR-08: icons are capped at 2MB. A 2MB+1 payload
+	// must be rejected before any upload happens.
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+	up := &stubUploader{}
+	svc, _, _ := newSkillSvc(t, up)
+
+	tooBig := make([]byte, 2*1024*1024+1)
+	_, err := svc.Create(ctx, dto.SkillCreate{Name: "Big"}, &services.SkillIconUpload{Content: tooBig, Ext: ".png"})
+	ae, ok := apperrors.As(err)
+	require.True(t, ok, "expected AppError, got %v", err)
+	require.Equal(t, apperrors.CodeBadRequest, ae.Code)
+	require.Contains(t, ae.Message, "2MB")
+	require.Equal(t, int32(0), atomic.LoadInt32(&up.uploaded), "oversized icon must not be uploaded")
+}
+
 func TestSkillService_List_Pagination_And_SortByNameASC(t *testing.T) {
 	// REVISION NOTES item #2: "sort by name ASC". This is a public-API
 	// contract — Python clients depend on it. Guard against accidental
