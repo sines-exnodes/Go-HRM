@@ -28,7 +28,7 @@ const (
 	skillDescMaxLen = 500
 
 	skillIconSubdir   = "skill-icons"
-	skillIconMaxBytes = 5 * 1024 * 1024
+	skillIconMaxBytes = 2 * 1024 * 1024 // BA DR-008-003-02 AC-09/SR-08: icons capped at 2MB
 )
 
 // allowedSkillIconMIME is the set of image content types accepted for a
@@ -130,7 +130,7 @@ func (s *SkillService) uploadIcon(ctx context.Context, icon SkillIconUpload) (st
 		return "", apperrors.ErrBadRequest("Icon file is empty")
 	}
 	if len(icon.Content) > skillIconMaxBytes {
-		return "", apperrors.ErrBadRequest("Icon must not exceed 5MB")
+		return "", apperrors.ErrBadRequest("Icon must not exceed 2MB")
 	}
 	sniffLen := len(icon.Content)
 	if sniffLen > 512 {
@@ -269,7 +269,17 @@ func (s *SkillService) Delete(ctx context.Context, id uuid.UUID) error {
 				"employee_count": count,
 			})
 	}
-	return s.repo.SoftDelete(ctx, id)
+	if err := s.repo.SoftDelete(ctx, id); err != nil {
+		return err
+	}
+	// Best-effort: remove the icon object from storage after the row is
+	// soft-deleted (parity with the Python source's delete_file on skill
+	// delete + BA DR-008-003-04 SR-08/AC-14). A storage failure must NOT
+	// fail the request — the catalog row is already gone from reads.
+	if row.IconURL != nil && *row.IconURL != "" && s.uploads != nil {
+		_ = s.uploads.Delete(ctx, *row.IconURL)
+	}
+	return nil
 }
 
 func (s *SkillService) Get(ctx context.Context, id uuid.UUID) (*dto.SkillRead, error) {

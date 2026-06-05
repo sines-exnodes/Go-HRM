@@ -3262,7 +3262,7 @@ paths:
         in: formData
         name: description
         type: string
-      - description: Optional icon (image, <=5MB)
+      - description: Optional icon (image, <=2MB)
         in: formData
         name: icon
         type: file
@@ -3344,7 +3344,7 @@ paths:
         in: formData
         name: description
         type: string
-      - description: New icon (image, <=5MB)
+      - description: New icon (image, <=2MB)
         in: formData
         name: icon
         type: file

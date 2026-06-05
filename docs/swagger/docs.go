@@ -3404,7 +3404,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "Optional icon (image, \u003c=5MB)",
+                        "description": "Optional icon (image, \u003c=2MB)",
                         "name": "icon",
                         "in": "formData"
                     }
@@ -3525,7 +3525,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "New icon (image, \u003c=5MB)",
+                        "description": "New icon (image, \u003c=2MB)",
                         "name": "icon",
                         "in": "formData"
                     }
