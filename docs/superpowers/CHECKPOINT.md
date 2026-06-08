@@ -1,10 +1,22 @@
 # Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (employees + announcements landed)
 
-**Last updated:** 2026-06-04
-**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements merged (PRs #5/#6); employees parity A/B/C merged to `main`; **employees parity ROUND 2 merged to `main`** via **PR #12** (`de83970`, 7 commits, fully verified). No parity branch in flight.
-**Branch:** `main`.
-**DB migration version:** **19** on `main` (through `000019_employee_experience_year_to_start_year`; 000018 name split, 000019 experience-year normalize). Next free: **000020**.
+**Last updated:** 2026-06-08
+**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements (PRs #5/#6), employees A/B/C, employees ROUND 2 (PR #12), roles & permissions (PR #14, `3cc459d`) all merged. **Attendance parity (Plan A + B) IMPLEMENTED** on branch `worktree-feat+attendance-parity` — not yet merged (see below).
+**Branch:** attendance work on `worktree-feat+attendance-parity` (off `origin/main` `3cc459d`); `main` otherwise idle.
+**DB migration version:** **21** on `main` (roles `level` 000020 + role-name partial-unique 000021, both via PR #14). **Attendance parity added NO migration** — version stays **21**. Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
+
+> ⚠️ **Checkpoint discrepancy (reconcile before merge):** this file (committed at `origin/main` `3cc459d`) predates the roles-parity checkpoint write, which exists only as an *uncommitted* edit in a separate working tree. The header above has been corrected to migration **21**, but the detailed Roles & Permissions parity subsection is NOT present in this committed copy. Reconcile the two checkpoint copies when merging the attendance branch.
+
+## Attendance parity — Plan A + B (IMPLEMENTED, branch `worktree-feat+attendance-parity`)
+
+Python↔Go attendance audit → locked decisions D1–D6 → two plans, executed subagent-driven (fresh implementer per task + two-stage spec/quality review). Full suite green (`go test ./...`, services ~181s, 0 fail / 0 skip). **No migration** (reads existing `leave_requests` + uses the existing `is_auto_checkout` column).
+
+- **Audit + plans:** [`specs/2026-06-05-attendance-parity-audit.md`](specs/2026-06-05-attendance-parity-audit.md), [`plans/2026-06-05-attendance-parity-a-matrix-leave.md`](plans/2026-06-05-attendance-parity-a-matrix-leave.md), [`plans/2026-06-05-attendance-parity-b-export-jobs.md`](plans/2026-06-05-attendance-parity-b-export-jobs.md).
+- **Plan A — leave-integrated matrix** (`cc60537`): approved leave rendered in matrix cells (G1, AC-016); combined half-day cells with `worked_half_status` + AM/PM thresholds 09:00/13:15/12:00/18:00 (G2, AC-026–031); leave-aware SR-011 Total Late/Early summaries (G6); `on_leave` status filter + combined multi-match (G4); **root `GET /api/v1/attendance` now returns the matrix** (D1, `43fdda6`) — flat list moved to `/attendance/records`, `/matrix` kept as alias.
+- **Plan B** — Excel export `GET /attendance/export` + `/export/{employee_id}` via `xuri/excelize/v2`, reusing the leave-aware `buildAllRows` so totals match the matrix (G3, AC-011/012/025); check-in/out now return `TodayStatusRead` (D2); `is_half_day` hours-based auto-flip removed — half-day is leave-driven (D5); `AutoCheckOut(cutoff)` service + `POST /attendance/auto-checkout` admin trigger gated `attendance:manage_data` (G5).
+- **Decisions:** D1 root=matrix · D2 TodayStatusRead · D3 excelize · D4 service+admin-endpoint now · D5 follow-BA (drop flip) · D6 keep admin CRUD.
+- **Deferred / follow-ups:** **G7 holiday "H" cells + streak-excludes-holidays — BLOCKED** (no holiday-calendar source; BA open question). Real **23:00 scheduler** trigger for `AutoCheckOut` (admin endpoint lands the logic now). **BA back-fill DR** for the Go-only admin-CRUD surface (kept per D6, currently unspecced). FE doc (web repo `api_info_go`) after merge.
 
 ## How to resume next session
 
