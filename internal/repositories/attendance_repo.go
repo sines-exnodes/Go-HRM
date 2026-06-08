@@ -231,8 +231,8 @@ func (r *attendanceRepo) FindOpenSession(ctx context.Context, attendanceID uuid.
 }
 
 // OpenSessionsBefore returns every open session whose check_in is before
-// the cutoff. Used by the (deferred) auto-checkout cron — stubbed here so
-// the cron has a wiring point when it's introduced.
+// the cutoff. Consumed by AttendanceService.AutoCheckOut (G5) — an admin
+// endpoint drives it today; a 23:00-company-time scheduler is a follow-up.
 func (r *attendanceRepo) OpenSessionsBefore(ctx context.Context, cutoff time.Time) ([]models.AttendanceSession, error) {
 	var rows []models.AttendanceSession
 	err := r.base(ctx).
