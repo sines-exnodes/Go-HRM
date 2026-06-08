@@ -49,7 +49,7 @@ func hasAttendanceManageAll(c *gin.Context) bool {
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.AttendanceCheckInReq  true  "check-in payload"
-// @Success      200   {object}  map[string]interface{}
+// @Success      200   {object}  dto.Response[dto.TodayStatusRead]
 // @Router       /api/v1/attendance/check-in [post]
 func (h *AttendanceHandler) CheckIn(c *gin.Context) {
 	u, okC := currentUser(c)
@@ -61,12 +61,16 @@ func (h *AttendanceHandler) CheckIn(c *gin.Context) {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
 		return
 	}
-	out, err := h.svc.CheckIn(c.Request.Context(), u.ID, req)
+	if _, err := h.svc.CheckIn(c.Request.Context(), u.ID, req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	status, err := h.svc.Today(c.Request.Context(), u.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.Response[dto.AttendanceRead]{Success: true, Message: "Checked in", Data: out})
+	c.JSON(http.StatusOK, dto.Response[dto.TodayStatusRead]{Success: true, Message: "Checked in", Data: status})
 }
 
 // CheckOut godoc
@@ -76,7 +80,7 @@ func (h *AttendanceHandler) CheckIn(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.AttendanceCheckOutReq  false  "check-out payload"
-// @Success      200   {object}  map[string]interface{}
+// @Success      200   {object}  dto.Response[dto.TodayStatusRead]
 // @Router       /api/v1/attendance/check-out [post]
 func (h *AttendanceHandler) CheckOut(c *gin.Context) {
 	u, okC := currentUser(c)
@@ -86,12 +90,16 @@ func (h *AttendanceHandler) CheckOut(c *gin.Context) {
 	var req dto.AttendanceCheckOutReq
 	// Empty body is fine — defaults to "now".
 	_ = c.ShouldBindJSON(&req)
-	out, err := h.svc.CheckOut(c.Request.Context(), u.ID, req)
+	if _, err := h.svc.CheckOut(c.Request.Context(), u.ID, req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	status, err := h.svc.Today(c.Request.Context(), u.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.Response[dto.AttendanceRead]{Success: true, Message: "Checked out", Data: out})
+	c.JSON(http.StatusOK, dto.Response[dto.TodayStatusRead]{Success: true, Message: "Checked out", Data: status})
 }
 
 // Today godoc
