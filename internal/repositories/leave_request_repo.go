@@ -58,6 +58,12 @@ type LeaveRequestRepository interface {
 	// whose date range intersects [from, to]. excludeID, if non-nil,
 	// excludes that row (used when updating an existing request).
 	Overlapping(ctx context.Context, employeeID uuid.UUID, from, to time.Time, excludeID *uuid.UUID) ([]models.LeaveRequest, error)
+
+	// ApprovedForEmployeesInRange returns live, status='approved' rows for the
+	// given employees whose [from_date, to_date] intersects [from, to].
+	// Used by the attendance matrix to overlay leave on cells. employeeIDs
+	// empty → no rows.
+	ApprovedForEmployeesInRange(ctx context.Context, employeeIDs []uuid.UUID, from, to time.Time) ([]models.LeaveRequest, error)
 }
 
 // LeaveDaysCount carries the per-type aggregate result of SumApprovedDays.
@@ -252,5 +258,19 @@ func (r *leaveRequestRepo) Overlapping(ctx context.Context, employeeID uuid.UUID
 	}
 	var items []models.LeaveRequest
 	err := q.Find(&items).Error
+	return items, err
+}
+
+func (r *leaveRequestRepo) ApprovedForEmployeesInRange(ctx context.Context, employeeIDs []uuid.UUID, from, to time.Time) ([]models.LeaveRequest, error) {
+	if len(employeeIDs) == 0 {
+		return nil, nil
+	}
+	var items []models.LeaveRequest
+	err := r.base(ctx).
+		Model(&models.LeaveRequest{}).
+		Where("employee_id IN ?", employeeIDs).
+		Where("status = ?", string(models.LeaveStatusApproved)).
+		Where("from_date <= ? AND to_date >= ?", to, from).
+		Find(&items).Error
 	return items, err
 }
