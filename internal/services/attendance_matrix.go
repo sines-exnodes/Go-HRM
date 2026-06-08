@@ -343,9 +343,7 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		size = 20
 	}
 
-	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
-	last := first.AddDate(0, 1, 0).Add(-time.Second)
-	daysInMonth := last.Day()
+	daysInMonth := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, loc).Day()
 
 	var employees []models.Employee
 	if asAdmin {
@@ -380,13 +378,60 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		employees = []models.Employee{*emp}
 	}
 
+	rows, err := s.buildAllRows(ctx, employees, year, month, loc, parseCSVSet(q.Status))
+	if err != nil {
+		return dto.AttendanceMatrixRead{}, err
+	}
+
+	total := len(rows)
+	start := (page - 1) * size
+	if start > total {
+		start = total
+	}
+	end := start + size
+	if end > total {
+		end = total
+	}
+	pageRows := rows[start:end]
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + size - 1) / size
+	}
+
+	return dto.AttendanceMatrixRead{
+		Year:        year,
+		Month:       month,
+		DaysInMonth: daysInMonth,
+		Items:       pageRows,
+		Total:       total,
+		Page:        page,
+		PageSize:    size,
+		TotalPages:  totalPages,
+	}, nil
+}
+
+// buildAllRows constructs every employee's matrix row (unpaginated) for the
+// given month. statusSet filters rows (nil = no filter). Shared by Matrix
+// (which paginates) and the Excel export (which writes all rows).
+func (s *AttendanceService) buildAllRows(
+	ctx context.Context,
+	employees []models.Employee,
+	year, month int,
+	loc *time.Location,
+	statusSet map[string]struct{},
+) ([]dto.AttendanceRowRead, error) {
+	now, _ := todayInTZ(loc)
+	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
+	last := first.AddDate(0, 1, 0).Add(-time.Second)
+	daysInMonth := last.Day()
+
 	ids := make([]uuid.UUID, 0, len(employees))
 	for _, e := range employees {
 		ids = append(ids, e.ID)
 	}
 	records, err := s.repo.ListForEmployeesInRange(ctx, ids, first, last)
 	if err != nil {
-		return dto.AttendanceMatrixRead{}, err
+		return nil, err
 	}
 	byEmp := make(map[uuid.UUID]map[string]models.Attendance, len(employees))
 	for _, r := range records {
@@ -402,7 +447,7 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 	// The earliest-inserted leave wins on overlap (first-write semantics).
 	leaves, err := s.leaves.ApprovedForEmployeesInRange(ctx, ids, first, last)
 	if err != nil {
-		return dto.AttendanceMatrixRead{}, err
+		return nil, err
 	}
 	leaveByEmp := make(map[uuid.UUID]map[string]models.LeaveRequest, len(employees))
 	for _, lv := range leaves {
@@ -419,7 +464,6 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		}
 	}
 
-	statusSet := parseCSVSet(q.Status)
 	rows := make([]dto.AttendanceRowRead, 0, len(employees))
 
 	for _, emp := range employees {
@@ -520,31 +564,7 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		rows = append(rows, row)
 	}
 
-	total := len(rows)
-	start := (page - 1) * size
-	if start > total {
-		start = total
-	}
-	end := start + size
-	if end > total {
-		end = total
-	}
-	pageRows := rows[start:end]
-	totalPages := 0
-	if total > 0 {
-		totalPages = (total + size - 1) / size
-	}
-
-	return dto.AttendanceMatrixRead{
-		Year:        year,
-		Month:       month,
-		DaysInMonth: daysInMonth,
-		Items:       pageRows,
-		Total:       total,
-		Page:        page,
-		PageSize:    size,
-		TotalPages:  totalPages,
-	}, nil
+	return rows, nil
 }
 
 // parseCSVSet splits a comma-separated string into a set. Returns nil when
