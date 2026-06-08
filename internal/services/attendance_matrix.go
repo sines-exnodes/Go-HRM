@@ -171,12 +171,43 @@ func (s *AttendanceService) AdminDelete(ctx context.Context, id uuid.UUID) error
 
 // Matrix cell status enum.
 const (
-	matrixOnTime  = "on_time"
-	matrixLate    = "late"
-	matrixAbsent  = "absent"
-	matrixWeekend = "weekend"
-	matrixNoData  = "no_data"
+	matrixOnTime         = "on_time"
+	matrixLate           = "late"
+	matrixAbsent         = "absent"
+	matrixWeekend        = "weekend"
+	matrixNoData         = "no_data"
+	matrixAnnualLeave    = "annual_leave"
+	matrixSickLeave      = "sick_leave"
+	matrixPersonalLeave  = "personal_leave"
+	matrixMaternityLeave = "maternity_leave"
+	matrixUnpaidLeave    = "unpaid_leave"
+	matrixHalfDayLeave   = "half_day_leave"
 )
+
+// Half-day boundary constants — BA-fixed (DR-004-001-01 SR-002/SR-011 v1.2),
+// mirror Python's _AM_END / _PM_LATE. AM late + workday-end thresholds come
+// from config (LateThreshold / CheckoutThreshold).
+const (
+	amHalfEndHour = 12 // end of the AM half (early-leave boundary when AM worked + PM on leave)
+	amHalfEndMin  = 0
+	pmLateHour    = 13 // PM-half late threshold (when AM on leave + PM worked)
+	pmLateMin     = 15
+)
+
+// leaveTypeToStatus maps an approved full-day leave type to its cell status.
+var leaveTypeToStatus = map[models.LeaveType]string{
+	models.LeaveTypeAnnual:    matrixAnnualLeave,
+	models.LeaveTypeSick:      matrixSickLeave,
+	models.LeaveTypePersonal:  matrixPersonalLeave,
+	models.LeaveTypeMaternity: matrixMaternityLeave,
+	models.LeaveTypeUnpaid:    matrixUnpaidLeave,
+}
+
+// onLeaveStatuses is the set used by the on_leave status filter.
+var onLeaveStatuses = map[string]struct{}{
+	matrixAnnualLeave: {}, matrixSickLeave: {}, matrixPersonalLeave: {},
+	matrixMaternityLeave: {}, matrixUnpaidLeave: {}, matrixHalfDayLeave: {},
+}
 
 // Matrix returns the monthly attendance matrix. Managers (asAdmin) see
 // every employee filtered by Search + DepartmentID; non-managers see only
