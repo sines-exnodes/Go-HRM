@@ -35,6 +35,9 @@ func TestAttendance_Export_BulkProducesXlsx(t *testing.T) {
 	assert.Equal(t, "Department", header[1])
 	assert.Contains(t, header, "Total Late Time")
 	assert.Contains(t, header, "Total Early Time")
+	// Both employees (admin bulk export) must appear as data rows — guards
+	// against silent truncation where only the header is written.
+	assert.GreaterOrEqual(t, len(rows), 3, "header + 2 employee rows expected")
 }
 
 func TestAttendance_Export_NonManagerSingle_DeniesOther(t *testing.T) {
