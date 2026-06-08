@@ -94,7 +94,7 @@ func main() {
 	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
-	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo)
+	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
 	// Phase 7 — SSE hub singleton + announcement service + handler.
 	// In-process pub/sub; horizontal scaling beyond 1 replica requires a
@@ -336,13 +336,23 @@ func main() {
 		attendance.GET("/me", attendanceH.Me)
 		// Permissioned reads. Non-managers are silently scoped to own
 		// rows by the service (matches Python contract).
+		// D1: root path serves the monthly matrix (Python/FE parity).
+		attendance.GET("", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Matrix)
+		// /matrix kept as an explicit alias.
 		attendance.GET("/matrix", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Matrix)
-		attendance.GET("", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.List)
+		// Flat paginated rows (Go-only convenience; not the BA matrix).
+		attendance.GET("/records", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.List)
 		attendance.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Get)
+		// Excel export (bulk + single). /export is a static literal so gin
+		// resolves it before the :id wildcard at the same depth. The nested
+		// /export/:employee_id is one depth deeper and therefore unambiguous.
+		attendance.GET("/export", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Export)
+		attendance.GET("/export/:employee_id", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.ExportEmployee)
 		// Admin manage.
 		attendance.POST("", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminCreate)
 		attendance.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminUpdate)
 		attendance.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminDelete)
+		attendance.POST("/auto-checkout", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AutoCheckOut)
 
 		// ---- /organization-settings (Phase 8) ----
 		// Attendance subtree is admin-only (RequirePerms). Company-profile

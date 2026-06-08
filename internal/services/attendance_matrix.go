@@ -171,12 +171,152 @@ func (s *AttendanceService) AdminDelete(ctx context.Context, id uuid.UUID) error
 
 // Matrix cell status enum.
 const (
-	matrixOnTime  = "on_time"
-	matrixLate    = "late"
-	matrixAbsent  = "absent"
-	matrixWeekend = "weekend"
-	matrixNoData  = "no_data"
+	matrixOnTime         = "on_time"
+	matrixLate           = "late"
+	matrixAbsent         = "absent"
+	matrixWeekend        = "weekend"
+	matrixNoData         = "no_data"
+	matrixAnnualLeave    = "annual_leave"
+	matrixSickLeave      = "sick_leave"
+	matrixPersonalLeave  = "personal_leave"
+	matrixMaternityLeave = "maternity_leave"
+	matrixUnpaidLeave    = "unpaid_leave"
+	matrixHalfDayLeave   = "half_day_leave"
 )
+
+// Half-day boundary constants — BA-fixed (DR-004-001-01 SR-002/SR-011 v1.2),
+// mirror Python's _AM_END / _PM_LATE. AM late + workday-end thresholds come
+// from config (LateThreshold / CheckoutThreshold).
+const (
+	amHalfEndHour = 12 // end of the AM half (early-leave boundary when AM worked + PM on leave)
+	amHalfEndMin  = 0
+	pmLateHour    = 13 // PM-half late threshold (when AM on leave + PM worked)
+	pmLateMin     = 15
+)
+
+// leaveTypeToStatus maps an approved full-day leave type to its cell status.
+var leaveTypeToStatus = map[models.LeaveType]string{
+	models.LeaveTypeAnnual:    matrixAnnualLeave,
+	models.LeaveTypeSick:      matrixSickLeave,
+	models.LeaveTypePersonal:  matrixPersonalLeave,
+	models.LeaveTypeMaternity: matrixMaternityLeave,
+	models.LeaveTypeUnpaid:    matrixUnpaidLeave,
+}
+
+// onLeaveStatuses is the set used by the on_leave status filter.
+var onLeaveStatuses = map[string]struct{}{
+	matrixAnnualLeave: {}, matrixSickLeave: {}, matrixPersonalLeave: {},
+	matrixMaternityLeave: {}, matrixUnpaidLeave: {}, matrixHalfDayLeave: {},
+}
+
+// applyLeaveCell overlays an approved leave onto a cell. Full-day leave maps
+// to its type's status; half-day leave maps to half_day_leave and the caller
+// is responsible for attaching any worked-half record + WorkedHalfStatus.
+func applyLeaveCell(cell *dto.AttendanceCellRead, lv models.LeaveRequest) {
+	lt := string(lv.LeaveType)
+	lp := string(lv.LeavePeriod)
+	cell.LeaveType = &lt
+	cell.LeavePeriod = &lp
+	if models.IsHalfDayPeriod(lv.LeavePeriod) {
+		cell.Status = matrixHalfDayLeave
+		return
+	}
+	if st, ok := leaveTypeToStatus[lv.LeaveType]; ok {
+		cell.Status = st
+	} else {
+		cell.Status = matrixAnnualLeave
+	}
+}
+
+// attachRecordToCell projects a worked attendance record (check-in/out, hours,
+// sessions) onto a cell. Used both for plain worked days and for the worked
+// half of a combined half-day-leave cell.
+func attachRecordToCell(cell *dto.AttendanceCellRead, rec models.Attendance) {
+	f := rec.Sessions[0]
+	l := rec.Sessions[len(rec.Sessions)-1]
+	ci := f.CheckIn
+	cell.CheckIn = &ci
+	cell.CheckOut = l.CheckOut
+	cell.IsLate = rec.IsLate
+	var total float64
+	sessions := make([]dto.AttendanceSessionRead, 0, len(rec.Sessions))
+	for _, sess := range rec.Sessions {
+		hw := hoursBetween(sess.CheckIn, sess.CheckOut)
+		sessions = append(sessions, dto.AttendanceSessionRead{
+			ID: sess.ID, CheckIn: sess.CheckIn, CheckOut: sess.CheckOut,
+			IsAutoCheckout: sess.IsAutoCheckout, HoursWorked: hw,
+		})
+		if hw != nil {
+			total += *hw
+		}
+	}
+	if total > 0 {
+		cell.HoursWorked = &total
+	}
+	cell.Sessions = sessions
+}
+
+// computeWorkedHalfStatus derives on_time | late | absent for the worked half
+// of a combined half-day-leave cell. When AM is on leave (worked PM) the PM
+// late boundary (pmLateHour:pmLateMin) applies; otherwise the configured AM
+// late threshold applies.
+func (s *AttendanceService) computeWorkedHalfStatus(cell *dto.AttendanceCellRead, lv models.LeaveRequest, loc *time.Location) string {
+	if cell.CheckIn == nil {
+		return matrixAbsent
+	}
+	firstLocal := cell.CheckIn.In(loc)
+	var threshold time.Time
+	if lv.LeavePeriod == models.LeavePeriodMorningHalf {
+		threshold = thresholdAt(firstLocal, pmLateHour, pmLateMin)
+	} else {
+		threshold = thresholdAt(firstLocal, s.cfg.LateThresholdHour, s.cfg.LateThresholdMinute)
+	}
+	if firstLocal.After(threshold) {
+		return matrixLate
+	}
+	return matrixOnTime
+}
+
+// accumulateSummary returns the (late, early) minute contribution of a single
+// cell to the row summary. Leave statuses contribute nothing; half-day-leave
+// cells contribute only for their worked half using the SR-011 boundaries.
+func (s *AttendanceService) accumulateSummary(cell dto.AttendanceCellRead, loc *time.Location) (int, int) {
+	switch cell.Status {
+	case matrixWeekend, matrixAbsent, matrixNoData,
+		matrixAnnualLeave, matrixSickLeave, matrixPersonalLeave,
+		matrixMaternityLeave, matrixUnpaidLeave:
+		return 0, 0
+	}
+	if cell.Status == matrixHalfDayLeave && cell.CheckIn == nil {
+		return 0, 0
+	}
+	lateHour, lateMin := s.cfg.LateThresholdHour, s.cfg.LateThresholdMinute
+	earlyHour, earlyMin := s.cfg.CheckoutThresholdHour, s.cfg.CheckoutThresholdMinute
+	if cell.Status == matrixHalfDayLeave && cell.LeavePeriod != nil {
+		switch *cell.LeavePeriod {
+		case string(models.LeavePeriodMorningHalf):
+			lateHour, lateMin = pmLateHour, pmLateMin
+		case string(models.LeavePeriodAfternoonHalf):
+			earlyHour, earlyMin = amHalfEndHour, amHalfEndMin
+		}
+	}
+	var lateAdd, earlyAdd int
+	if cell.CheckIn != nil {
+		ci := cell.CheckIn.In(loc)
+		ref := thresholdAt(ci, lateHour, lateMin)
+		if ci.After(ref) {
+			lateAdd = int(ci.Sub(ref).Minutes())
+		}
+	}
+	if cell.CheckOut != nil {
+		co := cell.CheckOut.In(loc)
+		ref := thresholdAt(co, earlyHour, earlyMin)
+		if co.Before(ref) {
+			earlyAdd = int(ref.Sub(co).Minutes())
+		}
+	}
+	return lateAdd, earlyAdd
+}
 
 // Matrix returns the monthly attendance matrix. Managers (asAdmin) see
 // every employee filtered by Search + DepartmentID; non-managers see only
@@ -203,9 +343,7 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		size = 20
 	}
 
-	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
-	last := first.AddDate(0, 1, 0).Add(-time.Second)
-	daysInMonth := last.Day()
+	daysInMonth := time.Date(year, time.Month(month)+1, 0, 0, 0, 0, 0, loc).Day()
 
 	var employees []models.Employee
 	if asAdmin {
@@ -240,116 +378,9 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		employees = []models.Employee{*emp}
 	}
 
-	ids := make([]uuid.UUID, 0, len(employees))
-	for _, e := range employees {
-		ids = append(ids, e.ID)
-	}
-	records, err := s.repo.ListForEmployeesInRange(ctx, ids, first, last)
+	rows, err := s.buildAllRows(ctx, employees, year, month, loc, parseCSVSet(q.Status))
 	if err != nil {
 		return dto.AttendanceMatrixRead{}, err
-	}
-	byEmp := make(map[uuid.UUID]map[string]models.Attendance, len(employees))
-	for _, r := range records {
-		m, ok := byEmp[r.EmployeeID]
-		if !ok {
-			m = make(map[string]models.Attendance)
-			byEmp[r.EmployeeID] = m
-		}
-		m[r.Date.Format("2006-01-02")] = r
-	}
-
-	statusSet := parseCSVSet(q.Status)
-	rows := make([]dto.AttendanceRowRead, 0, len(employees))
-
-	for _, emp := range employees {
-		cells := make(map[int]dto.AttendanceCellRead, daysInMonth)
-		empRecs := byEmp[emp.ID]
-		var totalLate, totalEarly int
-		cellStatusUnion := make(map[string]struct{}, 8)
-
-		for d := 1; d <= daysInMonth; d++ {
-			day := time.Date(year, time.Month(month), d, 0, 0, 0, 0, loc)
-			cell := dto.AttendanceCellRead{
-				Date: day.Format("2006-01-02"),
-				Day:  d,
-			}
-			switch {
-			case day.Weekday() == time.Saturday || day.Weekday() == time.Sunday:
-				cell.Status = matrixWeekend
-			default:
-				rec, ok := empRecs[day.Format("2006-01-02")]
-				if ok && len(rec.Sessions) > 0 {
-					f := rec.Sessions[0]
-					l := rec.Sessions[len(rec.Sessions)-1]
-					ci := f.CheckIn
-					cell.CheckIn = &ci
-					cell.CheckOut = l.CheckOut
-					var total float64
-					for _, sess := range rec.Sessions {
-						if hw := hoursBetween(sess.CheckIn, sess.CheckOut); hw != nil {
-							total += *hw
-						}
-					}
-					if total > 0 {
-						cell.HoursWorked = &total
-					}
-					cell.IsLate = rec.IsLate
-					if rec.IsLate {
-						cell.Status = matrixLate
-					} else {
-						cell.Status = matrixOnTime
-					}
-					// Per-day late / early-leave minute totals.
-					ciLocal := f.CheckIn.In(loc)
-					refLate := thresholdAt(ciLocal, s.cfg.LateThresholdHour, s.cfg.LateThresholdMinute)
-					if ciLocal.After(refLate) {
-						totalLate += int(ciLocal.Sub(refLate).Minutes())
-					}
-					if l.CheckOut != nil {
-						coLocal := l.CheckOut.In(loc)
-						refEarly := thresholdAt(coLocal, s.cfg.CheckoutThresholdHour, s.cfg.CheckoutThresholdMinute)
-						if coLocal.Before(refEarly) {
-							totalEarly += int(refEarly.Sub(coLocal).Minutes())
-						}
-					}
-				} else if day.Before(now) {
-					cell.Status = matrixAbsent
-				} else {
-					cell.Status = matrixNoData
-				}
-			}
-			cells[d] = cell
-			cellStatusUnion[cell.Status] = struct{}{}
-		}
-
-		// Status CSV filter: drop the row when none of its cells match.
-		if statusSet != nil {
-			matched := false
-			for k := range statusSet {
-				if _, ok := cellStatusUnion[k]; ok {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				continue
-			}
-		}
-
-		row := dto.AttendanceRowRead{
-			EmployeeID:        emp.ID,
-			EmployeeName:      emp.FullName(),
-			AvatarURL:         emp.AvatarURL,
-			Cells:             cells,
-			TotalLateMinutes:  totalLate,
-			TotalEarlyMinutes: totalEarly,
-		}
-		if emp.DepartmentID != nil {
-			if d, err := s.depts.FindByID(ctx, *emp.DepartmentID, false); err == nil && d != nil {
-				row.DepartmentName = &d.Name
-			}
-		}
-		rows = append(rows, row)
 	}
 
 	total := len(rows)
@@ -377,6 +408,163 @@ func (s *AttendanceService) Matrix(ctx context.Context, currentUserID uuid.UUID,
 		PageSize:    size,
 		TotalPages:  totalPages,
 	}, nil
+}
+
+// buildAllRows constructs every employee's matrix row (unpaginated) for the
+// given month. statusSet filters rows (nil = no filter). Shared by Matrix
+// (which paginates) and the Excel export (which writes all rows).
+func (s *AttendanceService) buildAllRows(
+	ctx context.Context,
+	employees []models.Employee,
+	year, month int,
+	loc *time.Location,
+	statusSet map[string]struct{},
+) ([]dto.AttendanceRowRead, error) {
+	now, _ := todayInTZ(loc)
+	first := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
+	last := first.AddDate(0, 1, 0).Add(-time.Second)
+	daysInMonth := last.Day()
+
+	ids := make([]uuid.UUID, 0, len(employees))
+	for _, e := range employees {
+		ids = append(ids, e.ID)
+	}
+	records, err := s.repo.ListForEmployeesInRange(ctx, ids, first, last)
+	if err != nil {
+		return nil, err
+	}
+	byEmp := make(map[uuid.UUID]map[string]models.Attendance, len(employees))
+	for _, r := range records {
+		m, ok := byEmp[r.EmployeeID]
+		if !ok {
+			m = make(map[string]models.Attendance)
+			byEmp[r.EmployeeID] = m
+		}
+		m[r.Date.Format("2006-01-02")] = r
+	}
+
+	// Approved leave overlay: keyed by employee → "YYYY-MM-DD" → the leave row.
+	// The earliest-inserted leave wins on overlap (first-write semantics).
+	leaves, err := s.leaves.ApprovedForEmployeesInRange(ctx, ids, first, last)
+	if err != nil {
+		return nil, err
+	}
+	leaveByEmp := make(map[uuid.UUID]map[string]models.LeaveRequest, len(employees))
+	for _, lv := range leaves {
+		m, ok := leaveByEmp[lv.EmployeeID]
+		if !ok {
+			m = make(map[string]models.LeaveRequest)
+			leaveByEmp[lv.EmployeeID] = m
+		}
+		for d := lv.FromDate; !d.After(lv.ToDate); d = d.AddDate(0, 0, 1) {
+			key := d.Format("2006-01-02")
+			if _, exists := m[key]; !exists {
+				m[key] = lv
+			}
+		}
+	}
+
+	rows := make([]dto.AttendanceRowRead, 0, len(employees))
+
+	for _, emp := range employees {
+		cells := make(map[int]dto.AttendanceCellRead, daysInMonth)
+		empRecs := byEmp[emp.ID]
+		var totalLate, totalEarly int
+		cellStatusUnion := make(map[string]struct{}, 8)
+		workedHalfUnion := make(map[string]struct{}, 4)
+
+		for d := 1; d <= daysInMonth; d++ {
+			day := time.Date(year, time.Month(month), d, 0, 0, 0, 0, loc)
+			cell := dto.AttendanceCellRead{
+				Date: day.Format("2006-01-02"),
+				Day:  d,
+			}
+			// Cell precedence: weekend → approved leave → attendance record →
+			// absent/no_data.
+			switch {
+			case day.Weekday() == time.Saturday || day.Weekday() == time.Sunday:
+				cell.Status = matrixWeekend
+			default:
+				key := day.Format("2006-01-02")
+				if lv, onLeave := leaveByEmp[emp.ID][key]; onLeave {
+					applyLeaveCell(&cell, lv)
+					if models.IsHalfDayPeriod(lv.LeavePeriod) {
+						if rec, ok := empRecs[key]; ok && len(rec.Sessions) > 0 {
+							attachRecordToCell(&cell, rec)
+						}
+						whs := s.computeWorkedHalfStatus(&cell, lv, loc)
+						cell.WorkedHalfStatus = &whs
+					}
+				} else if rec, ok := empRecs[key]; ok && len(rec.Sessions) > 0 {
+					attachRecordToCell(&cell, rec)
+					if rec.IsLate {
+						cell.Status = matrixLate
+					} else {
+						cell.Status = matrixOnTime
+					}
+				} else if day.Before(now) {
+					cell.Status = matrixAbsent
+				} else {
+					cell.Status = matrixNoData
+				}
+			}
+			cells[d] = cell
+			cellStatusUnion[cell.Status] = struct{}{}
+			if cell.WorkedHalfStatus != nil {
+				workedHalfUnion[*cell.WorkedHalfStatus] = struct{}{}
+			}
+			la, ea := s.accumulateSummary(cell, loc)
+			totalLate += la
+			totalEarly += ea
+		}
+
+		// Status CSV filter: drop the row when none of its cells match. The
+		// special "on_leave" token matches any leave status; otherwise a token
+		// matches either a cell status or a worked-half status (combined cells).
+		if statusSet != nil {
+			matched := false
+			for sf := range statusSet {
+				switch sf {
+				case "on_leave":
+					for k := range cellStatusUnion {
+						if _, ok := onLeaveStatuses[k]; ok {
+							matched = true
+						}
+					}
+				default:
+					if _, ok := cellStatusUnion[sf]; ok {
+						matched = true
+					}
+					if _, ok := workedHalfUnion[sf]; ok {
+						matched = true
+					}
+				}
+				if matched {
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+
+		row := dto.AttendanceRowRead{
+			EmployeeID:        emp.ID,
+			EmployeeName:      emp.FullName(),
+			AvatarURL:         emp.AvatarURL,
+			Cells:             cells,
+			TotalLateMinutes:  totalLate,
+			TotalEarlyMinutes: totalEarly,
+		}
+		if emp.DepartmentID != nil {
+			if d, err := s.depts.FindByID(ctx, *emp.DepartmentID, false); err == nil && d != nil {
+				row.DepartmentName = &d.Name
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	return rows, nil
 }
 
 // parseCSVSet splits a comma-separated string into a set. Returns nil when

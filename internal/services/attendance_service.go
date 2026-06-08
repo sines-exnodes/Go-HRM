@@ -22,11 +22,12 @@ import (
 // JWT-preloaded user.Roles — the service enforces ownership using that
 // flag plus the resolved current-employee ID. Same shape as LeaveService.
 type AttendanceService struct {
-	cfg   *config.Config
-	repo  repositories.AttendanceRepository
-	emps  repositories.EmployeeRepository
-	depts repositories.DepartmentRepository
-	pos   repositories.PositionRepository
+	cfg    *config.Config
+	repo   repositories.AttendanceRepository
+	emps   repositories.EmployeeRepository
+	depts  repositories.DepartmentRepository
+	pos    repositories.PositionRepository
+	leaves repositories.LeaveRequestRepository
 }
 
 // NewAttendanceService constructs an AttendanceService.
@@ -36,8 +37,9 @@ func NewAttendanceService(
 	emps repositories.EmployeeRepository,
 	depts repositories.DepartmentRepository,
 	pos repositories.PositionRepository,
+	leaves repositories.LeaveRequestRepository,
 ) *AttendanceService {
-	return &AttendanceService{cfg: cfg, repo: repo, emps: emps, depts: depts, pos: pos}
+	return &AttendanceService{cfg: cfg, repo: repo, emps: emps, depts: depts, pos: pos, leaves: leaves}
 }
 
 // ---- shared helpers ----
@@ -219,9 +221,8 @@ func (s *AttendanceService) CheckIn(ctx context.Context, currentUserID uuid.UUID
 // ---- Check-out ----
 
 // CheckOut closes the (single) open session for today. Returns 409 when
-// no open session exists. After close, total hours-worked is summed across
-// all sessions and is_half_day is flipped when the day total is below the
-// configured threshold.
+// no open session exists. is_half_day is leave-driven (set only by approved
+// half-day leave) and is NOT auto-flipped here based on hours (D5).
 func (s *AttendanceService) CheckOut(ctx context.Context, currentUserID uuid.UUID, in dto.AttendanceCheckOutReq) (dto.AttendanceRead, error) {
 	currentEmp, err := s.resolveCurrentEmployee(ctx, currentUserID)
 	if err != nil {
@@ -264,15 +265,6 @@ func (s *AttendanceService) CheckOut(ctx context.Context, currentUserID uuid.UUI
 	reloaded, err := s.repo.FindByID(ctx, row.ID)
 	if err != nil {
 		return dto.AttendanceRead{}, err
-	}
-	var total float64
-	for _, sess := range reloaded.Sessions {
-		if hw := hoursBetween(sess.CheckIn, sess.CheckOut); hw != nil {
-			total += *hw
-		}
-	}
-	if total > 0 && total < s.cfg.HalfDayHoursThreshold {
-		reloaded.IsHalfDay = true
 	}
 	if in.Notes != nil {
 		reloaded.Notes = in.Notes
@@ -390,6 +382,32 @@ func (s *AttendanceService) Get(ctx context.Context, id uuid.UUID, currentUserID
 		}
 	}
 	return s.toRead(ctx, row), nil
+}
+
+// ---- AutoCheckOut ----
+
+// AutoCheckOut closes every open session whose check_in precedes cutoff,
+// stamping check_out=cutoff and is_auto_checkout=true. Idempotent — a second
+// run finds nothing open. Returns the number of sessions closed. Intended to
+// run at 23:00 company time (mobile DR Rule 5); exposed via an admin endpoint
+// now, a scheduler later.
+func (s *AttendanceService) AutoCheckOut(ctx context.Context, cutoff time.Time) (int, error) {
+	open, err := s.repo.OpenSessionsBefore(ctx, cutoff.UTC())
+	if err != nil {
+		return 0, err
+	}
+	closed := 0
+	for i := range open {
+		sess := open[i]
+		co := cutoff.UTC()
+		sess.CheckOut = &co
+		sess.IsAutoCheckout = true
+		if err := s.repo.UpdateSession(ctx, &sess); err != nil {
+			return closed, err
+		}
+		closed++
+	}
+	return closed, nil
 }
 
 // ---- List ----

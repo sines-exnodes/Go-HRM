@@ -38,6 +38,7 @@ func newAttendanceSvc(t *testing.T) *services.AttendanceService {
 		repositories.NewEmployeeRepository(testDB),
 		repositories.NewDepartmentRepository(testDB),
 		repositories.NewPositionRepository(testDB),
+		repositories.NewLeaveRequestRepository(testDB),
 	)
 }
 
@@ -137,7 +138,10 @@ func TestAttendance_CheckOut_FullDay_NotHalfDay(t *testing.T) {
 	assert.InDelta(t, 9.0, *out.HoursWorked, 0.05)
 }
 
-func TestAttendance_CheckOut_ShortDay_FlagsHalfDay(t *testing.T) {
+// D5: is_half_day is leave-driven, not hours-driven. A short worked day must
+// NOT auto-flag half-day (the column is only set by approved half-day leave,
+// surfaced in the matrix, not on the attendance row).
+func TestAttendance_CheckOut_ShortDay_DoesNotFlagHalfDay(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
@@ -149,10 +153,10 @@ func TestAttendance_CheckOut_ShortDay_FlagsHalfDay(t *testing.T) {
 	_, err := svc.CheckIn(ctx, u.ID, dto.AttendanceCheckInReq{CheckIn: &ci})
 	require.NoError(t, err)
 
-	co := hcmTime(t, 2026, 5, 15, 11, 0) // 2.5h < 4h threshold
+	co := hcmTime(t, 2026, 5, 15, 11, 0) // 2.5h — short, but NOT half-day
 	out, err := svc.CheckOut(ctx, u.ID, dto.AttendanceCheckOutReq{CheckOut: &co})
 	require.NoError(t, err)
-	assert.True(t, out.IsHalfDay)
+	assert.False(t, out.IsHalfDay, "short worked day must not auto-flag half-day (D5)")
 }
 
 func TestAttendance_CheckOut_DoubleClose_Conflicts(t *testing.T) {
@@ -514,4 +518,38 @@ func TestAttendance_Matrix_WeekendsMarked(t *testing.T) {
 	// May 2026: 2 = Sat, 3 = Sun.
 	assert.Equal(t, "weekend", row.Cells[2].Status)
 	assert.Equal(t, "weekend", row.Cells[3].Status)
+}
+
+// G5: AutoCheckOut closes every open session whose check-in precedes the
+// cutoff, marking it auto-checkout, and is idempotent on a second run.
+func TestAttendance_AutoCheckOut_ClosesOpenSessions(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc := newAttendanceSvc(t)
+	u, _ := makeEmpUser(t, "autoout@example.com", "AutoOut")
+
+	ci := hcmTime(t, 2026, 5, 15, 8, 30)
+	_, err := svc.CheckIn(ctx, u.ID, dto.AttendanceCheckInReq{CheckIn: &ci})
+	require.NoError(t, err)
+
+	cutoff := hcmTime(t, 2026, 5, 15, 23, 0) // 11 PM company time
+	n, err := svc.AutoCheckOut(ctx, cutoff)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	// Idempotent — nothing open remains.
+	n2, err := svc.AutoCheckOut(ctx, cutoff)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n2)
+
+	// The session is now closed + flagged. Assert via List (Today may not see
+	// this row depending on the TZ-of-now).
+	out, err := svc.List(ctx, u.ID, false, dto.AttendanceListQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	require.Len(t, out.Items, 1)
+	require.Len(t, out.Items[0].Sessions, 1)
+	require.NotNil(t, out.Items[0].Sessions[0].CheckOut)
+	assert.True(t, out.Items[0].Sessions[0].IsAutoCheckout)
 }

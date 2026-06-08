@@ -147,16 +147,22 @@ type TodayStatusRead struct {
 // ---------- Matrix ----------
 
 // AttendanceCellRead is one day in the matrix. Status enum:
-// on_time | late | absent | weekend | no_data.
+// on_time | late | absent | weekend | no_data | annual_leave | sick_leave |
+// personal_leave | maternity_leave | unpaid_leave | half_day_leave.
+// For combined cells (half_day_leave + a worked half), WorkedHalfStatus is
+// one of on_time | late | absent; LeaveType/LeavePeriod describe the leave half.
 type AttendanceCellRead struct {
-	Date        string                  `json:"date"`
-	Day         int                     `json:"day"`
-	Status      string                  `json:"status"`
-	CheckIn     *time.Time              `json:"check_in,omitempty"`
-	CheckOut    *time.Time              `json:"check_out,omitempty"`
-	HoursWorked *float64                `json:"hours_worked,omitempty"`
-	IsLate      bool                    `json:"is_late"`
-	Sessions    []AttendanceSessionRead `json:"sessions,omitempty"`
+	Date             string                  `json:"date"`
+	Day              int                     `json:"day"`
+	Status           string                  `json:"status"`
+	CheckIn          *time.Time              `json:"check_in,omitempty"`
+	CheckOut         *time.Time              `json:"check_out,omitempty"`
+	HoursWorked      *float64                `json:"hours_worked,omitempty"`
+	IsLate           bool                    `json:"is_late"`
+	LeaveType        *string                 `json:"leave_type,omitempty"`
+	LeavePeriod      *string                 `json:"leave_period,omitempty"`
+	WorkedHalfStatus *string                 `json:"worked_half_status,omitempty"`
+	Sessions         []AttendanceSessionRead `json:"sessions,omitempty"`
 }
 
 // AttendanceRowRead is one employee's row in the matrix. Cells is keyed

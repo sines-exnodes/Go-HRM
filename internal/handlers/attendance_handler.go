@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -49,7 +50,7 @@ func hasAttendanceManageAll(c *gin.Context) bool {
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.AttendanceCheckInReq  true  "check-in payload"
-// @Success      200   {object}  map[string]interface{}
+// @Success      200   {object}  dto.Response[dto.TodayStatusRead]
 // @Router       /api/v1/attendance/check-in [post]
 func (h *AttendanceHandler) CheckIn(c *gin.Context) {
 	u, okC := currentUser(c)
@@ -61,12 +62,16 @@ func (h *AttendanceHandler) CheckIn(c *gin.Context) {
 		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
 		return
 	}
-	out, err := h.svc.CheckIn(c.Request.Context(), u.ID, req)
+	if _, err := h.svc.CheckIn(c.Request.Context(), u.ID, req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	status, err := h.svc.Today(c.Request.Context(), u.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.Response[dto.AttendanceRead]{Success: true, Message: "Checked in", Data: out})
+	c.JSON(http.StatusOK, dto.Response[dto.TodayStatusRead]{Success: true, Message: "Checked in", Data: status})
 }
 
 // CheckOut godoc
@@ -76,7 +81,7 @@ func (h *AttendanceHandler) CheckIn(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Param        body  body      dto.AttendanceCheckOutReq  false  "check-out payload"
-// @Success      200   {object}  map[string]interface{}
+// @Success      200   {object}  dto.Response[dto.TodayStatusRead]
 // @Router       /api/v1/attendance/check-out [post]
 func (h *AttendanceHandler) CheckOut(c *gin.Context) {
 	u, okC := currentUser(c)
@@ -86,12 +91,16 @@ func (h *AttendanceHandler) CheckOut(c *gin.Context) {
 	var req dto.AttendanceCheckOutReq
 	// Empty body is fine — defaults to "now".
 	_ = c.ShouldBindJSON(&req)
-	out, err := h.svc.CheckOut(c.Request.Context(), u.ID, req)
+	if _, err := h.svc.CheckOut(c.Request.Context(), u.ID, req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	status, err := h.svc.Today(c.Request.Context(), u.ID)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.Response[dto.AttendanceRead]{Success: true, Message: "Checked out", Data: out})
+	c.JSON(http.StatusOK, dto.Response[dto.TodayStatusRead]{Success: true, Message: "Checked out", Data: status})
 }
 
 // Today godoc
@@ -145,7 +154,7 @@ func (h *AttendanceHandler) Me(c *gin.Context) {
 }
 
 // List godoc
-// @Summary      List attendance rows
+// @Summary      Flat list of attendance rows (Go convenience; not the BA matrix)
 // @Description  Managers (with attendance:manage_data) see all rows; non-managers see only their own.
 // @Tags         attendance
 // @Security     BearerAuth
@@ -158,7 +167,7 @@ func (h *AttendanceHandler) Me(c *gin.Context) {
 // @Param        end_date      query  string  false  "YYYY-MM-DD"
 // @Param        status        query  string  false  "on_time|late"
 // @Success      200  {object}  map[string]interface{}
-// @Router       /api/v1/attendance [get]
+// @Router       /api/v1/attendance/records [get]
 func (h *AttendanceHandler) List(c *gin.Context) {
 	u, okC := currentUser(c)
 	if !okC {
@@ -276,8 +285,103 @@ func (h *AttendanceHandler) AdminDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.Response[struct{}]{Success: true, Message: "Deleted"})
 }
 
+// AutoCheckOut godoc
+// @Summary      Admin: close all open sessions before a cutoff (auto check-out)
+// @Description  Idempotent. Defaults the cutoff to now (company TZ) when omitted.
+// @Tags         attendance
+// @Security     BearerAuth
+// @Produce      json
+// @Param        cutoff  query  string  false  "RFC3339 cutoff; defaults to now"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /api/v1/attendance/auto-checkout [post]
+func (h *AttendanceHandler) AutoCheckOut(c *gin.Context) {
+	cutoff := time.Now()
+	if raw := c.Query("cutoff"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			_ = c.Error(apperrors.ErrBadRequest("invalid cutoff (expected RFC3339)"))
+			return
+		}
+		cutoff = parsed
+	}
+	n, err := h.svc.AutoCheckOut(c.Request.Context(), cutoff)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[map[string]int]{Success: true, Message: "Auto check-out complete", Data: map[string]int{"closed": n}})
+}
+
+// Export godoc
+// @Summary      Export the monthly attendance matrix to Excel (all visible employees)
+// @Tags         attendance
+// @Security     BearerAuth
+// @Produce      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param        month  query  int  false  "1-12"
+// @Param        year   query  int  false  "YYYY"
+// @Success      200  {file}  binary
+// @Router       /api/v1/attendance/export [get]
+func (h *AttendanceHandler) Export(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var q dto.AttendanceMatrixQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	data, err := h.svc.ExportMatrix(c.Request.Context(), u.ID, hasAttendanceManageAll(c), q, nil)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	writeXlsx(c, data, "attendance")
+}
+
+// ExportEmployee godoc
+// @Summary      Export a single employee's monthly attendance to Excel
+// @Tags         attendance
+// @Security     BearerAuth
+// @Produce      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param        employee_id  path   string  true  "employee uuid"
+// @Param        month        query  int     false  "1-12"
+// @Param        year         query  int     false  "YYYY"
+// @Success      200  {file}  binary
+// @Router       /api/v1/attendance/export/{employee_id} [get]
+func (h *AttendanceHandler) ExportEmployee(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	empID, err := parseIDParam(c, "employee_id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	var q dto.AttendanceMatrixQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	data, err := h.svc.ExportMatrix(c.Request.Context(), u.ID, hasAttendanceManageAll(c), q, &empID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	writeXlsx(c, data, "attendance_"+empID.String())
+}
+
+// writeXlsx streams an xlsx byte slice as a download.
+func writeXlsx(c *gin.Context, data []byte, basename string) {
+	c.Header("Content-Disposition", `attachment; filename="`+basename+`.xlsx"`)
+	c.Data(http.StatusOK,
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		data)
+}
+
 // Matrix godoc
-// @Summary      Monthly attendance matrix
+// @Summary      Monthly attendance matrix (managers: all employees; others: own row)
 // @Description  Managers see all employees; non-managers see only their own row.
 // @Tags         attendance
 // @Security     BearerAuth
@@ -290,7 +394,7 @@ func (h *AttendanceHandler) AdminDelete(c *gin.Context) {
 // @Param        department_id query  string  false  "department UUID (managers only)"
 // @Param        status        query  string  false  "CSV: on_time,late,absent,weekend,no_data"
 // @Success      200  {object}  map[string]interface{}
-// @Router       /api/v1/attendance/matrix [get]
+// @Router       /api/v1/attendance [get]
 func (h *AttendanceHandler) Matrix(c *gin.Context) {
 	u, okC := currentUser(c)
 	if !okC {
