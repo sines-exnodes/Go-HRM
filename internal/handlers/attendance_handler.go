@@ -276,6 +276,74 @@ func (h *AttendanceHandler) AdminDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.Response[struct{}]{Success: true, Message: "Deleted"})
 }
 
+// Export godoc
+// @Summary      Export the monthly attendance matrix to Excel (all visible employees)
+// @Tags         attendance
+// @Security     BearerAuth
+// @Produce      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param        month  query  int  false  "1-12"
+// @Param        year   query  int  false  "YYYY"
+// @Success      200  {file}  binary
+// @Router       /api/v1/attendance/export [get]
+func (h *AttendanceHandler) Export(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	var q dto.AttendanceMatrixQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	data, err := h.svc.ExportMatrix(c.Request.Context(), u.ID, hasAttendanceManageAll(c), q, nil)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	writeXlsx(c, data, "attendance")
+}
+
+// ExportEmployee godoc
+// @Summary      Export a single employee's monthly attendance to Excel
+// @Tags         attendance
+// @Security     BearerAuth
+// @Produce      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param        employee_id  path   string  true  "employee uuid"
+// @Param        month        query  int     false  "1-12"
+// @Param        year         query  int     false  "YYYY"
+// @Success      200  {file}  binary
+// @Router       /api/v1/attendance/export/{employee_id} [get]
+func (h *AttendanceHandler) ExportEmployee(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
+	empID, err := parseIDParam(c, "employee_id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	var q dto.AttendanceMatrixQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	data, err := h.svc.ExportMatrix(c.Request.Context(), u.ID, hasAttendanceManageAll(c), q, &empID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	writeXlsx(c, data, "attendance_"+empID.String())
+}
+
+// writeXlsx streams an xlsx byte slice as a download.
+func writeXlsx(c *gin.Context, data []byte, basename string) {
+	c.Header("Content-Disposition", `attachment; filename="`+basename+`.xlsx"`)
+	c.Data(http.StatusOK,
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		data)
+}
+
 // Matrix godoc
 // @Summary      Monthly attendance matrix (managers: all employees; others: own row)
 // @Description  Managers see all employees; non-managers see only their own row.

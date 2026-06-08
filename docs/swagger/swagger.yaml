@@ -1493,6 +1493,57 @@ paths:
       summary: Record a check-out for the authenticated user
       tags:
       - attendance
+  /api/v1/attendance/export:
+    get:
+      parameters:
+      - description: 1-12
+        in: query
+        name: month
+        type: integer
+      - description: YYYY
+        in: query
+        name: year
+        type: integer
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      security:
+      - BearerAuth: []
+      summary: Export the monthly attendance matrix to Excel (all visible employees)
+      tags:
+      - attendance
+  /api/v1/attendance/export/{employee_id}:
+    get:
+      parameters:
+      - description: employee uuid
+        in: path
+        name: employee_id
+        required: true
+        type: string
+      - description: 1-12
+        in: query
+        name: month
+        type: integer
+      - description: YYYY
+        in: query
+        name: year
+        type: integer
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+      security:
+      - BearerAuth: []
+      summary: Export a single employee's monthly attendance to Excel
+      tags:
+      - attendance
   /api/v1/attendance/me:
     get:
       parameters:

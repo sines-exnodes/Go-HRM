@@ -343,6 +343,11 @@ func main() {
 		// Flat paginated rows (Go-only convenience; not the BA matrix).
 		attendance.GET("/records", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.List)
 		attendance.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Get)
+		// Excel export (bulk + single). /export is a static literal so gin
+		// resolves it before the :id wildcard at the same depth. The nested
+		// /export/:employee_id is one depth deeper and therefore unambiguous.
+		attendance.GET("/export", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Export)
+		attendance.GET("/export/:employee_id", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.ExportEmployee)
 		// Admin manage.
 		attendance.POST("", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminCreate)
 		attendance.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminUpdate)
