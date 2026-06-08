@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-05
 **Module:** Attendance (mobile check-in/out + web monthly matrix + export)
-**Status:** AUDIT — **all decisions (D1–D6) LOCKED 2026-06-05**; no code yet (ready to plan)
+**Status:** IN PROGRESS — decisions D1–D6 LOCKED 2026-06-05. **Plan A DONE** (G1/G2/G4/G6 + D1 implemented, verified — full suite green on branch `worktree-feat+attendance-parity`). Plan B (G3/G5/D2/D5) in progress. G7 (holidays) blocked.
 **Method:** module-by-module parity audit (same pipeline as announcements/employees/roles:
 audit → locked decisions → PR(s) → verification log → FE doc → handoff)
 
@@ -26,17 +26,16 @@ audit → locked decisions → PR(s) → verification log → FE doc → handoff
 Go's attendance API is a **superset on the admin/CRUD axis** and a **subset on the
 two headline web features the BA actually asks for**:
 
-- **Missing (in-scope, BA-backed):**
-  1. **Leave-integrated matrix** — approved leave rendered in matrix cells (AC-016, SR-004).
-  2. **Combined half-day cells** — ½-leave + worked half, `worked_half_status`, AM/PM
+- **In-scope, BA-backed** (status):
+  1. ✅ **DONE (Plan A)** — **Leave-integrated matrix** — approved leave rendered in matrix cells (AC-016, SR-004).
+  2. ✅ **DONE (Plan A)** — **Combined half-day cells** — ½-leave + worked half, `worked_half_status`, AM/PM
      thresholds (AC-026–031, SR-002/003/004/008/011).
-  3. **Excel export** — bulk + per-employee `.xlsx`, incl. the two summary columns
+  3. ⏳ **Plan B** — **Excel export** — bulk + per-employee `.xlsx`, incl. the two summary columns
      (AC-011/012/025, SR-009).
-  4. **`on_leave` status filter** + combined-cell multi-match (AC-005/031, SR-008).
-  5. **11 PM auto check-out job** (mobile AC-11/12, Rule 5) — Go has the
+  4. ✅ **DONE (Plan A)** — **`on_leave` status filter** + combined-cell multi-match (AC-005/031, SR-008).
+  5. ⏳ **Plan B** — **11 PM auto check-out job** (mobile AC-11/12, Rule 5) — Go has the
      `is_auto_checkout` column but nothing drives it.
-  6. **Leave-aware summary math** — Go computes `total_late/early_minutes` but only the
-     full-day case; the SR-011 half-day-worked boundaries are absent.
+  6. ✅ **DONE (Plan A)** — **Leave-aware summary math** — SR-011 half-day-worked boundaries now applied.
 
 - **Built in NEITHER (needs a data source, BA open question):**
   7. **Holiday "H" cells** + streak-excludes-holidays (SR-006, mobile AC-16). No holiday
