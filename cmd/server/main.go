@@ -94,7 +94,7 @@ func main() {
 	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
-	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo)
+	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
 	// Phase 7 — SSE hub singleton + announcement service + handler.
 	// In-process pub/sub; horizontal scaling beyond 1 replica requires a

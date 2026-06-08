@@ -22,11 +22,12 @@ import (
 // JWT-preloaded user.Roles — the service enforces ownership using that
 // flag plus the resolved current-employee ID. Same shape as LeaveService.
 type AttendanceService struct {
-	cfg   *config.Config
-	repo  repositories.AttendanceRepository
-	emps  repositories.EmployeeRepository
-	depts repositories.DepartmentRepository
-	pos   repositories.PositionRepository
+	cfg    *config.Config
+	repo   repositories.AttendanceRepository
+	emps   repositories.EmployeeRepository
+	depts  repositories.DepartmentRepository
+	pos    repositories.PositionRepository
+	leaves repositories.LeaveRequestRepository
 }
 
 // NewAttendanceService constructs an AttendanceService.
@@ -36,8 +37,9 @@ func NewAttendanceService(
 	emps repositories.EmployeeRepository,
 	depts repositories.DepartmentRepository,
 	pos repositories.PositionRepository,
+	leaves repositories.LeaveRequestRepository,
 ) *AttendanceService {
-	return &AttendanceService{cfg: cfg, repo: repo, emps: emps, depts: depts, pos: pos}
+	return &AttendanceService{cfg: cfg, repo: repo, emps: emps, depts: depts, pos: pos, leaves: leaves}
 }
 
 // ---- shared helpers ----

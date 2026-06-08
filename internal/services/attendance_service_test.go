@@ -38,6 +38,7 @@ func newAttendanceSvc(t *testing.T) *services.AttendanceService {
 		repositories.NewEmployeeRepository(testDB),
 		repositories.NewDepartmentRepository(testDB),
 		repositories.NewPositionRepository(testDB),
+		repositories.NewLeaveRequestRepository(testDB),
 	)
 }
 
