@@ -1,7 +1,7 @@
 # Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (leave-requests parity committed locally; push + PR + FE doc + deploy + seed still needed)
 
 **Last updated:** 2026-06-08
-**Stopped at:** Leave-requests parity — Plan A (`0132dd8`) and Plan B (`d632a69`) committed to **local `main`**. Both plans fully reviewed (spec + quality, two-stage). NOT YET pushed to `origin/main`. Next: push → PR → FE doc → deploy → seed (see "How to resume" below).
+**Stopped at:** Leave-requests parity — Plans A+B committed + **FE doc written** (`f7783ec`). All on **local `main`**, NOT YET pushed to `origin/main`. Next: push → PR → deploy → seed (see "How to resume" below).
 **Branch:** `main` local = `d632a69`. `origin/main` = `0a42ff1` (attendance parity merge). Two commits ahead.
 **DB migration version:** **21** (unchanged — leave-requests parity adds no migration). Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
@@ -39,13 +39,7 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 Leave-requests parity Plans A+B are committed locally but NOT pushed. Steps remaining:
 
 1. **Push + PR** — run `superpowers:finishing-a-development-branch` → push local `main` (or create a branch `feat/leave-requests-parity` from the two commits) → open PR → merge.
-2. **FE doc** — create `docs/superpowers/handoff-2026-06-08-leave-requests-fe-api-changes.md` covering:
-   - Permission split: `approve_team` / `approve_all` replace legacy `approve` in role assignments
-   - `POST /:id/approve` and `/:id/reject` no longer gated by a route-level perm — handler checks scope
-   - `DELETE /:id/cancel` response now includes `was_approved: bool`
-   - New `GET /leave-requests/export` → xlsx download (same filters as list)
-   - Attachment limit now 5 MB; DOCX files now accepted
-   - Dashboard upcoming/history now returns 10 items (was 5)
+2. **FE doc** — ✅ DONE `f7783ec` — [`handoff-2026-06-08-leave-requests-fe-api-changes.md`](handoff-2026-06-08-leave-requests-fe-api-changes.md)
 3. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is already on `main`)
 4. **Seed** — if the dev DB has existing Manager-role assignments using the old `leave_requests:approve` string, run a one-off SQL update:
    ```sql
