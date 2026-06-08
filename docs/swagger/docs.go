@@ -495,6 +495,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/attendance/auto-checkout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Idempotent. Defaults the cutoff to now (company TZ) when omitted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "attendance"
+                ],
+                "summary": "Admin: close all open sessions before a cutoff (auto check-out)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "RFC3339 cutoff; defaults to now",
+                        "name": "cutoff",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/attendance/check-in": {
             "post": {
                 "security": [
@@ -527,8 +561,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead"
                         }
                     }
                 }
@@ -565,8 +598,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": true
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead"
                         }
                     }
                 }
@@ -4487,6 +4519,26 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.AttendanceSessionRead": {
+            "type": "object",
+            "properties": {
+                "check_in": {
+                    "type": "string"
+                },
+                "check_out": {
+                    "type": "string"
+                },
+                "hours_worked": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_auto_checkout": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.AttendanceSettingsUpdate": {
             "type": "object",
             "properties": {
@@ -5378,6 +5430,20 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.TodayStatusRead"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData": {
             "type": "object",
             "properties": {
@@ -5477,6 +5543,32 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.TodayStatusRead": {
+            "type": "object",
+            "properties": {
+                "current_check_in": {
+                    "type": "string"
+                },
+                "is_late": {
+                    "type": "boolean"
+                },
+                "monthly_count": {
+                    "type": "integer"
+                },
+                "sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceSessionRead"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "streak": {
+                    "type": "integer"
                 }
             }
         },

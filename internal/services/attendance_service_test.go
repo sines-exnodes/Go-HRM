@@ -519,3 +519,37 @@ func TestAttendance_Matrix_WeekendsMarked(t *testing.T) {
 	assert.Equal(t, "weekend", row.Cells[2].Status)
 	assert.Equal(t, "weekend", row.Cells[3].Status)
 }
+
+// G5: AutoCheckOut closes every open session whose check-in precedes the
+// cutoff, marking it auto-checkout, and is idempotent on a second run.
+func TestAttendance_AutoCheckOut_ClosesOpenSessions(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc := newAttendanceSvc(t)
+	u, _ := makeEmpUser(t, "autoout@example.com", "AutoOut")
+
+	ci := hcmTime(t, 2026, 5, 15, 8, 30)
+	_, err := svc.CheckIn(ctx, u.ID, dto.AttendanceCheckInReq{CheckIn: &ci})
+	require.NoError(t, err)
+
+	cutoff := hcmTime(t, 2026, 5, 15, 23, 0) // 11 PM company time
+	n, err := svc.AutoCheckOut(ctx, cutoff)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+
+	// Idempotent — nothing open remains.
+	n2, err := svc.AutoCheckOut(ctx, cutoff)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n2)
+
+	// The session is now closed + flagged. Assert via List (Today may not see
+	// this row depending on the TZ-of-now).
+	out, err := svc.List(ctx, u.ID, false, dto.AttendanceListQuery{Page: 1, PageSize: 10})
+	require.NoError(t, err)
+	require.Len(t, out.Items, 1)
+	require.Len(t, out.Items[0].Sessions, 1)
+	require.NotNil(t, out.Items[0].Sessions[0].CheckOut)
+	assert.True(t, out.Items[0].Sessions[0].IsAutoCheckout)
+}

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -282,6 +283,33 @@ func (h *AttendanceHandler) AdminDelete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.Response[struct{}]{Success: true, Message: "Deleted"})
+}
+
+// AutoCheckOut godoc
+// @Summary      Admin: close all open sessions before a cutoff (auto check-out)
+// @Description  Idempotent. Defaults the cutoff to now (company TZ) when omitted.
+// @Tags         attendance
+// @Security     BearerAuth
+// @Produce      json
+// @Param        cutoff  query  string  false  "RFC3339 cutoff; defaults to now"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /api/v1/attendance/auto-checkout [post]
+func (h *AttendanceHandler) AutoCheckOut(c *gin.Context) {
+	cutoff := time.Now()
+	if raw := c.Query("cutoff"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			_ = c.Error(apperrors.ErrBadRequest("invalid cutoff (expected RFC3339)"))
+			return
+		}
+		cutoff = parsed
+	}
+	n, err := h.svc.AutoCheckOut(c.Request.Context(), cutoff)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[map[string]int]{Success: true, Message: "Auto check-out complete", Data: map[string]int{"closed": n}})
 }
 
 // Export godoc

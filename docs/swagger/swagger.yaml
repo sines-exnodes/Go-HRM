@@ -180,6 +180,19 @@ definitions:
       notes:
         type: string
     type: object
+  github_com_exnodes_hrm-api_internal_dto.AttendanceSessionRead:
+    properties:
+      check_in:
+        type: string
+      check_out:
+        type: string
+      hours_worked:
+        type: number
+      id:
+        type: string
+      is_auto_checkout:
+        type: boolean
+    type: object
   github_com_exnodes_hrm-api_internal_dto.AttendanceSettingsUpdate:
     properties:
       checkout_threshold_hour:
@@ -816,6 +829,15 @@ definitions:
       success:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.TodayStatusRead'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
   github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData:
     properties:
       data:
@@ -885,6 +907,23 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.TodayStatusRead:
+    properties:
+      current_check_in:
+        type: string
+      is_late:
+        type: boolean
+      monthly_count:
+        type: integer
+      sessions:
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.AttendanceSessionRead'
+        type: array
+      status:
+        type: string
+      streak:
+        type: integer
     type: object
   github_com_exnodes_hrm-api_internal_dto.UserSummary:
     properties:
@@ -1446,6 +1485,27 @@ paths:
       summary: Admin update of an attendance row
       tags:
       - attendance
+  /api/v1/attendance/auto-checkout:
+    post:
+      description: Idempotent. Defaults the cutoff to now (company TZ) when omitted.
+      parameters:
+      - description: RFC3339 cutoff; defaults to now
+        in: query
+        name: cutoff
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 'Admin: close all open sessions before a cutoff (auto check-out)'
+      tags:
+      - attendance
   /api/v1/attendance/check-in:
     post:
       consumes:
@@ -1463,8 +1523,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead'
       security:
       - BearerAuth: []
       summary: Record a check-in for the authenticated user
@@ -1486,8 +1545,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead'
       security:
       - BearerAuth: []
       summary: Record a check-out for the authenticated user

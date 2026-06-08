@@ -384,6 +384,32 @@ func (s *AttendanceService) Get(ctx context.Context, id uuid.UUID, currentUserID
 	return s.toRead(ctx, row), nil
 }
 
+// ---- AutoCheckOut ----
+
+// AutoCheckOut closes every open session whose check_in precedes cutoff,
+// stamping check_out=cutoff and is_auto_checkout=true. Idempotent — a second
+// run finds nothing open. Returns the number of sessions closed. Intended to
+// run at 23:00 company time (mobile DR Rule 5); exposed via an admin endpoint
+// now, a scheduler later.
+func (s *AttendanceService) AutoCheckOut(ctx context.Context, cutoff time.Time) (int, error) {
+	open, err := s.repo.OpenSessionsBefore(ctx, cutoff.UTC())
+	if err != nil {
+		return 0, err
+	}
+	closed := 0
+	for i := range open {
+		sess := open[i]
+		co := cutoff.UTC()
+		sess.CheckOut = &co
+		sess.IsAutoCheckout = true
+		if err := s.repo.UpdateSession(ctx, &sess); err != nil {
+			return closed, err
+		}
+		closed++
+	}
+	return closed, nil
+}
+
 // ---- List ----
 
 // List returns paginated attendance rows. Route-level PermAttendanceRead

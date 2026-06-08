@@ -352,6 +352,7 @@ func main() {
 		attendance.POST("", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminCreate)
 		attendance.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminUpdate)
 		attendance.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminDelete)
+		attendance.POST("/auto-checkout", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AutoCheckOut)
 
 		// ---- /organization-settings (Phase 8) ----
 		// Attendance subtree is admin-only (RequirePerms). Company-profile
