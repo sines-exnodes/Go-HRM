@@ -1,14 +1,14 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (employees + announcements landed)
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (attendance MERGED + deployed; roles, employees, announcements landed)
 
 **Last updated:** 2026-06-08
-**Stopped at:** Phases 0–9 complete on `main`. Post-migration **Python ↔ Go API parity**: announcements (PRs #5/#6), employees A/B/C, employees ROUND 2 (PR #12), roles & permissions (PR #14, `3cc459d`) all merged. **Attendance parity (Plan A + B) IMPLEMENTED** on branch `worktree-feat+attendance-parity` — not yet merged (see below).
-**Branch:** attendance work on `worktree-feat+attendance-parity` (off `origin/main` `3cc459d`); `main` otherwise idle.
-**DB migration version:** **21** on `main` (roles `level` 000020 + role-name partial-unique 000021, both via PR #14). **Attendance parity added NO migration** — version stays **21**. Next free: **000022**.
+**Stopped at:** Phases 0–9 complete. Post-migration **Python ↔ Go API parity** — all merged to `main`: announcements (PRs #5/#6), employees A/B/C, employees ROUND 2 (PR #12), roles & permissions (PR #14), and **Attendance parity (Plan A + B) MERGED via PR #16 (`0a42ff1`)**. Attendance is also **deployed to the dev backend** (`:8080`) and **demo-seeded** (see below). No parity branch in flight.
+**Branch:** `main` (= `origin/main` `0a42ff1`). The `worktree-feat+attendance-parity` worktree is now redundant (its code == main) and can be removed.
+**DB migration version:** **21** on `main` (roles `level` 000020 + role-name partial-unique 000021, via PR #14). **Attendance parity added NO migration** — version stays **21**. Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
-> ⚠️ **Checkpoint discrepancy (reconcile before merge):** this file (committed at `origin/main` `3cc459d`) predates the roles-parity checkpoint write, which exists only as an *uncommitted* edit in a separate working tree. The header above has been corrected to migration **21**, but the detailed Roles & Permissions parity subsection is NOT present in this committed copy. Reconcile the two checkpoint copies when merging the attendance branch.
+> **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
 
-## Attendance parity — Plan A + B (IMPLEMENTED, branch `worktree-feat+attendance-parity`)
+## Attendance parity — Plan A + B (MERGED to `main`, PR #16 `0a42ff1`)
 
 Python↔Go attendance audit → locked decisions D1–D6 → two plans, executed subagent-driven (fresh implementer per task + two-stage spec/quality review). Full suite green (`go test ./...`, services ~181s, 0 fail / 0 skip). **No migration** (reads existing `leave_requests` + uses the existing `is_auto_checkout` column).
 
@@ -16,21 +16,25 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 - **Plan A — leave-integrated matrix** (`cc60537`): approved leave rendered in matrix cells (G1, AC-016); combined half-day cells with `worked_half_status` + AM/PM thresholds 09:00/13:15/12:00/18:00 (G2, AC-026–031); leave-aware SR-011 Total Late/Early summaries (G6); `on_leave` status filter + combined multi-match (G4); **root `GET /api/v1/attendance` now returns the matrix** (D1, `43fdda6`) — flat list moved to `/attendance/records`, `/matrix` kept as alias.
 - **Plan B** — Excel export `GET /attendance/export` + `/export/{employee_id}` via `xuri/excelize/v2`, reusing the leave-aware `buildAllRows` so totals match the matrix (G3, AC-011/012/025); check-in/out now return `TodayStatusRead` (D2); `is_half_day` hours-based auto-flip removed — half-day is leave-driven (D5); `AutoCheckOut(cutoff)` service + `POST /attendance/auto-checkout` admin trigger gated `attendance:manage_data` (G5).
 - **Decisions:** D1 root=matrix · D2 TodayStatusRead · D3 excelize · D4 service+admin-endpoint now · D5 follow-BA (drop flip) · D6 keep admin CRUD.
-- **Deferred / follow-ups:** **G7 holiday "H" cells + streak-excludes-holidays — BLOCKED** (no holiday-calendar source; BA open question). Real **23:00 scheduler** trigger for `AutoCheckOut` (admin endpoint lands the logic now). **BA back-fill DR** for the Go-only admin-CRUD surface (kept per D6, currently unspecced). FE doc (web repo `api_info_go`) after merge.
+- **Deferred / follow-ups:** **G7 holiday "H" cells + streak-excludes-holidays — BLOCKED** (no holiday-calendar source; BA open question). Real **23:00 scheduler** trigger for `AutoCheckOut` (admin endpoint lands the logic now). **BA back-fill DR** for the Go-only admin-CRUD surface (kept per D6, currently unspecced).
+- **FE doc — DONE:** `worktree`/repo handoff `docs/superpowers/handoff-2026-06-08-attendance-fe-api-changes.md` + web repo `exnodes-hrm-web-nextjs/api_info_go/attendance.md` (created, untracked there). Leads with the breaking changes (root=matrix, check-in/out→TodayStatusRead, `is_half_day` no longer hours-driven).
+- **Deployed to dev (`:8080`) — DONE:** the app container runs **Air hot-reload, bind-mounted from the `E:\Work\Go-HRM` checkout** (now on `main`). After merge, the main checkout was switched to `main` and the container restarted; live smoke verified root matrix (leave cells + combined half-day + `worked_half_status`), `?status=on_leave`, `GET /export` (valid xlsx), `/records`, boot at migration 21. (A WIP stash from `fix/skill-icon-cleanup-2mb-cap` was set aside on that branch — `git stash list`.)
+- **Demo data — SEEDED** (dev DB `exnodes_hrm`): April + May 2026 across **6 employees** (added Mai/Long/Huong/Tuan), covering on_time/late/absent/weekend/multi-session, all 5 full-day leave types, and half-day-off with all 3 `worked_half_status` variants (on_time/late/absent) for both morning & afternoon halves; June 1–5 light fill for the default view. Idempotent script: `seed-attendance-demo.sql` (currently in the redundant worktree; not yet moved to `scripts/`).
 
 ## How to resume next session
 
-The implementation pipeline is closed. Suggested next priorities (in
-descending value):
+The implementation pipeline is closed (all parity modules merged). Suggested next
+priorities (in descending value):
 
-1. **Bundled code review** — Phases 4-9 have not been formally reviewed. See "Code review status" below for the recommended bundle.
-2. **Phase 6 follow-up** — switch attendance thresholds from env vars to `system_config` lookup (Phase 8 produced the row; Phase 6 still reads env). One small commit.
-3. **Phase 7 attachment-upload HTTP handler** — model + repo are in place; the route is the one missing piece.
-4. **Manager-role completeness** — Phase 5 manager lacks `Update/Delete` on leave_requests (flagged for next BA pass).
-5. **Production env wiring** — set `FIREBASE_CREDENTIALS_PATH` + real SMTP host for invite emails.
-6. **Phase 9 password-reset flow** — reuse `EmailService` + add a `password-reset.html` template if BA confirms scope.
+1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Found by the FE permission-matrix check: entirely unbuilt (no `request_tickets:*` perms, no model/migration/repo/service/handler/routes). FE matrix P11/P12/P13 have no backing. A full vertical slice: ticket model + migration (**000022**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read the EP-003 DRs in `ba-requirements/` first.
+2. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage` and leaves reads auth-only (visibility-filtered, the mobile model). Decide with BA whether the web needs a role-gated read (`announcements:read`).
+3. **Attendance follow-ups** (post-merge): real **23:00 scheduler** for `AutoCheckOut`; **G7 holidays** (blocked on a calendar source); switch attendance late/checkout thresholds from env vars to `system_config` lookup (the row exists from Phase 8); move `seed-attendance-demo.sql` into `scripts/` if a committed seeder is wanted; BA back-fill DR for the admin-CRUD surface (D6).
+4. **Bundled code review** — Phases 4-9 have not been formally reviewed. See "Code review status" below.
+5. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
+6. **Manager-role completeness** — Phase 5 manager lacks `Update/Delete` on leave_requests.
+7. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host. **Phase 9 password-reset flow** if BA confirms scope.
 
-If a Phase 10 is added later: REVISION NOTES pattern remains the way to draft it. Latest taken migration = **000019**; next is **000020**.
+Latest taken migration = **000021**; next is **000022**.
 
 ### Resume entry points
 
