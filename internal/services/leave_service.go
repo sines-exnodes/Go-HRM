@@ -17,6 +17,14 @@ import (
 	"github.com/exnodes/hrm-api/internal/repositories"
 )
 
+// ApproveScope is the approval authority resolved by the handler from JWT claims.
+type ApproveScope int
+
+const (
+	ApproveScopeTeam ApproveScope = 1 // approve_team: BFS subordinate chain only
+	ApproveScopeAll  ApproveScope = 2 // approve_all, legacy approve, or wildcard *
+)
+
 // ---- Attachment upload constants ----
 
 const (
@@ -544,17 +552,55 @@ func (s *LeaveService) Update(ctx context.Context, id uuid.UUID, currentUserID u
 	return &dto.LeaveRequestWriteResult{Request: read, Warnings: warnings}, nil
 }
 
-// Approve transitions a pending request to approved. Permission gate is
-// applied upstream (RequirePerms(PermLeaveApprove)).
-func (s *LeaveService) Approve(ctx context.Context, id uuid.UUID) (*dto.LeaveRequestRead, error) {
+// Approve transitions a pending request to approved.
+func (s *LeaveService) Approve(ctx context.Context, id uuid.UUID, approverUserID uuid.UUID, scope ApproveScope) (*dto.LeaveRequestRead, error) {
+	row, err := s.leaves.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrNotFound("Leave request")
+		}
+		return nil, err
+	}
+	if err := s.checkCanApproveOrReject(ctx, approverUserID, scope, row); err != nil {
+		return nil, err
+	}
 	return s.transitionStatus(ctx, id, models.LeaveStatusApproved, []models.LeaveStatus{models.LeaveStatusPending})
 }
 
-// Reject transitions a pending request to rejected. Permission gate is
-// applied upstream (RequirePerms(PermLeaveApprove) — Python uses the
-// same permission for approve and reject).
-func (s *LeaveService) Reject(ctx context.Context, id uuid.UUID) (*dto.LeaveRequestRead, error) {
+// Reject transitions a pending request to rejected.
+func (s *LeaveService) Reject(ctx context.Context, id uuid.UUID, approverUserID uuid.UUID, scope ApproveScope) (*dto.LeaveRequestRead, error) {
+	row, err := s.leaves.FindByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.ErrNotFound("Leave request")
+		}
+		return nil, err
+	}
+	if err := s.checkCanApproveOrReject(ctx, approverUserID, scope, row); err != nil {
+		return nil, err
+	}
 	return s.transitionStatus(ctx, id, models.LeaveStatusRejected, []models.LeaveStatus{models.LeaveStatusPending})
+}
+
+// checkCanApproveOrReject enforces BFS team-scoped approval authority.
+// ApproveScopeAll bypasses the check entirely. ApproveScopeTeam requires
+// the leave owner to be in the approver's transitive subordinate set.
+func (s *LeaveService) checkCanApproveOrReject(ctx context.Context, approverUserID uuid.UUID, scope ApproveScope, lr *models.LeaveRequest) error {
+	if scope == ApproveScopeAll {
+		return nil
+	}
+	approverEmp, err := s.emps.FindByUserID(ctx, approverUserID)
+	if err != nil {
+		return apperrors.ErrForbidden("Approver has no employee record")
+	}
+	subordinates, err := s.emps.SubordinateIDs(ctx, approverEmp.ID)
+	if err != nil {
+		return err
+	}
+	if !subordinates[lr.EmployeeID] {
+		return apperrors.ErrForbidden("You can only approve leave requests for employees in your reporting chain")
+	}
+	return nil
 }
 
 // Cancel transitions pending or approved to cancelled. Owner can cancel

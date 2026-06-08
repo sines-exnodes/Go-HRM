@@ -61,13 +61,15 @@ const (
 	PermSkillsDelete Permission = "skills:delete"
 
 	// Leave Requests
-	PermLeaveRead    Permission = "leave_requests:read"
-	PermLeaveCreate  Permission = "leave_requests:create"
-	PermLeaveUpdate  Permission = "leave_requests:update"
-	PermLeaveDelete  Permission = "leave_requests:delete"
-	PermLeaveApprove Permission = "leave_requests:approve"
-	PermLeaveCancel  Permission = "leave_requests:cancel"
-	PermLeaveManage  Permission = "leave_requests:manage"
+	PermLeaveRead        Permission = "leave_requests:read"
+	PermLeaveCreate      Permission = "leave_requests:create"
+	PermLeaveUpdate      Permission = "leave_requests:update"
+	PermLeaveDelete      Permission = "leave_requests:delete"
+	PermLeaveApprove     Permission = "leave_requests:approve"      // kept for backward compat; prefer ApproveTeam/ApproveAll
+	PermLeaveApproveTeam Permission = "leave_requests:approve_team" // approve own subordinate chain only (BFS)
+	PermLeaveApproveAll  Permission = "leave_requests:approve_all"  // approve any employee's request
+	PermLeaveCancel      Permission = "leave_requests:cancel"
+	PermLeaveManage      Permission = "leave_requests:manage"
 
 	// Leave Quota
 	PermLeaveQuotaManage Permission = "leave_quota:manage"
@@ -100,7 +102,7 @@ func AllPermissions() []Permission {
 		PermPositionsRead, PermPositionsCreate, PermPositionsUpdate, PermPositionsDelete,
 		PermSkillsRead, PermSkillsCreate, PermSkillsUpdate, PermSkillsDelete,
 		PermLeaveRead, PermLeaveCreate, PermLeaveUpdate, PermLeaveDelete,
-		PermLeaveApprove, PermLeaveCancel, PermLeaveManage,
+		PermLeaveApproveTeam, PermLeaveApproveAll, PermLeaveCancel, PermLeaveManage,
 		PermLeaveQuotaManage,
 		PermAttendanceRead, PermAttendanceManage,
 		PermOrgSettings,
@@ -218,7 +220,8 @@ var PermissionGroups = []PermissionGroup{
 			{PermLeaveCreate, "Create Leave Requests", "Submit leave requests"},
 			{PermLeaveUpdate, "Edit Leave Requests", "Update leave request details"},
 			{PermLeaveDelete, "Delete Leave Requests", "Soft-delete leave requests"},
-			{PermLeaveApprove, "Approve/Reject Leave Requests", "Approve or reject pending leave requests"},
+			{PermLeaveApproveTeam, "Approve Own Team's Requests", "Approve or reject leave requests from employees in your direct reporting chain"},
+			{PermLeaveApproveAll, "Approve All Leave Requests", "Approve or reject any employee's leave request regardless of reporting line"},
 			{PermLeaveCancel, "Cancel Leave Requests", "Cancel pending or approved leave requests"},
 			{PermLeaveManage, "Manage Others' Leave Requests", "Create, edit, and view leave requests on behalf of other employees"},
 		},

@@ -297,7 +297,7 @@ func TestLeaveService_ApproveAndCancel_BalanceLifecycle(t *testing.T) {
 	leaveID := uuid.MustParse(res.Request.ID)
 
 	// Approve → status=approved.
-	read, err := svc.Approve(ctx, leaveID)
+	read, err := svc.Approve(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 	require.NoError(t, err)
 	require.Equal(t, models.LeaveStatusApproved, read.Status)
 
@@ -335,7 +335,7 @@ func TestLeaveService_Reject_FromPending_OK(t *testing.T) {
 		Reason:      "x",
 	}, nil)
 	require.NoError(t, err)
-	read, err := svc.Reject(ctx, uuid.MustParse(res.Request.ID))
+	read, err := svc.Reject(ctx, uuid.MustParse(res.Request.ID), uuid.Nil, services.ApproveScopeAll)
 	require.NoError(t, err)
 	require.Equal(t, models.LeaveStatusRejected, read.Status)
 }
@@ -353,9 +353,9 @@ func TestLeaveService_ApproveAfterReject_Conflict(t *testing.T) {
 		LeavePeriod: models.LeavePeriodFullDay, LeaveType: models.LeaveTypePersonal, Reason: "x",
 	}, nil)
 	leaveID := uuid.MustParse(res.Request.ID)
-	_, _ = svc.Reject(ctx, leaveID)
+	_, _ = svc.Reject(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 
-	_, err := svc.Approve(ctx, leaveID)
+	_, err := svc.Approve(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 	require.Error(t, err)
 	var ae *apperrors.AppError
 	require.True(t, errors.As(err, &ae))
@@ -376,7 +376,7 @@ func TestLeaveService_Update_ApprovedByAdmin_RevertsToPending(t *testing.T) {
 		LeavePeriod: models.LeavePeriodFullDay, LeaveType: models.LeaveTypePersonal, Reason: "x",
 	}, nil)
 	leaveID := uuid.MustParse(res.Request.ID)
-	_, _ = svc.Approve(ctx, leaveID)
+	_, _ = svc.Approve(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 
 	newReason := "updated reason"
 	out, err := svc.Update(ctx, leaveID, admin.UserID, true, dto.LeaveRequestUpdate{Reason: &newReason}, nil)
@@ -399,7 +399,7 @@ func TestLeaveService_Update_RejectedTerminal_Conflict(t *testing.T) {
 		LeavePeriod: models.LeavePeriodFullDay, LeaveType: models.LeaveTypePersonal, Reason: "x",
 	}, nil)
 	leaveID := uuid.MustParse(res.Request.ID)
-	_, _ = svc.Reject(ctx, leaveID)
+	_, _ = svc.Reject(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 
 	newReason := "no edits"
 	_, err := svc.Update(ctx, leaveID, admin.UserID, true, dto.LeaveRequestUpdate{Reason: &newReason}, nil)
@@ -455,7 +455,7 @@ func TestLeaveService_Delete_NonAdminOwnerOnlyPending(t *testing.T) {
 		LeavePeriod: models.LeavePeriodFullDay, LeaveType: models.LeaveTypePersonal, Reason: "q",
 	}, nil)
 	leaveID := uuid.MustParse(res2.Request.ID)
-	_, _ = svc.Approve(ctx, leaveID)
+	_, _ = svc.Approve(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 	err := svc.Delete(ctx, leaveID, emp.UserID, false)
 	require.Error(t, err)
 	var ae *apperrors.AppError
@@ -477,7 +477,7 @@ func TestLeaveService_Delete_AdminCanDeleteAnyStatus(t *testing.T) {
 		LeavePeriod: models.LeavePeriodFullDay, LeaveType: models.LeaveTypePersonal, Reason: "x",
 	}, nil)
 	leaveID := uuid.MustParse(res.Request.ID)
-	_, _ = svc.Approve(ctx, leaveID)
+	_, _ = svc.Approve(ctx, leaveID, uuid.Nil, services.ApproveScopeAll)
 
 	// Admin deletes the approved row.
 	require.NoError(t, svc.Delete(ctx, leaveID, admin.UserID, true))
@@ -552,7 +552,7 @@ func TestLeaveService_List_FiltersByStatus(t *testing.T) {
 		}, nil)
 		require.NoError(t, err)
 		if i == 0 {
-			_, _ = svc.Approve(ctx, uuid.MustParse(res.Request.ID))
+			_, _ = svc.Approve(ctx, uuid.MustParse(res.Request.ID), uuid.Nil, services.ApproveScopeAll)
 		}
 	}
 

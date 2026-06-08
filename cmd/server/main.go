@@ -294,8 +294,8 @@ func main() {
 		leaves.POST("", middleware.RequirePerms(authSvc, permissions.PermLeaveCreate), leaveH.Create)
 		leaves.GET(":id", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.Get)
 		leaves.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermLeaveUpdate), leaveH.Update)
-		leaves.POST(":id/approve", middleware.RequirePerms(authSvc, permissions.PermLeaveApprove), leaveH.Approve)
-		leaves.POST(":id/reject", middleware.RequirePerms(authSvc, permissions.PermLeaveApprove), leaveH.Reject)
+		leaves.POST(":id/approve", leaveH.Approve)
+		leaves.POST(":id/reject", leaveH.Reject)
 		leaves.POST(":id/cancel", middleware.RequirePerms(authSvc, permissions.PermLeaveCancel), leaveH.Cancel)
 		// POST (not DELETE) per Python source — REVISION NOTES item #5.
 		leaves.POST(":id/delete", middleware.RequirePerms(authSvc, permissions.PermLeaveDelete), leaveH.Delete)

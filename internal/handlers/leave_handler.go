@@ -53,6 +53,32 @@ func hasLeaveManageAll(c *gin.Context) bool {
 	return false
 }
 
+// resolveApproveScope scans JWT-loaded roles for an approve permission.
+// Priority: PermAll / PermLeaveApproveAll / legacy PermLeaveApprove → ApproveScopeAll;
+//
+//	PermLeaveApproveTeam → ApproveScopeTeam (keep scanning for stronger).
+func resolveApproveScope(c *gin.Context) (services.ApproveScope, bool) {
+	u, okC := currentUser(c)
+	if !okC {
+		return 0, false
+	}
+	var found services.ApproveScope
+	for _, r := range u.Roles {
+		for _, p := range []string(r.Permissions) {
+			switch permissions.Permission(p) {
+			case permissions.PermAll, permissions.PermLeaveApproveAll, permissions.PermLeaveApprove:
+				return services.ApproveScopeAll, true
+			case permissions.PermLeaveApproveTeam:
+				found = services.ApproveScopeTeam
+			}
+		}
+	}
+	if found != 0 {
+		return found, true
+	}
+	return 0, false
+}
+
 // readLeaveAttachment extracts the optional `attachment` multipart file.
 // Returns (nil, nil) when the form field is absent — supported for both
 // Create and Update. Mirrors readSkillIcon's shape.
@@ -332,19 +358,29 @@ func (h *LeaveHandler) Update(c *gin.Context) {
 
 // Approve godoc
 // @Summary      Approve a pending leave request
+// @Description  Requires approve_team (own subordinate chain only) or approve_all (any employee).
 // @Tags         leave-requests
 // @Security     BearerAuth
 // @Produce      json
-// @Param        id path string true "leave request uuid"
-// @Success      200 {object} map[string]interface{}
+// @Param        id   path  string  true  "leave request UUID"
+// @Success      200  {object}  map[string]interface{}
 // @Router       /api/v1/leave-requests/{id}/approve [post]
 func (h *LeaveHandler) Approve(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
 	id, err := parseIDParam(c, "id")
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	out, err := h.svc.Approve(c.Request.Context(), id)
+	scope, ok := resolveApproveScope(c)
+	if !ok {
+		_ = c.Error(apperrors.ErrForbidden("Insufficient approve permission"))
+		return
+	}
+	out, err := h.svc.Approve(c.Request.Context(), id, u.ID, scope)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -354,19 +390,29 @@ func (h *LeaveHandler) Approve(c *gin.Context) {
 
 // Reject godoc
 // @Summary      Reject a pending leave request
+// @Description  Same permission semantics as Approve — requires approve_team or approve_all.
 // @Tags         leave-requests
 // @Security     BearerAuth
 // @Produce      json
-// @Param        id path string true "leave request uuid"
-// @Success      200 {object} map[string]interface{}
+// @Param        id   path  string  true  "leave request UUID"
+// @Success      200  {object}  map[string]interface{}
 // @Router       /api/v1/leave-requests/{id}/reject [post]
 func (h *LeaveHandler) Reject(c *gin.Context) {
+	u, okC := currentUser(c)
+	if !okC {
+		return
+	}
 	id, err := parseIDParam(c, "id")
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	out, err := h.svc.Reject(c.Request.Context(), id)
+	scope, ok := resolveApproveScope(c)
+	if !ok {
+		_ = c.Error(apperrors.ErrForbidden("Insufficient approve permission"))
+		return
+	}
+	out, err := h.svc.Reject(c.Request.Context(), id, u.ID, scope)
 	if err != nil {
 		_ = c.Error(err)
 		return

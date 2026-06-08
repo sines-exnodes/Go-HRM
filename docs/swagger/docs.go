@@ -2619,6 +2619,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Requires approve_team (own subordinate chain only) or approve_all (any employee).",
                 "produces": [
                     "application/json"
                 ],
@@ -2629,7 +2630,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "leave request uuid",
+                        "description": "leave request UUID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -2723,6 +2724,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Same permission semantics as Approve — requires approve_team or approve_all.",
                 "produces": [
                     "application/json"
                 ],
@@ -2733,7 +2735,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "leave request uuid",
+                        "description": "leave request UUID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -5664,6 +5666,8 @@ const docTemplate = `{
                 "leave_requests:update",
                 "leave_requests:delete",
                 "leave_requests:approve",
+                "leave_requests:approve_team",
+                "leave_requests:approve_all",
                 "leave_requests:cancel",
                 "leave_requests:manage",
                 "leave_quota:manage",
@@ -5672,6 +5676,61 @@ const docTemplate = `{
                 "organization_settings:manage",
                 "announcements:manage",
                 "invites:manage"
+            ],
+            "x-enum-comments": {
+                "PermLeaveApprove": "kept for backward compat; prefer ApproveTeam/ApproveAll",
+                "PermLeaveApproveAll": "approve any employee's request",
+                "PermLeaveApproveTeam": "approve own subordinate chain only (BFS)"
+            },
+            "x-enum-descriptions": [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "kept for backward compat; prefer ApproveTeam/ApproveAll",
+                "approve own subordinate chain only (BFS)",
+                "approve any employee's request",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                ""
             ],
             "x-enum-varnames": [
                 "PermAll",
@@ -5712,6 +5771,8 @@ const docTemplate = `{
                 "PermLeaveUpdate",
                 "PermLeaveDelete",
                 "PermLeaveApprove",
+                "PermLeaveApproveTeam",
+                "PermLeaveApproveAll",
                 "PermLeaveCancel",
                 "PermLeaveManage",
                 "PermLeaveQuotaManage",

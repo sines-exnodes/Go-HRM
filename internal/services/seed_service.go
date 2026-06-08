@@ -86,7 +86,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermPositionsRead, permissions.PermPositionsCreate, permissions.PermPositionsUpdate, permissions.PermPositionsDelete,
 				permissions.PermSkillsRead, permissions.PermSkillsCreate, permissions.PermSkillsUpdate, permissions.PermSkillsDelete,
 				permissions.PermLeaveRead, permissions.PermLeaveCreate, permissions.PermLeaveUpdate, permissions.PermLeaveDelete,
-				permissions.PermLeaveApprove, permissions.PermLeaveCancel, permissions.PermLeaveManage,
+				permissions.PermLeaveApproveAll, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermLeaveQuotaManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
 				// Phase 4: announcement-label endpoints are gated by
@@ -119,7 +119,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermPositionsRead, permissions.PermPositionsCreate, permissions.PermPositionsUpdate,
 				permissions.PermSkillsRead, permissions.PermSkillsCreate, permissions.PermSkillsUpdate,
 				permissions.PermLeaveRead, permissions.PermLeaveCreate, permissions.PermLeaveUpdate, permissions.PermLeaveDelete,
-				permissions.PermLeaveApprove, permissions.PermLeaveCancel, permissions.PermLeaveManage,
+				permissions.PermLeaveApproveAll, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermLeaveQuotaManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
 				// Phase 4: HR managers publish announcements in the Python
@@ -139,8 +139,8 @@ func defaultRoles() []roleSeed {
 				permissions.PermDepartmentsRead,
 				permissions.PermPositionsRead,
 				permissions.PermSkillsRead,
-				permissions.PermLeaveRead, permissions.PermLeaveCreate,
-				permissions.PermLeaveApprove, permissions.PermLeaveCancel, permissions.PermLeaveManage,
+				permissions.PermLeaveRead, permissions.PermLeaveCreate, permissions.PermLeaveUpdate, permissions.PermLeaveDelete,
+				permissions.PermLeaveApproveTeam, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
 			},
 		},

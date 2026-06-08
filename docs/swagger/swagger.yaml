@@ -1002,6 +1002,8 @@ definitions:
     - leave_requests:update
     - leave_requests:delete
     - leave_requests:approve
+    - leave_requests:approve_team
+    - leave_requests:approve_all
     - leave_requests:cancel
     - leave_requests:manage
     - leave_quota:manage
@@ -1011,6 +1013,59 @@ definitions:
     - announcements:manage
     - invites:manage
     type: string
+    x-enum-comments:
+      PermLeaveApprove: kept for backward compat; prefer ApproveTeam/ApproveAll
+      PermLeaveApproveAll: approve any employee's request
+      PermLeaveApproveTeam: approve own subordinate chain only (BFS)
+    x-enum-descriptions:
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - kept for backward compat; prefer ApproveTeam/ApproveAll
+    - approve own subordinate chain only (BFS)
+    - approve any employee's request
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
+    - ""
     x-enum-varnames:
     - PermAll
     - PermAuthLogin
@@ -1050,6 +1105,8 @@ definitions:
     - PermLeaveUpdate
     - PermLeaveDelete
     - PermLeaveApprove
+    - PermLeaveApproveTeam
+    - PermLeaveApproveAll
     - PermLeaveCancel
     - PermLeaveManage
     - PermLeaveQuotaManage
@@ -2710,8 +2767,10 @@ paths:
       - leave-requests
   /api/v1/leave-requests/{id}/approve:
     post:
+      description: Requires approve_team (own subordinate chain only) or approve_all
+        (any employee).
       parameters:
-      - description: leave request uuid
+      - description: leave request UUID
         in: path
         name: id
         required: true
@@ -2777,8 +2836,10 @@ paths:
       - leave-requests
   /api/v1/leave-requests/{id}/reject:
     post:
+      description: Same permission semantics as Approve — requires approve_team or
+        approve_all.
       parameters:
-      - description: leave request uuid
+      - description: leave request UUID
         in: path
         name: id
         required: true
