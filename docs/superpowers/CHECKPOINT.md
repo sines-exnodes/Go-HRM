@@ -1,12 +1,23 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (attendance MERGED + deployed; roles, employees, announcements landed)
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (leave-requests parity committed locally; push + PR + FE doc + deploy + seed still needed)
 
 **Last updated:** 2026-06-08
-**Stopped at:** Phases 0–9 complete. Post-migration **Python ↔ Go API parity** — all merged to `main`: announcements (PRs #5/#6), employees A/B/C, employees ROUND 2 (PR #12), roles & permissions (PR #14), and **Attendance parity (Plan A + B) MERGED via PR #16 (`0a42ff1`)**. Attendance is also **deployed to the dev backend** (`:8080`) and **demo-seeded** (see below). No parity branch in flight.
-**Branch:** `main` (= `origin/main` `0a42ff1`). The `worktree-feat+attendance-parity` worktree is now redundant (its code == main) and can be removed.
-**DB migration version:** **21** on `main` (roles `level` 000020 + role-name partial-unique 000021, via PR #14). **Attendance parity added NO migration** — version stays **21**. Next free: **000022**.
+**Stopped at:** Leave-requests parity — Plan A (`0132dd8`) and Plan B (`d632a69`) committed to **local `main`**. Both plans fully reviewed (spec + quality, two-stage). NOT YET pushed to `origin/main`. Next: push → PR → FE doc → deploy → seed (see "How to resume" below).
+**Branch:** `main` local = `d632a69`. `origin/main` = `0a42ff1` (attendance parity merge). Two commits ahead.
+**DB migration version:** **21** (unchanged — leave-requests parity adds no migration). Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
+
+## Leave Requests parity — Plan A + B (committed locally; push + PR pending)
+
+Python↔Go leave-request audit → locked decisions D1–D7 → two plans, executed subagent-driven (fresh implementer per task + two-stage spec/quality review per plan). Full suite green (`make test`, all PASS or SKIP). **No migration** (leave was migration 000008, already live).
+
+- **Audit + decisions:** [`specs/2026-06-08-leave-requests-parity-audit.md`](specs/2026-06-08-leave-requests-parity-audit.md) — 11-endpoint inventory, Gaps G1–G10, Decisions D1–D7 all LOCKED 2026-06-08.
+- **Plans:** [`plans/2026-06-08-leave-requests-parity-plan-a.md`](plans/2026-06-08-leave-requests-parity-plan-a.md) (permission split + seed), [`plans/2026-06-08-leave-requests-parity-plan-b.md`](plans/2026-06-08-leave-requests-parity-plan-b.md) (bug fixes + export).
+- **Plan A (`0132dd8`):** `leave_requests:approve_team` + `leave_requests:approve_all` permission constants; `ApproveScope` type + `checkCanApproveOrReject` BFS enforcement in service (mirrors Python `check_can_approve_or_reject`, reuses `emps.SubordinateIDs`); `resolveApproveScope` handler helper; perm gate moved out of router middleware into handler; seed: Admin/HR Manager → `approve_all`, Manager → `approve_team + update + delete`. Also: `PermLeaveApprove` removed from `AllPermissions()` (kept as constant for backward-compat runtime code path) to satisfy `TestPermissionGroupsContainsAll`.
+- **Plan B (`d632a69`):** G3 empty-PATCH no-op guard (no more Approved→Pending revert); G4 DOCX MIME detection via ZIP-sniff + `.docx` extension fallback; G5 attachment limit 10 MB → 5 MB; G6 dashboard limit 5 → 10; G7 `Cancel` returns `(read, wasApproved, error)` + handler embeds `was_approved` in response; G10 `GET /api/v1/leave-requests/export` → xlsx via excelize.
+- **Decisions delivered:** D1=A (full split + legacy compat) · D2=B (keep Go MIME types + DOCX + 5 MB) · D3/D5/D7 = recommended (fix dashboard, cancel wasApproved, Manager seed) · D6=A (Excel export).
+- **Deferred:** G9 leave-quota carry-forward endpoints (not in Python source per audit); no FE handoff yet.
 
 ## Attendance parity — Plan A + B (MERGED to `main`, PR #16 `0a42ff1`)
 
@@ -23,16 +34,34 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-The implementation pipeline is closed (all parity modules merged). Suggested next
-priorities (in descending value):
+### IMMEDIATE: finish leave-requests parity pipeline
 
-1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Found by the FE permission-matrix check: entirely unbuilt (no `request_tickets:*` perms, no model/migration/repo/service/handler/routes). FE matrix P11/P12/P13 have no backing. A full vertical slice: ticket model + migration (**000022**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read the EP-003 DRs in `ba-requirements/` first.
-2. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage` and leaves reads auth-only (visibility-filtered, the mobile model). Decide with BA whether the web needs a role-gated read (`announcements:read`).
-3. **Attendance follow-ups** (post-merge): real **23:00 scheduler** for `AutoCheckOut`; **G7 holidays** (blocked on a calendar source); switch attendance late/checkout thresholds from env vars to `system_config` lookup (the row exists from Phase 8); move `seed-attendance-demo.sql` into `scripts/` if a committed seeder is wanted; BA back-fill DR for the admin-CRUD surface (D6).
-4. **Bundled code review** — Phases 4-9 have not been formally reviewed. See "Code review status" below.
+Leave-requests parity Plans A+B are committed locally but NOT pushed. Steps remaining:
+
+1. **Push + PR** — run `superpowers:finishing-a-development-branch` → push local `main` (or create a branch `feat/leave-requests-parity` from the two commits) → open PR → merge.
+2. **FE doc** — create `docs/superpowers/handoff-2026-06-08-leave-requests-fe-api-changes.md` covering:
+   - Permission split: `approve_team` / `approve_all` replace legacy `approve` in role assignments
+   - `POST /:id/approve` and `/:id/reject` no longer gated by a route-level perm — handler checks scope
+   - `DELETE /:id/cancel` response now includes `was_approved: bool`
+   - New `GET /leave-requests/export` → xlsx download (same filters as list)
+   - Attachment limit now 5 MB; DOCX files now accepted
+   - Dashboard upcoming/history now returns 10 items (was 5)
+3. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is already on `main`)
+4. **Seed** — if the dev DB has existing Manager-role assignments using the old `leave_requests:approve` string, run a one-off SQL update:
+   ```sql
+   -- NOT needed for seed-created rows (seed re-runs on boot, replacing perms);
+   -- only needed for hand-assigned role permission overrides if any exist
+   ```
+   The seed service is idempotent and will update the Manager role on next boot.
+
+### Subsequent priorities (in descending value):
+
+1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000022**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
+2. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
+3. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; **G7 holidays** (blocked on calendar source); switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
+4. **Bundled code review** — Phases 4-9 have not been formally reviewed.
 5. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
-6. **Manager-role completeness** — Phase 5 manager lacks `Update/Delete` on leave_requests.
-7. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host. **Phase 9 password-reset flow** if BA confirms scope.
+6. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
 
 Latest taken migration = **000021**; next is **000022**.
 
@@ -280,7 +309,7 @@ Phases 4–9: **review not yet requested.** Recommendation — one final bundled
 
 - Untracked (intentional): `.claude/`, `AGENTS.md`, `CLAUDE.md`.
 - Phase 5/6/7/8/9 plan files have unticked `- [ ]` checkboxes in draft task bodies — superseded by REVISION NOTES blocks; not worth churn commits.
-- Phase 5 manager-role completeness gap (lacks `Update/Delete` on leave_requests).
+- Phase 5 manager-role completeness gap — **FIXED in leave-requests parity Plan A** (Manager now has `approve_team + update + delete`).
 - Phase 6 attendance service still reads thresholds from env vars — should switch to `system_config` lookup now that the row exists.
 - Phase 7 attachment-upload HTTP handler is deferred.
 - Phase 7 `target_audience='custom'` deferred (no backing table).
