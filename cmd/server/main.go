@@ -336,8 +336,12 @@ func main() {
 		attendance.GET("/me", attendanceH.Me)
 		// Permissioned reads. Non-managers are silently scoped to own
 		// rows by the service (matches Python contract).
+		// D1: root path serves the monthly matrix (Python/FE parity).
+		attendance.GET("", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Matrix)
+		// /matrix kept as an explicit alias.
 		attendance.GET("/matrix", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Matrix)
-		attendance.GET("", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.List)
+		// Flat paginated rows (Go-only convenience; not the BA matrix).
+		attendance.GET("/records", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.List)
 		attendance.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAttendanceRead), attendanceH.Get)
 		// Admin manage.
 		attendance.POST("", middleware.RequirePerms(authSvc, permissions.PermAttendanceManage), attendanceH.AdminCreate)

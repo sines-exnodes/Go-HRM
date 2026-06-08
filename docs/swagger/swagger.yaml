@@ -1311,9 +1311,16 @@ paths:
       - announcements
   /api/v1/attendance:
     get:
-      description: Managers (with attendance:manage_data) see all rows; non-managers
-        see only their own.
+      description: Managers see all employees; non-managers see only their own row.
       parameters:
+      - description: 1-12
+        in: query
+        name: month
+        type: integer
+      - description: YYYY
+        in: query
+        name: year
+        type: integer
       - description: page
         in: query
         name: page
@@ -1322,23 +1329,15 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: filter by employee
+      - description: name filter (managers only)
         in: query
-        name: employee_id
+        name: search
         type: string
-      - description: filter by department
+      - description: department UUID (managers only)
         in: query
         name: department_id
         type: string
-      - description: YYYY-MM-DD
-        in: query
-        name: start_date
-        type: string
-      - description: YYYY-MM-DD
-        in: query
-        name: end_date
-        type: string
-      - description: on_time|late
+      - description: 'CSV: on_time,late,absent,weekend,no_data'
         in: query
         name: status
         type: string
@@ -1352,7 +1351,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: List attendance rows
+      summary: 'Monthly attendance matrix (managers: all employees; others: own row)'
       tags:
       - attendance
     post:
@@ -1494,51 +1493,6 @@ paths:
       summary: Record a check-out for the authenticated user
       tags:
       - attendance
-  /api/v1/attendance/matrix:
-    get:
-      description: Managers see all employees; non-managers see only their own row.
-      parameters:
-      - description: 1-12
-        in: query
-        name: month
-        type: integer
-      - description: YYYY
-        in: query
-        name: year
-        type: integer
-      - description: page
-        in: query
-        name: page
-        type: integer
-      - description: page size
-        in: query
-        name: page_size
-        type: integer
-      - description: name filter (managers only)
-        in: query
-        name: search
-        type: string
-      - description: department UUID (managers only)
-        in: query
-        name: department_id
-        type: string
-      - description: 'CSV: on_time,late,absent,weekend,no_data'
-        in: query
-        name: status
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Monthly attendance matrix
-      tags:
-      - attendance
   /api/v1/attendance/me:
     get:
       parameters:
@@ -1569,6 +1523,52 @@ paths:
       security:
       - BearerAuth: []
       summary: List my own attendance rows
+      tags:
+      - attendance
+  /api/v1/attendance/records:
+    get:
+      description: Managers (with attendance:manage_data) see all rows; non-managers
+        see only their own.
+      parameters:
+      - description: page
+        in: query
+        name: page
+        type: integer
+      - description: page size
+        in: query
+        name: page_size
+        type: integer
+      - description: filter by employee
+        in: query
+        name: employee_id
+        type: string
+      - description: filter by department
+        in: query
+        name: department_id
+        type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: start_date
+        type: string
+      - description: YYYY-MM-DD
+        in: query
+        name: end_date
+        type: string
+      - description: on_time|late
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Flat list of attendance rows (Go convenience; not the BA matrix)
       tags:
       - attendance
   /api/v1/attendance/today:

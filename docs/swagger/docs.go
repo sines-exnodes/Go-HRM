@@ -395,15 +395,27 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Managers (with attendance:manage_data) see all rows; non-managers see only their own.",
+                "description": "Managers see all employees; non-managers see only their own row.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "attendance"
                 ],
-                "summary": "List attendance rows",
+                "summary": "Monthly attendance matrix (managers: all employees; others: own row)",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "1-12",
+                        "name": "month",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "YYYY",
+                        "name": "year",
+                        "in": "query"
+                    },
                     {
                         "type": "integer",
                         "description": "page",
@@ -418,31 +430,19 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "filter by employee",
-                        "name": "employee_id",
+                        "description": "name filter (managers only)",
+                        "name": "search",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter by department",
+                        "description": "department UUID (managers only)",
                         "name": "department_id",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "YYYY-MM-DD",
-                        "name": "start_date",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "YYYY-MM-DD",
-                        "name": "end_date",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "on_time|late",
+                        "description": "CSV: on_time,late,absent,weekend,no_data",
                         "name": "status",
                         "in": "query"
                     }
@@ -572,76 +572,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/attendance/matrix": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Managers see all employees; non-managers see only their own row.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "attendance"
-                ],
-                "summary": "Monthly attendance matrix",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "1-12",
-                        "name": "month",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "YYYY",
-                        "name": "year",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "page size",
-                        "name": "page_size",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "name filter (managers only)",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "department UUID (managers only)",
-                        "name": "department_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "CSV: on_time,late,absent,weekend,no_data",
-                        "name": "status",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/attendance/me": {
             "get": {
                 "security": [
@@ -679,6 +609,76 @@ const docTemplate = `{
                         "type": "string",
                         "description": "YYYY-MM-DD",
                         "name": "end_date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/attendance/records": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Managers (with attendance:manage_data) see all rows; non-managers see only their own.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "attendance"
+                ],
+                "summary": "Flat list of attendance rows (Go convenience; not the BA matrix)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by employee",
+                        "name": "employee_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by department",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "YYYY-MM-DD",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "YYYY-MM-DD",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "on_time|late",
+                        "name": "status",
                         "in": "query"
                     }
                 ],

@@ -145,7 +145,7 @@ func (h *AttendanceHandler) Me(c *gin.Context) {
 }
 
 // List godoc
-// @Summary      List attendance rows
+// @Summary      Flat list of attendance rows (Go convenience; not the BA matrix)
 // @Description  Managers (with attendance:manage_data) see all rows; non-managers see only their own.
 // @Tags         attendance
 // @Security     BearerAuth
@@ -158,7 +158,7 @@ func (h *AttendanceHandler) Me(c *gin.Context) {
 // @Param        end_date      query  string  false  "YYYY-MM-DD"
 // @Param        status        query  string  false  "on_time|late"
 // @Success      200  {object}  map[string]interface{}
-// @Router       /api/v1/attendance [get]
+// @Router       /api/v1/attendance/records [get]
 func (h *AttendanceHandler) List(c *gin.Context) {
 	u, okC := currentUser(c)
 	if !okC {
@@ -277,7 +277,7 @@ func (h *AttendanceHandler) AdminDelete(c *gin.Context) {
 }
 
 // Matrix godoc
-// @Summary      Monthly attendance matrix
+// @Summary      Monthly attendance matrix (managers: all employees; others: own row)
 // @Description  Managers see all employees; non-managers see only their own row.
 // @Tags         attendance
 // @Security     BearerAuth
@@ -290,7 +290,7 @@ func (h *AttendanceHandler) AdminDelete(c *gin.Context) {
 // @Param        department_id query  string  false  "department UUID (managers only)"
 // @Param        status        query  string  false  "CSV: on_time,late,absent,weekend,no_data"
 // @Success      200  {object}  map[string]interface{}
-// @Router       /api/v1/attendance/matrix [get]
+// @Router       /api/v1/attendance [get]
 func (h *AttendanceHandler) Matrix(c *gin.Context) {
 	u, okC := currentUser(c)
 	if !okC {
