@@ -29,7 +29,7 @@ const (
 
 const (
 	leaveAttachmentSubdir   = "leave-attachments"
-	leaveAttachmentMaxBytes = 10 * 1024 * 1024 // 10 MB
+	leaveAttachmentMaxBytes = 5 * 1024 * 1024 // 5 MB
 )
 
 // allowedAttachmentMIME is the set of content types accepted for a leave
@@ -37,12 +37,18 @@ const (
 // check sniffs the file bytes via http.DetectContentType — the client's
 // Content-Type header is treated as a hint only (review-fix #2 pattern,
 // already battle-tested in Phase 2 avatars and Phase 4 skill icons).
+// docxMIME is the canonical MIME type for Office Open XML Word documents.
+// http.DetectContentType sniffs DOCX files as "application/zip" because the
+// DOCX container is a ZIP archive — see G4 in the 2026-06-08 parity audit.
+const docxMIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
 var allowedAttachmentMIME = map[string]bool{
 	"image/jpeg":      true,
 	"image/png":       true,
 	"image/gif":       true,
 	"image/webp":      true,
 	"application/pdf": true,
+	docxMIME:          true,
 }
 
 // AttachmentUpload bundles the multipart attachment fields. Nil means
@@ -166,15 +172,21 @@ func (s *LeaveService) uploadAttachment(ctx context.Context, att AttachmentUploa
 		return "", apperrors.ErrBadRequest("Attachment file is empty")
 	}
 	if len(att.Content) > leaveAttachmentMaxBytes {
-		return "", apperrors.ErrBadRequest("Attachment must not exceed 10MB")
+		return "", apperrors.ErrBadRequest("Attachment must not exceed 5MB")
 	}
 	sniffLen := len(att.Content)
 	if sniffLen > 512 {
 		sniffLen = 512
 	}
 	sniffed := http.DetectContentType(att.Content[:sniffLen])
+	// http.DetectContentType sniffs DOCX as "application/zip" because DOCX is
+	// a ZIP container. Fall back to the real MIME when the extension says .docx
+	// (Ext is lowercased by the caller — see AttachmentUpload.Ext comment).
+	if sniffed == "application/zip" && att.Ext == ".docx" {
+		sniffed = docxMIME
+	}
 	if !allowedAttachmentMIME[sniffed] {
-		return "", apperrors.ErrBadRequest("Attachment must be a PDF or image (PNG, JPEG, GIF, WEBP)")
+		return "", apperrors.ErrBadRequest("Attachment must be a PDF, image (PNG, JPEG, GIF, WEBP), or Word document (DOCX)")
 	}
 	url, err := s.uploads.Upload(ctx, leaveAttachmentSubdir, att.Ext, att.Content, sniffed)
 	if err != nil {
@@ -477,6 +489,19 @@ func (s *LeaveService) Update(ctx context.Context, id uuid.UUID, currentUserID u
 		}
 	}
 
+	// No-op guard: if no fields were provided and no attachment was supplied,
+	// return the current row unchanged without a status transition (G3 fix —
+	// prevents an empty PATCH from reverting an Approved request to Pending).
+	hasChanges := in.FromDate != nil || in.ToDate != nil || in.LeavePeriod != nil ||
+		in.LeaveType != nil || in.Reason != nil || attachment != nil
+	if !hasChanges {
+		read, err := s.populateRead(ctx, row)
+		if err != nil {
+			return nil, err
+		}
+		return &dto.LeaveRequestWriteResult{Request: read, Warnings: []string{}}, nil
+	}
+
 	// Apply patches. Pointer types preserve "not provided" semantics.
 	if in.FromDate != nil {
 		row.FromDate = *in.FromDate
@@ -606,22 +631,30 @@ func (s *LeaveService) checkCanApproveOrReject(ctx context.Context, approverUser
 // Cancel transitions pending or approved to cancelled. Owner can cancel
 // their own; admin can cancel anyone's. Permission gate is applied
 // upstream (RequirePerms(PermLeaveCancel)); ownership is enforced here.
-func (s *LeaveService) Cancel(ctx context.Context, id uuid.UUID, currentUserID uuid.UUID, asAdmin bool) (*dto.LeaveRequestRead, error) {
+// The returned bool (wasApproved) is true when the row was in the
+// Approved state before cancellation — the handler uses this to signal
+// that the caller's quota should be restored (G7 parity fix).
+func (s *LeaveService) Cancel(ctx context.Context, id uuid.UUID, currentUserID uuid.UUID, asAdmin bool) (*dto.LeaveRequestRead, bool, error) {
 	row, err := s.leaves.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperrors.ErrNotFound("Leave request")
+			return nil, false, apperrors.ErrNotFound("Leave request")
 		}
-		return nil, err
+		return nil, false, err
 	}
 	currentEmp, err := s.resolveCurrentEmployee(ctx, currentUserID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if !asAdmin && row.EmployeeID != currentEmp.ID {
-		return nil, apperrors.ErrForbidden("You do not own this leave request")
+		return nil, false, apperrors.ErrForbidden("You do not own this leave request")
 	}
-	return s.transitionStatus(ctx, id, models.LeaveStatusCancelled, []models.LeaveStatus{models.LeaveStatusPending, models.LeaveStatusApproved})
+	wasApproved := row.Status == models.LeaveStatusApproved
+	read, err := s.transitionStatus(ctx, id, models.LeaveStatusCancelled, []models.LeaveStatus{models.LeaveStatusPending, models.LeaveStatusApproved})
+	if err != nil {
+		return nil, false, err
+	}
+	return read, wasApproved, nil
 }
 
 // transitionStatus is the shared finalizer for Approve/Reject/Cancel.
@@ -815,11 +848,11 @@ func (s *LeaveService) GetMyDashboard(ctx context.Context, currentUserID uuid.UU
 		return nil, err
 	}
 	today := truncateToDate(time.Now().UTC())
-	upcomingRows, err := s.leaves.Upcoming(ctx, emp.ID, today, 5)
+	upcomingRows, err := s.leaves.Upcoming(ctx, emp.ID, today, 10)
 	if err != nil {
 		return nil, err
 	}
-	historyRows, err := s.leaves.History(ctx, emp.ID, today, 5)
+	historyRows, err := s.leaves.History(ctx, emp.ID, today, 10)
 	if err != nil {
 		return nil, err
 	}

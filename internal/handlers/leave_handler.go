@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -31,9 +32,9 @@ func NewLeaveHandler(svc *services.LeaveService) *LeaveHandler {
 }
 
 // maxLeaveAttachmentBytes mirrors leave_service.leaveAttachmentMaxBytes
-// (10 MB). Duplicated so the handler can reject oversized uploads before
+// (5 MB). Duplicated so the handler can reject oversized uploads before
 // the service is called.
-const maxLeaveAttachmentBytes = 10 * 1024 * 1024
+const maxLeaveAttachmentBytes = 5 * 1024 * 1024
 
 // hasLeaveManageAll walks the JWT-preloaded user.Roles for the wildcard
 // "*" permission or PermLeaveManage. Same shape as hasManageAll in
@@ -96,7 +97,7 @@ func readLeaveAttachment(c *gin.Context) (*services.AttachmentUpload, error) {
 		return nil, nil
 	}
 	if fh.Size > maxLeaveAttachmentBytes {
-		return nil, apperrors.ErrBadRequest("Attachment must not exceed 10MB")
+		return nil, apperrors.ErrBadRequest("Attachment must not exceed 5MB")
 	}
 	f, err := fh.Open()
 	if err != nil {
@@ -108,7 +109,7 @@ func readLeaveAttachment(c *gin.Context) (*services.AttachmentUpload, error) {
 		return nil, apperrors.ErrBadRequest("cannot read attachment")
 	}
 	if len(content) > maxLeaveAttachmentBytes {
-		return nil, apperrors.ErrBadRequest("Attachment must not exceed 10MB")
+		return nil, apperrors.ErrBadRequest("Attachment must not exceed 5MB")
 	}
 	ext := strings.ToLower(filepath.Ext(fh.Filename))
 	return &services.AttachmentUpload{
@@ -259,7 +260,7 @@ func (h *LeaveHandler) ListMyHistory(c *gin.Context) {
 // @Accept       multipart/form-data
 // @Produce      json
 // @Param        data       formData string  false "JSON-encoded LeaveRequestCreate (multipart only)"
-// @Param        attachment formData file    false "Optional attachment (PDF/PNG/JPG/GIF/WEBP, <=10MB)"
+// @Param        attachment formData file    false "Optional attachment (PDF/PNG/JPG/GIF/WEBP, <=5MB)"
 // @Success      201 {object} map[string]interface{}
 // @Router       /api/v1/leave-requests [post]
 func (h *LeaveHandler) Create(c *gin.Context) {
@@ -439,12 +440,19 @@ func (h *LeaveHandler) Cancel(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-	out, err := h.svc.Cancel(c.Request.Context(), id, u.ID, hasLeaveManageAll(c))
+	out, wasApproved, err := h.svc.Cancel(c.Request.Context(), id, u.ID, hasLeaveManageAll(c))
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	c.JSON(http.StatusOK, dto.Response[*dto.LeaveRequestRead]{Success: true, Data: out})
+	type cancelResult struct {
+		*dto.LeaveRequestRead
+		WasApproved bool `json:"was_approved"`
+	}
+	c.JSON(http.StatusOK, dto.Response[cancelResult]{
+		Success: true,
+		Data:    cancelResult{LeaveRequestRead: out, WasApproved: wasApproved},
+	})
 }
 
 // Delete godoc
@@ -471,4 +479,35 @@ func (h *LeaveHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dto.Response[struct{}]{Success: true, Message: "Leave request deleted"})
+}
+
+// Export godoc
+// @Summary      Export leave requests as Excel
+// @Description  Returns an .xlsx download matching the same filters as the list endpoint. Requires leave_requests:read.
+// @Tags         leave-requests
+// @Security     BearerAuth
+// @Produce      application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Param        status        query  []string  false  "filter by status"
+// @Param        department_id query  string    false  "filter by department UUID"
+// @Param        position_id   query  string    false  "filter by position UUID"
+// @Param        search        query  string    false  "search employee name"
+// @Success      200  {string}  binary
+// @Router       /api/v1/leave-requests/export [get]
+func (h *LeaveHandler) Export(c *gin.Context) {
+	var q dto.LeaveListQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		_ = c.Error(apperrors.ErrBadRequest(err.Error()))
+		return
+	}
+	data, err := h.svc.ExportLeave(c.Request.Context(), q)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	writeLeaveXlsx(c, data, "leave-requests")
+}
+
+func writeLeaveXlsx(c *gin.Context, data []byte, basename string) {
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.xlsx"`, basename))
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", data)
 }

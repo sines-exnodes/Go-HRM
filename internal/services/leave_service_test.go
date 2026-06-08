@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/exnodes/hrm-api/internal/dto"
@@ -308,7 +309,7 @@ func TestLeaveService_ApproveAndCancel_BalanceLifecycle(t *testing.T) {
 	require.InDelta(t, 10.0, bal.AnnualRemaining, 0.001)
 
 	// Cancel approved → status=cancelled.
-	read, err = svc.Cancel(ctx, leaveID, emp.UserID, false)
+	read, _, err = svc.Cancel(ctx, leaveID, emp.UserID, false)
 	require.NoError(t, err)
 	require.Equal(t, models.LeaveStatusCancelled, read.Status)
 
@@ -604,7 +605,7 @@ func TestLeaveService_ListMyHistory_ReturnsPastOrTerminal(t *testing.T) {
 		FromDate: dateAt(2099, 2, 1), ToDate: dateAt(2099, 2, 1),
 		LeavePeriod: models.LeavePeriodFullDay, LeaveType: models.LeaveTypePersonal, Reason: "future-cancelled",
 	}, nil)
-	_, err := svc.Cancel(ctx, uuid.MustParse(res2.Request.ID), emp.UserID, false)
+	_, _, err := svc.Cancel(ctx, uuid.MustParse(res2.Request.ID), emp.UserID, false)
 	require.NoError(t, err)
 
 	page, err := svc.ListMyHistory(ctx, emp.UserID, dto.LeaveHistoryQuery{Page: 1, PageSize: 10})
@@ -704,4 +705,93 @@ func TestLeaveService_Create_AttachmentPDF_OK(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res.Request.AttachmentURL)
 	require.Equal(t, int32(1), up.uploaded)
+}
+
+// TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus verifies that an empty
+// PATCH body does not reset an Approved request back to Pending. This was a
+// Go-specific regression: status-transition logic ran unconditionally even when
+// no fields changed (G3 fix).
+func TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _, _ := newLeaveSvc(t, nil)
+	_, emp := makeEmpUser(t, "emp-noop@x.com", "Emp NoOp")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	createRes, err := svc.Create(ctx, emp.UserID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 9, 1),
+		ToDate:      dateAt(2026, 9, 1),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypePersonal,
+		Reason:      "noop test",
+	}, nil)
+	require.NoError(t, err)
+
+	id := uuid.MustParse(createRes.Request.ID)
+	require.NoError(t, testDB.Model(&models.LeaveRequest{}).
+		Where("id = ?", id).
+		Update("status", models.LeaveStatusApproved).Error)
+
+	updateRes, err := svc.Update(ctx, id, emp.UserID, false, dto.LeaveRequestUpdate{}, nil)
+	require.NoError(t, err, "empty PATCH must not error")
+	assert.Equal(t, string(models.LeaveStatusApproved), string(updateRes.Request.Status),
+		"empty PATCH must not revert Approved→Pending (G3 regression)")
+}
+
+// TestCancel_WasApprovedTrue verifies that cancelling an Approved request
+// returns wasApproved=true so callers know quota should be restored (G7).
+func TestCancel_WasApprovedTrue(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _, _ := newLeaveSvc(t, nil)
+	_, emp := makeEmpUser(t, "emp-cancel-was@x.com", "Emp CancelWas")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	createRes, err := svc.Create(ctx, emp.UserID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 10, 1),
+		ToDate:      dateAt(2026, 10, 1),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypePersonal,
+		Reason:      "cancel was approved",
+	}, nil)
+	require.NoError(t, err)
+
+	id := uuid.MustParse(createRes.Request.ID)
+	require.NoError(t, testDB.Model(&models.LeaveRequest{}).
+		Where("id = ?", id).
+		Update("status", models.LeaveStatusApproved).Error)
+
+	_, wasApproved, err := svc.Cancel(ctx, id, emp.UserID, false)
+	require.NoError(t, err)
+	assert.True(t, wasApproved, "cancelling an Approved request must return wasApproved=true")
+}
+
+// TestCancel_WasApprovedFalse verifies that cancelling a Pending request
+// returns wasApproved=false.
+func TestCancel_WasApprovedFalse(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _, _ := newLeaveSvc(t, nil)
+	_, emp := makeEmpUser(t, "emp-cancel-pending@x.com", "Emp CancelPending")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	createRes, err := svc.Create(ctx, emp.UserID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 10, 5),
+		ToDate:      dateAt(2026, 10, 5),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypePersonal,
+		Reason:      "cancel pending",
+	}, nil)
+	require.NoError(t, err)
+
+	id := uuid.MustParse(createRes.Request.ID)
+	_, wasApproved, err := svc.Cancel(ctx, id, emp.UserID, false)
+	require.NoError(t, err)
+	assert.False(t, wasApproved, "cancelling a Pending request must return wasApproved=false")
 }

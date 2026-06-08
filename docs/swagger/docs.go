@@ -2387,7 +2387,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "Optional attachment (PDF/PNG/JPG/GIF/WEBP, \u003c=10MB)",
+                        "description": "Optional attachment (PDF/PNG/JPG/GIF/WEBP, \u003c=5MB)",
                         "name": "attachment",
                         "in": "formData"
                     }
@@ -2463,6 +2463,61 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/leave-requests/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns an .xlsx download matching the same filters as the list endpoint. Requires leave_requests:read.",
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "leave-requests"
+                ],
+                "summary": "Export leave requests as Excel",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "filter by status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by department UUID",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter by position UUID",
+                        "name": "position_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "search employee name",
+                        "name": "search",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 }

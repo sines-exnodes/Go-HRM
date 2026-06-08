@@ -292,6 +292,7 @@ func main() {
 		leaves.GET("/balance/:employee_id", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.GetBalance)
 		leaves.GET("", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.List)
 		leaves.POST("", middleware.RequirePerms(authSvc, permissions.PermLeaveCreate), leaveH.Create)
+		leaves.GET("export", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.Export)
 		leaves.GET(":id", middleware.RequirePerms(authSvc, permissions.PermLeaveRead), leaveH.Get)
 		leaves.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermLeaveUpdate), leaveH.Update)
 		leaves.POST(":id/approve", leaveH.Approve)
