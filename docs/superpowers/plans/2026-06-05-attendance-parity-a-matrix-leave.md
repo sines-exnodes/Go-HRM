@@ -88,20 +88,33 @@ func (r *leaveRequestRepo) ApprovedForEmployeesInRange(ctx context.Context, empl
 
 - [ ] **Step 3: Write the failing test**
 
-Create `internal/repositories/leave_request_repo_test.go` (or add to it if present). If creating, match the package + DB-guard pattern used by other repo tests in this package (`skipIfNoDB`, `truncateAll`, `testDB` are shared in the package test main). Use `makeEmpUser`/`makeUser` helpers if they exist in the repositories test package; otherwise create the employee row directly with `testDB.Create`.
+> **CORRECTION (verified 2026-06-05):** the `internal/repositories` package has **no test harness** — `testDB`/`skipIfNoDB`/`truncateAll`/`makeEmpUser` are defined ONLY in the `services_test` package (`internal/services/testhelper_test.go`). Do **not** bootstrap a new `TestMain` for repositories. Put this direct repo-method test in the `services_test` package, where the DB harness already exists, importing `repositories`.
+
+Create `internal/services/leave_repo_range_test.go`:
 
 ```go
+package services_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/exnodes/hrm-api/internal/models"
+	"github.com/exnodes/hrm-api/internal/repositories"
+)
+
 func TestLeaveRepo_ApprovedForEmployeesInRange(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
-	repo := NewLeaveRequestRepository(testDB)
+	repo := repositories.NewLeaveRequestRepository(testDB)
 
-	emp := &models.Employee{
-		FirstName: "Leave", LastName: "Subject",
-		ContractType: "official", ContractRenewal: 1, PaymentMethod: "bank_transfer",
-	}
-	require.NoError(t, testDB.Create(emp).Error)
+	_, emp := makeEmpUser(t, "leaverange@example.com", "LeaveRange")
 
 	mk := func(from, to string, status models.LeaveStatus) {
 		f, _ := time.Parse("2006-01-02", from)
@@ -125,15 +138,18 @@ func TestLeaveRepo_ApprovedForEmployeesInRange(t *testing.T) {
 }
 ```
 
+> `makeEmpUser(t, email, firstName)` returns `(user, employee)` — both with `uuid.UUID` IDs. Confirm the exact signature in `internal/services/testhelper_test.go` before use.
+
 - [ ] **Step 4: Run it — expect FAIL then PASS**
 
-Run: `go test ./internal/repositories/ -run TestLeaveRepo_ApprovedForEmployeesInRange -v`
-Expected: compiles, PASS (the method exists from Steps 1–2). If the repo test package has no shared `testDB`/`skipIfNoDB`, mirror the helper bootstrap from `attendance` service tests' `TestMain` — check `internal/repositories/*_test.go` for the existing pattern before adding a new `TestMain`.
+Set the test DB first: `export TEST_DATABASE_URL="postgres://postgres:devpassword@localhost:5432/exnodes_hrm_test?sslmode=disable"`
+Run: `go test ./internal/services/ -run TestLeaveRepo_ApprovedForEmployeesInRange -v`
+Expected: PASS (the method exists from Steps 1–2; before adding the method, the package would not compile — write the method first, then the test, per this corrected ordering).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add internal/repositories/leave_request_repo.go internal/repositories/leave_request_repo_test.go
+git add internal/repositories/leave_request_repo.go internal/services/leave_repo_range_test.go
 git commit -m "feat(attendance): add ApprovedForEmployeesInRange leave query for matrix overlay"
 ```
 
