@@ -221,9 +221,8 @@ func (s *AttendanceService) CheckIn(ctx context.Context, currentUserID uuid.UUID
 // ---- Check-out ----
 
 // CheckOut closes the (single) open session for today. Returns 409 when
-// no open session exists. After close, total hours-worked is summed across
-// all sessions and is_half_day is flipped when the day total is below the
-// configured threshold.
+// no open session exists. is_half_day is leave-driven (set only by approved
+// half-day leave) and is NOT auto-flipped here based on hours (D5).
 func (s *AttendanceService) CheckOut(ctx context.Context, currentUserID uuid.UUID, in dto.AttendanceCheckOutReq) (dto.AttendanceRead, error) {
 	currentEmp, err := s.resolveCurrentEmployee(ctx, currentUserID)
 	if err != nil {
@@ -266,15 +265,6 @@ func (s *AttendanceService) CheckOut(ctx context.Context, currentUserID uuid.UUI
 	reloaded, err := s.repo.FindByID(ctx, row.ID)
 	if err != nil {
 		return dto.AttendanceRead{}, err
-	}
-	var total float64
-	for _, sess := range reloaded.Sessions {
-		if hw := hoursBetween(sess.CheckIn, sess.CheckOut); hw != nil {
-			total += *hw
-		}
-	}
-	if total > 0 && total < s.cfg.HalfDayHoursThreshold {
-		reloaded.IsHalfDay = true
 	}
 	if in.Notes != nil {
 		reloaded.Notes = in.Notes

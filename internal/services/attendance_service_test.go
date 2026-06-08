@@ -138,7 +138,10 @@ func TestAttendance_CheckOut_FullDay_NotHalfDay(t *testing.T) {
 	assert.InDelta(t, 9.0, *out.HoursWorked, 0.05)
 }
 
-func TestAttendance_CheckOut_ShortDay_FlagsHalfDay(t *testing.T) {
+// D5: is_half_day is leave-driven, not hours-driven. A short worked day must
+// NOT auto-flag half-day (the column is only set by approved half-day leave,
+// surfaced in the matrix, not on the attendance row).
+func TestAttendance_CheckOut_ShortDay_DoesNotFlagHalfDay(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
@@ -150,10 +153,10 @@ func TestAttendance_CheckOut_ShortDay_FlagsHalfDay(t *testing.T) {
 	_, err := svc.CheckIn(ctx, u.ID, dto.AttendanceCheckInReq{CheckIn: &ci})
 	require.NoError(t, err)
 
-	co := hcmTime(t, 2026, 5, 15, 11, 0) // 2.5h < 4h threshold
+	co := hcmTime(t, 2026, 5, 15, 11, 0) // 2.5h — short, but NOT half-day
 	out, err := svc.CheckOut(ctx, u.ID, dto.AttendanceCheckOutReq{CheckOut: &co})
 	require.NoError(t, err)
-	assert.True(t, out.IsHalfDay)
+	assert.False(t, out.IsHalfDay, "short worked day must not auto-flag half-day (D5)")
 }
 
 func TestAttendance_CheckOut_DoubleClose_Conflicts(t *testing.T) {
