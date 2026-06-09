@@ -335,6 +335,13 @@ func (s *AnnouncementService) Update(ctx context.Context, id uuid.UUID, currentU
 		}
 		return nil, err
 	}
+
+	// Block edits on terminal states.
+	if row.Status == models.AnnouncementStatusPublished ||
+		row.Status == models.AnnouncementStatusArchived {
+		return nil, apperrors.ErrConflict("Cannot edit a published or archived announcement")
+	}
+
 	currentEmp, err := s.resolveCurrentEmployee(ctx, currentUserID)
 	if err != nil {
 		return nil, err

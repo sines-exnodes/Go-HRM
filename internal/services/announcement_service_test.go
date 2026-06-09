@@ -2,14 +2,17 @@ package services_test
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/exnodes/hrm-api/internal/dto"
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
 	"github.com/exnodes/hrm-api/internal/models"
 	"github.com/exnodes/hrm-api/internal/repositories"
 	"github.com/exnodes/hrm-api/internal/services"
@@ -270,15 +273,23 @@ func TestAnnouncement_Update_AlreadyPublished_DoesNotRebroadcast(t *testing.T) {
 
 	svc, hub := newAnnouncementSvc(t)
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
-	pub := models.AnnouncementStatusPublished
-	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y", Status: &pub})
-	require.NoError(t, err)
-	require.Equal(t, 1, hub.Count())
 
-	newTitle := "x revised"
-	_, err = svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{Title: &newTitle})
+	// Create a draft, update title (no broadcast), then publish (1 broadcast).
+	// A second publish call must NOT rebroadcast.
+	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
-	assert.Equal(t, 1, hub.Count(), "edit of already-published must NOT rebroadcast")
+	require.Equal(t, 0, hub.Count())
+
+	// Promote draft → published via Update.
+	pub := models.AnnouncementStatusPublished
+	_, err = svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{Status: &pub})
+	require.NoError(t, err)
+	assert.Equal(t, 1, hub.Count(), "draft→published in Update must broadcast once")
+
+	// Publish again via Publish — already published, must NOT rebroadcast.
+	_, err = svc.Publish(ctx, a.ID, admin.ID, true)
+	require.NoError(t, err)
+	assert.Equal(t, 1, hub.Count(), "already-published rows must NOT rebroadcast")
 }
 
 func TestAnnouncement_Update_NonOwner_Forbidden(t *testing.T) {
@@ -695,4 +706,54 @@ func TestAnnouncement_Update_ReplaceRecipients(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, out3.TargetRecipients, 0, "empty slice must clear the set")
+}
+
+// makeAnnouncement inserts an announcement row directly with the given status.
+func makeAnnouncement(t *testing.T, authorID uuid.UUID, status models.AnnouncementStatus) *models.Announcement {
+	t.Helper()
+	now := time.Now().UTC()
+	ann := &models.Announcement{
+		Title:          "Test announcement",
+		Description:    "Test description",
+		Status:         status,
+		TargetAudience: models.AnnouncementAudienceAll,
+		AuthorID:       authorID,
+	}
+	if status == models.AnnouncementStatusPublished || status == models.AnnouncementStatusArchived {
+		ann.PublishedAt = &now
+	}
+	require.NoError(t, testDB.Create(ann).Error)
+	return ann
+}
+
+func TestAnnouncement_Update_PublishedRow_Returns409(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	_, emp := makeEmpUser(t, "author-upd-pub@test.com", "Author Pub")
+	ann := makeAnnouncement(t, emp.ID, models.AnnouncementStatusPublished)
+
+	_, err := svc.Update(ctx, ann.ID, emp.UserID, false, dto.AnnouncementUpdate{})
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusConflict, appErr.HTTP)
+}
+
+func TestAnnouncement_Update_ArchivedRow_Returns409(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	_, emp := makeEmpUser(t, "author-upd-arch@test.com", "Author Arch")
+	ann := makeAnnouncement(t, emp.ID, models.AnnouncementStatusArchived)
+
+	_, err := svc.Update(ctx, ann.ID, emp.UserID, false, dto.AnnouncementUpdate{})
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusConflict, appErr.HTTP)
 }
