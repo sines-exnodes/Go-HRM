@@ -102,14 +102,8 @@ func main() {
 	// comment).
 	sseHub := sse.NewHub()
 	defer sseHub.Stop()
-	announcementSvc := services.NewAnnouncementService(
-		announcementRepo, employeeRepo, departmentRepo, labelRepo,
-		sseHubAdapter{hub: sseHub},
-		nil, // TODO(Task5): wire annNotifier (push+email) here
-	)
-	orgSettingsSvc := services.NewOrganizationSettingsService(systemConfigRepo, employeeRepo)
 
-	// Phase 9 — Email + Invite + Push.
+	// Phase 9 — Email + Invite + Push (must be initialized before announcements).
 	// All three degrade gracefully when their respective env keys are
 	// empty: EmailService logs + records last_email_error; PushClient
 	// becomes a no-op logger. Boot never fails on misconfig.
@@ -119,6 +113,14 @@ func main() {
 	}
 	pushClient := services.NewPushClient(cfg)
 	pushSvc := services.NewPushNotificationService(pushClient, tokenRepo)
+
+	annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo)
+	announcementSvc := services.NewAnnouncementService(
+		announcementRepo, employeeRepo, departmentRepo, labelRepo,
+		sseHubAdapter{hub: sseHub},
+		annNotifier,
+	)
+	orgSettingsSvc := services.NewOrganizationSettingsService(systemConfigRepo, employeeRepo)
 	inviteSvc := services.NewInviteService(cfg, inviteRepo, employeeRepo, userRepo, roleRepo, empSvc, emailSvc, db)
 
 	// ---- run idempotent seed on boot ----
