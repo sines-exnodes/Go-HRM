@@ -2,14 +2,17 @@ package services_test
 
 import (
 	"context"
+	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/exnodes/hrm-api/internal/dto"
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
 	"github.com/exnodes/hrm-api/internal/models"
 	"github.com/exnodes/hrm-api/internal/repositories"
 	"github.com/exnodes/hrm-api/internal/services"
@@ -56,8 +59,57 @@ func newAnnouncementSvc(t *testing.T) (*services.AnnouncementService, *captureHu
 		repositories.NewDepartmentRepository(testDB),
 		repositories.NewLabelRepository(testDB),
 		hub,
+		nil, // notifier — tests that don't need dispatch use nil
 	)
 	return svc, hub
+}
+
+// ---- captureNotifier mock ----
+
+type captureNotifier struct {
+	mu    sync.Mutex
+	calls []notifyCall
+}
+
+type notifyCall struct {
+	UserIDs     []uuid.UUID
+	Title       string
+	Description string
+}
+
+func (n *captureNotifier) NotifyAnnouncement(_ context.Context, userIDs []uuid.UUID, title, description string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.calls = append(n.calls, notifyCall{UserIDs: userIDs, Title: title, Description: description})
+}
+
+func (n *captureNotifier) callCount() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return len(n.calls)
+}
+
+func (n *captureNotifier) lastCall() notifyCall {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.calls[len(n.calls)-1]
+}
+
+// svcWithNotifier builds a service wired to a specific notifier.
+func svcWithNotifier(t *testing.T, notifier services.AnnouncementNotifier) *services.AnnouncementService {
+	t.Helper()
+	return services.NewAnnouncementService(
+		repositories.NewAnnouncementRepository(testDB),
+		repositories.NewEmployeeRepository(testDB),
+		repositories.NewDepartmentRepository(testDB),
+		repositories.NewLabelRepository(testDB),
+		&captureHub{},
+		notifier,
+	)
+}
+
+func ptrAudience(v models.AnnouncementTargetAudience) *models.AnnouncementTargetAudience {
+	return &v
 }
 
 // makeLabel inserts a label and returns it.
@@ -270,15 +322,23 @@ func TestAnnouncement_Update_AlreadyPublished_DoesNotRebroadcast(t *testing.T) {
 
 	svc, hub := newAnnouncementSvc(t)
 	admin, _ := makeEmpUser(t, "admin@example.com", "Admin")
-	pub := models.AnnouncementStatusPublished
-	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y", Status: &pub})
-	require.NoError(t, err)
-	require.Equal(t, 1, hub.Count())
 
-	newTitle := "x revised"
-	_, err = svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{Title: &newTitle})
+	// Create a draft, update title (no broadcast), then publish (1 broadcast).
+	// A second publish call must NOT rebroadcast.
+	a, err := svc.Create(ctx, admin.ID, dto.AnnouncementCreate{Title: "x", Description: "y"})
 	require.NoError(t, err)
-	assert.Equal(t, 1, hub.Count(), "edit of already-published must NOT rebroadcast")
+	require.Equal(t, 0, hub.Count())
+
+	// Promote draft → published via Update.
+	pub := models.AnnouncementStatusPublished
+	_, err = svc.Update(ctx, a.ID, admin.ID, true, dto.AnnouncementUpdate{Status: &pub})
+	require.NoError(t, err)
+	assert.Equal(t, 1, hub.Count(), "draft→published in Update must broadcast once")
+
+	// Publish again via Publish — already published, must NOT rebroadcast.
+	_, err = svc.Publish(ctx, a.ID, admin.ID, true)
+	require.NoError(t, err)
+	assert.Equal(t, 1, hub.Count(), "already-published rows must NOT rebroadcast")
 }
 
 func TestAnnouncement_Update_NonOwner_Forbidden(t *testing.T) {
@@ -695,4 +755,242 @@ func TestAnnouncement_Update_ReplaceRecipients(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Len(t, out3.TargetRecipients, 0, "empty slice must clear the set")
+}
+
+// ---- Employee repo helpers (notification dispatch) ----
+
+func TestEmployeeRepo_FindAllActive_ReturnsNonDeleted(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	truncateAll(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	_, e1 := makeEmpUser(t, "findall-active-1@test.com", "Find Active One")
+	_, e2 := makeEmpUser(t, "findall-active-2@test.com", "Find Active Two")
+	// soft-delete e2 directly in DB (bypass service to avoid auth)
+	require.NoError(t, testDB.Model(&models.Employee{}).Where("id = ?", e2.ID).Updates(map[string]interface{}{
+		"is_deleted": true,
+	}).Error)
+
+	emps, err := repo.FindAllActive(context.Background())
+	require.NoError(t, err)
+	ids := make(map[uuid.UUID]bool)
+	for _, e := range emps {
+		ids[e.ID] = true
+	}
+	assert.True(t, ids[e1.ID], "active employee should be returned")
+	assert.False(t, ids[e2.ID], "deleted employee should not be returned")
+}
+
+func TestEmployeeRepo_FindByIDs_ReturnsMatchingNonDeleted(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	truncateAll(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	_, e1 := makeEmpUser(t, "findbyids-1@test.com", "Find ByIDs One")
+	_, e2 := makeEmpUser(t, "findbyids-2@test.com", "Find ByIDs Two")
+	_, e3 := makeEmpUser(t, "findbyids-3@test.com", "Find ByIDs Three")
+	require.NoError(t, testDB.Model(&models.Employee{}).Where("id = ?", e3.ID).Updates(map[string]interface{}{
+		"is_deleted": true,
+	}).Error)
+
+	emps, err := repo.FindByIDs(context.Background(), []uuid.UUID{e1.ID, e2.ID, e3.ID})
+	require.NoError(t, err)
+	ids := make(map[uuid.UUID]bool)
+	for _, e := range emps {
+		ids[e.ID] = true
+	}
+	assert.True(t, ids[e1.ID])
+	assert.True(t, ids[e2.ID])
+	assert.False(t, ids[e3.ID], "soft-deleted should be excluded")
+}
+
+func TestEmployeeRepo_FindByIDs_EmptySlice_ReturnsNil(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	emps, err := repo.FindByIDs(context.Background(), []uuid.UUID{})
+	require.NoError(t, err)
+	assert.Empty(t, emps)
+}
+
+func TestEmployeeRepo_FindByDepartmentIDs_ReturnsMatchingNonDeleted(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	truncateAll(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	dept := makeRawDept(t, "notify-dept-repo")
+	_, e1 := makeEmpUserInDept(t, "notifydept-repo-1@test.com", "Notify Dept One", dept.ID)
+	_, e2 := makeEmpUserInDept(t, "notifydept-repo-2@test.com", "Notify Dept Two", dept.ID)
+	_, e3 := makeEmpUser(t, "notifydept-nodept@test.com", "Notify No Dept")
+
+	emps, err := repo.FindByDepartmentIDs(context.Background(), []uuid.UUID{dept.ID})
+	require.NoError(t, err)
+	ids := make(map[uuid.UUID]bool)
+	for _, e := range emps {
+		ids[e.ID] = true
+	}
+	assert.True(t, ids[e1.ID])
+	assert.True(t, ids[e2.ID])
+	assert.False(t, ids[e3.ID], "employee in different dept should not appear")
+}
+
+// makeAnnouncement inserts an announcement row directly with the given status.
+func makeAnnouncement(t *testing.T, authorID uuid.UUID, status models.AnnouncementStatus) *models.Announcement {
+	t.Helper()
+	now := time.Now().UTC()
+	ann := &models.Announcement{
+		Title:          "Test announcement",
+		Description:    "Test description",
+		Status:         status,
+		TargetAudience: models.AnnouncementAudienceAll,
+		AuthorID:       authorID,
+	}
+	if status == models.AnnouncementStatusPublished || status == models.AnnouncementStatusArchived {
+		ann.PublishedAt = &now
+	}
+	require.NoError(t, testDB.Create(ann).Error)
+	return ann
+}
+
+func TestAnnouncement_Update_PublishedRow_Returns409(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	_, emp := makeEmpUser(t, "author-upd-pub@test.com", "Author Pub")
+	ann := makeAnnouncement(t, emp.ID, models.AnnouncementStatusPublished)
+
+	_, err := svc.Update(ctx, ann.ID, emp.UserID, false, dto.AnnouncementUpdate{})
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusConflict, appErr.HTTP)
+}
+
+func TestAnnouncement_Update_ArchivedRow_Returns409(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	svc, _ := newAnnouncementSvc(t)
+	_, emp := makeEmpUser(t, "author-upd-arch@test.com", "Author Arch")
+	ann := makeAnnouncement(t, emp.ID, models.AnnouncementStatusArchived)
+
+	_, err := svc.Update(ctx, ann.ID, emp.UserID, false, dto.AnnouncementUpdate{})
+	require.Error(t, err)
+	var appErr *apperrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, http.StatusConflict, appErr.HTTP)
+}
+
+// ---- Notifier dispatch (G2) ----
+
+func TestAnnouncement_NilNotifier_DoesNotPanic(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	svc := svcWithNotifier(t, nil)
+	_, u := makeEmpUser(t, "nil-notifier-author@test.com", "Nil Author")
+	_, err := svc.Create(context.Background(), u.UserID, dto.AnnouncementCreate{
+		Title:       "Silent publish",
+		Description: "body",
+		SendNow:     true,
+	})
+	require.NoError(t, err)
+	// If we reach here without panic, the nil guard works.
+}
+
+func TestAnnouncement_Publish_DispatchesNotifier_AudienceAll(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	notifier := &captureNotifier{}
+	svc := svcWithNotifier(t, notifier)
+	_, author := makeEmpUser(t, "dispatch-all-author@test.com", "Dispatch All Author")
+	_, _ = makeEmpUser(t, "dispatch-all-emp1@test.com", "Emp1")
+	_, _ = makeEmpUser(t, "dispatch-all-emp2@test.com", "Emp2")
+
+	_, err := svc.Create(context.Background(), author.UserID, dto.AnnouncementCreate{
+		Title:       "All notif",
+		Description: "body",
+		SendNow:     true,
+	})
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond) // let goroutine finish
+	assert.Equal(t, 1, notifier.callCount(), "notifier should be called once on publish")
+	call := notifier.lastCall()
+	assert.GreaterOrEqual(t, len(call.UserIDs), 3, "should notify at least the 3 employees we created")
+	assert.Equal(t, "All notif", call.Title)
+}
+
+func TestAnnouncement_Publish_DispatchesNotifier_AudienceDepartment(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	notifier := &captureNotifier{}
+	svc := svcWithNotifier(t, notifier)
+	_, author := makeEmpUser(t, "dispatch-dept-author@test.com", "Dispatch Dept Author")
+	dept := makeRawDept(t, "dispatch-dept")
+	_, deptEmp := makeEmpUserInDept(t, "dispatch-dept-member@test.com", "Member", dept.ID)
+	_, outsideEmp := makeEmpUser(t, "dispatch-dept-outside@test.com", "Outside")
+
+	_, err := svc.Create(context.Background(), author.UserID, dto.AnnouncementCreate{
+		Title:          "Dept notif",
+		Description:    "body",
+		SendNow:        true,
+		TargetAudience: ptrAudience(models.AnnouncementAudienceDepartment),
+		DepartmentIDs:  []uuid.UUID{dept.ID},
+	})
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond)
+	assert.Equal(t, 1, notifier.callCount())
+	call := notifier.lastCall()
+	userIDSet := make(map[uuid.UUID]bool)
+	for _, id := range call.UserIDs {
+		userIDSet[id] = true
+	}
+	assert.True(t, userIDSet[deptEmp.UserID], "dept member should be notified")
+	assert.False(t, userIDSet[outsideEmp.UserID], "outside member should not be notified")
+}
+
+func TestAnnouncement_Publish_DispatchesNotifier_AudienceCustom(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	notifier := &captureNotifier{}
+	svc := svcWithNotifier(t, notifier)
+	_, author := makeEmpUser(t, "dispatch-custom-author@test.com", "Dispatch Custom Author")
+	_, recipEmp := makeEmpUser(t, "dispatch-custom-recip@test.com", "Recip")
+	_, otherEmp := makeEmpUser(t, "dispatch-custom-other@test.com", "Other")
+
+	_, err := svc.Create(context.Background(), author.UserID, dto.AnnouncementCreate{
+		Title:          "Custom notif",
+		Description:    "body",
+		SendNow:        true,
+		TargetAudience: ptrAudience(models.AnnouncementAudienceCustom),
+		RecipientIDs:   []uuid.UUID{recipEmp.ID},
+	})
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond)
+	assert.Equal(t, 1, notifier.callCount())
+	call := notifier.lastCall()
+	userIDSet := make(map[uuid.UUID]bool)
+	for _, id := range call.UserIDs {
+		userIDSet[id] = true
+	}
+	assert.True(t, userIDSet[recipEmp.UserID], "named recipient should be notified")
+	assert.False(t, userIDSet[otherEmp.UserID], "other emp should not be notified")
 }

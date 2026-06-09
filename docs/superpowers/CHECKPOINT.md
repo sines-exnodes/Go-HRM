@@ -1,12 +1,31 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (leave-requests parity PUSHED to origin/main; deploy + seed still needed)
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (announcements parity on `main`; deploy + seed still needed)
 
 **Last updated:** 2026-06-09
-**Stopped at:** Leave-requests parity — Plans A+B + FE docs fully committed and **pushed to `origin/main`** (`a5b6a69`). Next: deploy (`docker restart exnodes-hrm-app`) + seed (auto on next boot). Then: Request Tickets module (EP-003).
-**Branch:** `main` — local = `origin/main` = `a5b6a69`. In sync.
-**DB migration version:** **21** (unchanged — leave-requests parity adds no migration). Next free: **000022**.
+**Stopped at:** Announcements parity Plans A+B fully committed to `main` (`222b979`). Not yet pushed. Next: push + deploy (`docker restart exnodes-hrm-app`) + seed. Then: Request Tickets module (EP-003).
+**Branch:** `main` — local ahead of `origin/main` (origin = `a5b6a69`; local = `222b979`). **Push pending.**
+**DB migration version:** **21** (unchanged — announcements parity adds no migration). Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
+
+## Announcements parity — Plans A+B (committed to `main`; push pending)
+
+Python↔Go announcements parity audit → 3 gaps locked → Plans A (trivial) + B (dispatch), executed subagent-driven. Full suite green. **No migration.**
+
+- **Audit:** [`specs/2026-06-09-announcements-parity-audit.md`](specs/2026-06-09-announcements-parity-audit.md) — 8 gaps, 3 actionable (G1/G2/G3), 5 intentional divergences.
+- **Plans:** [`plans/2026-06-09-announcements-parity-plan-a.md`](plans/2026-06-09-announcements-parity-plan-a.md) · [`plans/2026-06-09-announcements-parity-plan-b.md`](plans/2026-06-09-announcements-parity-plan-b.md).
+- **Plan A — G3 + G1** (`a988f29` + `bfbaf35` + `23daf5c`):
+  - G3: 409 guard in `AnnouncementService.Update` for published/archived rows — matches Python's ConflictException. Fires before ownership check.
+  - G1: `POST /api/v1/mobile/announcements/:id/read` route alias → existing `MarkViewed` handler. Zero new logic.
+  - Swagger `@Failure 409` added to Update handler.
+- **Plan B — G2: push + email dispatch on publish** (`97c4af8` + `f525dd8` + `8952277` + `6601f51` + `3f7fd4c` + `222b979`):
+  - `EmployeeRepository`: `FindAllActive` / `FindByIDs` / `FindByDepartmentIDs` — used to resolve `target_audience` → `[]uuid.UUID` user IDs.
+  - `EmailService.SendAnnouncementNotification` — gomail pattern, 10s timeout. `sendMessage` + `fromAddress` private helpers extracted to deduplicate vs `SendInvite`.
+  - `AnnouncementNotifier` interface (nil-safe) + `broadcastPublished` now launches `go dispatchNotifications` after SSE. `resolveRecipientUserIDs` handles all/department/custom audience modes.
+  - Concrete `announcementNotifier` in `internal/services/announcement_notifier.go` — calls `push.SendToUser` + `email.SendAnnouncementNotification` per user; per-user errors logged, loop continues.
+  - Wired in `main.go`: `annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo)`.
+- **Verification:** `go test ./...` all PASS, `go fmt ./...` + `go vet ./...` clean. HEAD is `222b979`.
+- **Deploy pending:** push + `docker restart exnodes-hrm-app`.
 
 ## Leave Requests parity — Plan A + B (committed locally; push + PR pending)
 
@@ -36,14 +55,13 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: deploy leave-requests parity to dev
+### IMMEDIATE: push + deploy announcements + leave-requests parity
 
-Leave-requests parity Plans A+B are **committed and pushed** to `origin/main`. Steps remaining:
+Both announcements and leave-requests parity are committed locally but not yet pushed or deployed.
 
-1. ~~**Push + PR**~~ — ✅ DONE (`a5b6a69` is on `origin/main`)
-2. ~~**FE doc**~~ — ✅ DONE (`f7783ec` + web repo `api_info_go/leave_requests.md`)
-3. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is already on `main`)
-4. **Seed** — idempotent; the seed service will update Manager role (`approve_team + update + delete`) on next boot automatically. No manual SQL needed.
+1. **Push** — `git push origin main` (carries announcements parity + leave-requests parity commits)
+2. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is on `main`)
+3. **Seed** — auto on next boot (Manager role perms updated by seed service idempotently)
 
 ### Subsequent priorities (in descending value):
 

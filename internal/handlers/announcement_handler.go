@@ -154,6 +154,7 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 // @Param        id    path  string                  true  "announcement uuid"
 // @Param        body  body  dto.AnnouncementUpdate  true  "patch payload"
 // @Success      200   {object}  map[string]interface{}
+// @Failure      409   {object}  map[string]interface{}  "announcement is published or archived"
 // @Router       /api/v1/announcements/{id} [patch]
 func (h *AnnouncementHandler) Update(c *gin.Context) {
 	u, ok := currentUser(c)

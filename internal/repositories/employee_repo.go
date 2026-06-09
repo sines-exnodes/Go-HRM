@@ -48,6 +48,11 @@ type EmployeeRepository interface {
 	// (active AND inactive), with User/Department/Position preloaded.
 	ListDirectReports(ctx context.Context, managerID uuid.UUID) ([]models.Employee, error)
 
+	// Notification-dispatch helpers (announcement service).
+	FindAllActive(ctx context.Context) ([]models.Employee, error)
+	FindByIDs(ctx context.Context, ids []uuid.UUID) ([]models.Employee, error)
+	FindByDepartmentIDs(ctx context.Context, deptIDs []uuid.UUID) ([]models.Employee, error)
+
 	WithTx(tx *gorm.DB) EmployeeRepository
 	DB() *gorm.DB
 }
@@ -348,3 +353,32 @@ func (r *employeeRepository) WithTx(tx *gorm.DB) EmployeeRepository {
 }
 
 func (r *employeeRepository) DB() *gorm.DB { return r.db }
+
+// FindAllActive returns every non-deleted employee (no preloads).
+func (r *employeeRepository) FindAllActive(ctx context.Context) ([]models.Employee, error) {
+	var emps []models.Employee
+	err := r.db.WithContext(ctx).Scopes(notDeleted).Find(&emps).Error
+	return emps, err
+}
+
+// FindByIDs returns non-deleted employees whose ID is in ids.
+// Returns nil, nil for an empty input slice (fast-path — avoids an IN () SQL error).
+func (r *employeeRepository) FindByIDs(ctx context.Context, ids []uuid.UUID) ([]models.Employee, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var emps []models.Employee
+	err := r.db.WithContext(ctx).Scopes(notDeleted).Where("id IN ?", ids).Find(&emps).Error
+	return emps, err
+}
+
+// FindByDepartmentIDs returns non-deleted employees whose department_id is in deptIDs.
+// Returns nil, nil for an empty input slice.
+func (r *employeeRepository) FindByDepartmentIDs(ctx context.Context, deptIDs []uuid.UUID) ([]models.Employee, error) {
+	if len(deptIDs) == 0 {
+		return nil, nil
+	}
+	var emps []models.Employee
+	err := r.db.WithContext(ctx).Scopes(notDeleted).Where("department_id IN ?", deptIDs).Find(&emps).Error
+	return emps, err
+}
