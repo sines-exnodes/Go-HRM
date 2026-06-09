@@ -323,6 +323,7 @@ func main() {
 		mobileAnnounce.GET("", announcementH.MobileBrief)
 		mobileAnnounce.GET("/list", announcementH.MobileList)
 		mobileAnnounce.GET(":id", announcementH.MobileGet)
+		mobileAnnounce.POST(":id/read", announcementH.MarkViewed)
 
 		// ---- /attendance (Phase 6) ----
 		// Gin route precedence: literal segments (today/me/matrix) must be
