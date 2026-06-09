@@ -132,3 +132,74 @@ func (s *EmailService) SendInvite(ctx context.Context, toEmail string, data Invi
 		return fmt.Errorf("smtp send: timeout after 10s")
 	}
 }
+
+// SendAnnouncementNotification sends an HTML+plaintext email notification
+// for a published announcement. Uses the same gomail/SMTP pattern as
+// SendInvite with a 10s timeout.
+// Returns ErrEmailDisabled when SMTP is not configured.
+func (s *EmailService) SendAnnouncementNotification(ctx context.Context, toEmail, title, description string) error {
+	if !s.IsConfigured() {
+		log.Printf("email: skipped announcement notification to %s — SMTP not configured", toEmail)
+		return ErrEmailDisabled
+	}
+
+	appName := s.cfg.AppName
+	if appName == "" {
+		appName = "HRM"
+	}
+
+	htmlBody := fmt.Sprintf(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px">
+  <div style="background:#f8f9fa;padding:30px;border-radius:10px">
+    <h2 style="color:#2563eb">%s</h2>
+    <div style="line-height:1.6">%s</div>
+    <hr style="border:none;border-top:1px solid #ddd;margin:20px 0">
+    <p style="color:#999;font-size:12px">This is an automated message from %s.</p>
+  </div>
+</body></html>`, title, description, appName)
+
+	plainText := fmt.Sprintf("%s\n\n%s\n\n-- %s", title, description, appName)
+
+	from := s.cfg.SMTPFromEmail
+	if from == "" {
+		from = "no-reply@" + s.cfg.AppName
+	}
+	fromAddr := from
+	if s.cfg.SMTPFromName != "" {
+		fromAddr = fmt.Sprintf("%s <%s>", s.cfg.SMTPFromName, from)
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", fromAddr)
+	m.SetHeader("To", toEmail)
+	m.SetHeader("Subject", fmt.Sprintf("[%s] New Announcement: %s", appName, title))
+	m.SetBody("text/plain", plainText)
+	m.AddAlternative("text/html", htmlBody)
+
+	d := gomail.NewDialer(s.cfg.SMTPHost, s.cfg.SMTPPort, s.cfg.SMTPUser, s.cfg.SMTPPassword)
+	d.SSL = false
+	if !s.cfg.SMTPUseTLS {
+		d.TLSConfig = nil
+	}
+
+	// gomail uses net/smtp internally which doesn't honour ctx — wrap
+	// with a deadline goroutine so a hung SMTP doesn't pin the request.
+	done := make(chan error, 1)
+	go func() {
+		done <- d.DialAndSend(m)
+	}()
+
+	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("smtp send announcement: %w", err)
+		}
+		return nil
+	case <-deadline.Done():
+		return fmt.Errorf("smtp send announcement: timeout after 10s")
+	}
+}
