@@ -87,50 +87,17 @@ func (s *EmailService) SendInvite(ctx context.Context, toEmail string, data Invi
 		return fmt.Errorf("render invite.txt: %w", err)
 	}
 
-	from := s.cfg.SMTPFromEmail
-	if from == "" {
-		from = "no-reply@" + s.cfg.AppName
-	}
-	fromAddr := from
-	if s.cfg.SMTPFromName != "" {
-		fromAddr = fmt.Sprintf("%s <%s>", s.cfg.SMTPFromName, from)
-	}
-
 	m := gomail.NewMessage()
-	m.SetHeader("From", fromAddr)
+	m.SetHeader("From", s.fromAddress())
 	m.SetHeader("To", toEmail)
 	m.SetHeader("Subject", fmt.Sprintf("You're invited to %s", data.AppName))
 	m.SetBody("text/plain", textBuf.String())
 	m.AddAlternative("text/html", htmlBuf.String())
 
-	d := gomail.NewDialer(s.cfg.SMTPHost, s.cfg.SMTPPort, s.cfg.SMTPUser, s.cfg.SMTPPassword)
-	d.SSL = false
-	// gomail switches to STARTTLS automatically when the server advertises
-	// it; SSL=true is for implicit-TLS port 465. We default to STARTTLS
-	// when SMTP_USE_TLS=true; Mailpit ignores it on port 1025.
-	if !s.cfg.SMTPUseTLS {
-		d.TLSConfig = nil
+	if err := s.sendMessage(ctx, m); err != nil {
+		return fmt.Errorf("send invite: %w", err)
 	}
-
-	// gomail uses net/smtp internally which doesn't honour ctx — wrap
-	// with a deadline goroutine so a hung SMTP doesn't pin the request.
-	done := make(chan error, 1)
-	go func() {
-		done <- d.DialAndSend(m)
-	}()
-
-	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("smtp send: %w", err)
-		}
-		return nil
-	case <-deadline.Done():
-		return fmt.Errorf("smtp send: timeout after 10s")
-	}
+	return nil
 }
 
 // SendAnnouncementNotification sends an HTML+plaintext email notification
@@ -161,45 +128,56 @@ func (s *EmailService) SendAnnouncementNotification(ctx context.Context, toEmail
 
 	plainText := fmt.Sprintf("%s\n\n%s\n\n-- %s", title, description, appName)
 
-	from := s.cfg.SMTPFromEmail
-	if from == "" {
-		from = "no-reply@" + s.cfg.AppName
-	}
-	fromAddr := from
-	if s.cfg.SMTPFromName != "" {
-		fromAddr = fmt.Sprintf("%s <%s>", s.cfg.SMTPFromName, from)
-	}
-
 	m := gomail.NewMessage()
-	m.SetHeader("From", fromAddr)
+	m.SetHeader("From", s.fromAddress())
 	m.SetHeader("To", toEmail)
 	m.SetHeader("Subject", fmt.Sprintf("[%s] New Announcement: %s", appName, title))
 	m.SetBody("text/plain", plainText)
 	m.AddAlternative("text/html", htmlBody)
 
+	if err := s.sendMessage(ctx, m); err != nil {
+		return fmt.Errorf("send announcement notification: %w", err)
+	}
+	return nil
+}
+
+// fromAddress builds the RFC 5322 From header value using the configured
+// SMTPFromEmail and SMTPFromName. Falls back to no-reply@<AppName> when
+// SMTPFromEmail is empty.
+func (s *EmailService) fromAddress() string {
+	from := s.cfg.SMTPFromEmail
+	if from == "" {
+		from = "no-reply@" + s.cfg.AppName
+	}
+	if s.cfg.SMTPFromName != "" {
+		return fmt.Sprintf("%s <%s>", s.cfg.SMTPFromName, from)
+	}
+	return from
+}
+
+// sendMessage dials SMTP and sends m, honouring a 10-second deadline.
+// gomail uses net/smtp internally which doesn't honour ctx — wrap with a
+// deadline goroutine so a hung SMTP doesn't pin the request.
+func (s *EmailService) sendMessage(ctx context.Context, m *gomail.Message) error {
 	d := gomail.NewDialer(s.cfg.SMTPHost, s.cfg.SMTPPort, s.cfg.SMTPUser, s.cfg.SMTPPassword)
 	d.SSL = false
+	// gomail switches to STARTTLS automatically when the server advertises
+	// it; SSL=true is for implicit-TLS port 465. We default to STARTTLS
+	// when SMTP_USE_TLS=true; Mailpit ignores it on port 1025.
 	if !s.cfg.SMTPUseTLS {
 		d.TLSConfig = nil
 	}
 
-	// gomail uses net/smtp internally which doesn't honour ctx — wrap
-	// with a deadline goroutine so a hung SMTP doesn't pin the request.
 	done := make(chan error, 1)
-	go func() {
-		done <- d.DialAndSend(m)
-	}()
+	go func() { done <- d.DialAndSend(m) }()
 
 	deadline, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	select {
 	case err := <-done:
-		if err != nil {
-			return fmt.Errorf("smtp send announcement: %w", err)
-		}
-		return nil
+		return err
 	case <-deadline.Done():
-		return fmt.Errorf("smtp send announcement: timeout after 10s")
+		return fmt.Errorf("smtp: send timeout after 10s")
 	}
 }
