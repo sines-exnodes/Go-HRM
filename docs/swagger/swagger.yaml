@@ -1355,6 +1355,11 @@ paths:
           schema:
             additionalProperties: true
             type: object
+        "409":
+          description: announcement is published or archived
+          schema:
+            additionalProperties: true
+            type: object
       security:
       - BearerAuth: []
       summary: Update an announcement (owner or admin)
