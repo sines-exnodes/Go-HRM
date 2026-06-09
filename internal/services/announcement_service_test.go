@@ -59,8 +59,57 @@ func newAnnouncementSvc(t *testing.T) (*services.AnnouncementService, *captureHu
 		repositories.NewDepartmentRepository(testDB),
 		repositories.NewLabelRepository(testDB),
 		hub,
+		nil, // notifier — tests that don't need dispatch use nil
 	)
 	return svc, hub
+}
+
+// ---- captureNotifier mock ----
+
+type captureNotifier struct {
+	mu    sync.Mutex
+	calls []notifyCall
+}
+
+type notifyCall struct {
+	UserIDs     []uuid.UUID
+	Title       string
+	Description string
+}
+
+func (n *captureNotifier) NotifyAnnouncement(_ context.Context, userIDs []uuid.UUID, title, description string) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.calls = append(n.calls, notifyCall{UserIDs: userIDs, Title: title, Description: description})
+}
+
+func (n *captureNotifier) callCount() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return len(n.calls)
+}
+
+func (n *captureNotifier) lastCall() notifyCall {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.calls[len(n.calls)-1]
+}
+
+// svcWithNotifier builds a service wired to a specific notifier.
+func svcWithNotifier(t *testing.T, notifier services.AnnouncementNotifier) *services.AnnouncementService {
+	t.Helper()
+	return services.NewAnnouncementService(
+		repositories.NewAnnouncementRepository(testDB),
+		repositories.NewEmployeeRepository(testDB),
+		repositories.NewDepartmentRepository(testDB),
+		repositories.NewLabelRepository(testDB),
+		&captureHub{},
+		notifier,
+	)
+}
+
+func ptrAudience(v models.AnnouncementTargetAudience) *models.AnnouncementTargetAudience {
+	return &v
 }
 
 // makeLabel inserts a label and returns it.
@@ -841,4 +890,107 @@ func TestAnnouncement_Update_ArchivedRow_Returns409(t *testing.T) {
 	var appErr *apperrors.AppError
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, http.StatusConflict, appErr.HTTP)
+}
+
+// ---- Notifier dispatch (G2) ----
+
+func TestAnnouncement_NilNotifier_DoesNotPanic(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	svc := svcWithNotifier(t, nil)
+	_, u := makeEmpUser(t, "nil-notifier-author@test.com", "Nil Author")
+	_, err := svc.Create(context.Background(), u.UserID, dto.AnnouncementCreate{
+		Title:       "Silent publish",
+		Description: "body",
+		SendNow:     true,
+	})
+	require.NoError(t, err)
+	// If we reach here without panic, the nil guard works.
+}
+
+func TestAnnouncement_Publish_DispatchesNotifier_AudienceAll(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	notifier := &captureNotifier{}
+	svc := svcWithNotifier(t, notifier)
+	_, author := makeEmpUser(t, "dispatch-all-author@test.com", "Dispatch All Author")
+	_, _ = makeEmpUser(t, "dispatch-all-emp1@test.com", "Emp1")
+	_, _ = makeEmpUser(t, "dispatch-all-emp2@test.com", "Emp2")
+
+	_, err := svc.Create(context.Background(), author.UserID, dto.AnnouncementCreate{
+		Title:       "All notif",
+		Description: "body",
+		SendNow:     true,
+	})
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond) // let goroutine finish
+	assert.Equal(t, 1, notifier.callCount(), "notifier should be called once on publish")
+	call := notifier.lastCall()
+	assert.GreaterOrEqual(t, len(call.UserIDs), 3, "should notify at least the 3 employees we created")
+	assert.Equal(t, "All notif", call.Title)
+}
+
+func TestAnnouncement_Publish_DispatchesNotifier_AudienceDepartment(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	notifier := &captureNotifier{}
+	svc := svcWithNotifier(t, notifier)
+	_, author := makeEmpUser(t, "dispatch-dept-author@test.com", "Dispatch Dept Author")
+	dept := makeRawDept(t, "dispatch-dept")
+	_, deptEmp := makeEmpUserInDept(t, "dispatch-dept-member@test.com", "Member", dept.ID)
+	_, outsideEmp := makeEmpUser(t, "dispatch-dept-outside@test.com", "Outside")
+
+	_, err := svc.Create(context.Background(), author.UserID, dto.AnnouncementCreate{
+		Title:          "Dept notif",
+		Description:    "body",
+		SendNow:        true,
+		TargetAudience: ptrAudience(models.AnnouncementAudienceDepartment),
+		DepartmentIDs:  []uuid.UUID{dept.ID},
+	})
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond)
+	assert.Equal(t, 1, notifier.callCount())
+	call := notifier.lastCall()
+	userIDSet := make(map[uuid.UUID]bool)
+	for _, id := range call.UserIDs {
+		userIDSet[id] = true
+	}
+	assert.True(t, userIDSet[deptEmp.UserID], "dept member should be notified")
+	assert.False(t, userIDSet[outsideEmp.UserID], "outside member should not be notified")
+}
+
+func TestAnnouncement_Publish_DispatchesNotifier_AudienceCustom(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	truncateAll(t)
+	notifier := &captureNotifier{}
+	svc := svcWithNotifier(t, notifier)
+	_, author := makeEmpUser(t, "dispatch-custom-author@test.com", "Dispatch Custom Author")
+	_, recipEmp := makeEmpUser(t, "dispatch-custom-recip@test.com", "Recip")
+	_, otherEmp := makeEmpUser(t, "dispatch-custom-other@test.com", "Other")
+
+	_, err := svc.Create(context.Background(), author.UserID, dto.AnnouncementCreate{
+		Title:          "Custom notif",
+		Description:    "body",
+		SendNow:        true,
+		TargetAudience: ptrAudience(models.AnnouncementAudienceCustom),
+		RecipientIDs:   []uuid.UUID{recipEmp.ID},
+	})
+	require.NoError(t, err)
+	time.Sleep(150 * time.Millisecond)
+	assert.Equal(t, 1, notifier.callCount())
+	call := notifier.lastCall()
+	userIDSet := make(map[uuid.UUID]bool)
+	for _, id := range call.UserIDs {
+		userIDSet[id] = true
+	}
+	assert.True(t, userIDSet[recipEmp.UserID], "named recipient should be notified")
+	assert.False(t, userIDSet[otherEmp.UserID], "other emp should not be notified")
 }

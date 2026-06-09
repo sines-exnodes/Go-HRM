@@ -105,6 +105,7 @@ func main() {
 	announcementSvc := services.NewAnnouncementService(
 		announcementRepo, employeeRepo, departmentRepo, labelRepo,
 		sseHubAdapter{hub: sseHub},
+		nil, // TODO(Task5): wire annNotifier (push+email) here
 	)
 	orgSettingsSvc := services.NewOrganizationSettingsService(systemConfigRepo, employeeRepo)
 

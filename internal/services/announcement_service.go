@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -23,29 +24,38 @@ type HubBroadcaster interface {
 	Broadcast(eventType string, data any, filter func(userID uuid.UUID) bool)
 }
 
+// AnnouncementNotifier dispatches push + email notifications when an
+// announcement is published. Nil disables notifications (tests, dev).
+type AnnouncementNotifier interface {
+	NotifyAnnouncement(ctx context.Context, userIDs []uuid.UUID, title, description string)
+}
+
 // AnnouncementService owns the announcement aggregate. Permission gating
 // is two-layered: route-level RequirePerms upstream; service-level
 // ownership branch via the asAdmin bool precomputed by the handler from
 // the JWT-preloaded user.Roles. Same shape as LeaveService /
 // AttendanceService.
 type AnnouncementService struct {
-	repo   repositories.AnnouncementRepository
-	emps   repositories.EmployeeRepository
-	depts  repositories.DepartmentRepository
-	labels repositories.LabelRepository
-	hub    HubBroadcaster // optional — nil disables SSE broadcasts
+	repo     repositories.AnnouncementRepository
+	emps     repositories.EmployeeRepository
+	depts    repositories.DepartmentRepository
+	labels   repositories.LabelRepository
+	hub      HubBroadcaster       // optional — nil disables SSE broadcasts
+	notifier AnnouncementNotifier // optional — nil disables push/email notifications
 }
 
 // NewAnnouncementService constructs an AnnouncementService. Pass nil
-// for hub in tests that don't need to assert broadcasts.
+// for hub in tests that don't need to assert broadcasts. Pass nil for
+// notifier in tests or when push/email is not yet wired.
 func NewAnnouncementService(
 	repo repositories.AnnouncementRepository,
 	emps repositories.EmployeeRepository,
 	depts repositories.DepartmentRepository,
 	labels repositories.LabelRepository,
 	hub HubBroadcaster,
+	notifier AnnouncementNotifier,
 ) *AnnouncementService {
-	return &AnnouncementService{repo: repo, emps: emps, depts: depts, labels: labels, hub: hub}
+	return &AnnouncementService{repo: repo, emps: emps, depts: depts, labels: labels, hub: hub, notifier: notifier}
 }
 
 // ---- Shared helpers ----
@@ -226,6 +236,67 @@ func (s *AnnouncementService) broadcastPublished(a *models.Announcement) {
 	// and that refetch goes through the GET visibility filter. Avoids
 	// duplicating the audience logic in the hub layer.
 	s.hub.Broadcast("announcement_published", payload, nil)
+	if s.notifier != nil {
+		go s.dispatchNotifications(a)
+	}
+}
+
+func (s *AnnouncementService) dispatchNotifications(ann *models.Announcement) {
+	ctx := context.Background()
+	userIDs, err := s.resolveRecipientUserIDs(ctx, ann)
+	if err != nil {
+		log.Printf("announcements: dispatchNotifications resolve for %s: %v", ann.ID, err)
+		return
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+	s.notifier.NotifyAnnouncement(ctx, userIDs, ann.Title, ann.Description)
+}
+
+func (s *AnnouncementService) resolveRecipientUserIDs(ctx context.Context, ann *models.Announcement) ([]uuid.UUID, error) {
+	switch ann.TargetAudience {
+	case models.AnnouncementAudienceAll:
+		emps, err := s.emps.FindAllActive(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]uuid.UUID, 0, len(emps))
+		for _, e := range emps {
+			ids = append(ids, e.UserID)
+		}
+		return ids, nil
+	case models.AnnouncementAudienceDepartment:
+		deptIDs := make([]uuid.UUID, 0, len(ann.TargetDepartments))
+		for _, td := range ann.TargetDepartments {
+			deptIDs = append(deptIDs, td.DepartmentID)
+		}
+		emps, err := s.emps.FindByDepartmentIDs(ctx, deptIDs)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]uuid.UUID, 0, len(emps))
+		for _, e := range emps {
+			ids = append(ids, e.UserID)
+		}
+		return ids, nil
+	case models.AnnouncementAudienceCustom:
+		empIDs := make([]uuid.UUID, 0, len(ann.TargetUsers))
+		for _, tu := range ann.TargetUsers {
+			empIDs = append(empIDs, tu.EmployeeID)
+		}
+		emps, err := s.emps.FindByIDs(ctx, empIDs)
+		if err != nil {
+			return nil, err
+		}
+		ids := make([]uuid.UUID, 0, len(emps))
+		for _, e := range emps {
+			ids = append(ids, e.UserID)
+		}
+		return ids, nil
+	default:
+		return nil, nil
+	}
 }
 
 // ---- Create ----
