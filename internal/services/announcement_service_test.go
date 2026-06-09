@@ -708,6 +708,91 @@ func TestAnnouncement_Update_ReplaceRecipients(t *testing.T) {
 	assert.Len(t, out3.TargetRecipients, 0, "empty slice must clear the set")
 }
 
+// ---- Employee repo helpers (notification dispatch) ----
+
+func TestEmployeeRepo_FindAllActive_ReturnsNonDeleted(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	truncateAll(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	_, e1 := makeEmpUser(t, "findall-active-1@test.com", "Find Active One")
+	_, e2 := makeEmpUser(t, "findall-active-2@test.com", "Find Active Two")
+	// soft-delete e2 directly in DB (bypass service to avoid auth)
+	require.NoError(t, testDB.Model(&models.Employee{}).Where("id = ?", e2.ID).Updates(map[string]interface{}{
+		"is_deleted": true,
+	}).Error)
+
+	emps, err := repo.FindAllActive(context.Background())
+	require.NoError(t, err)
+	ids := make(map[uuid.UUID]bool)
+	for _, e := range emps {
+		ids[e.ID] = true
+	}
+	assert.True(t, ids[e1.ID], "active employee should be returned")
+	assert.False(t, ids[e2.ID], "deleted employee should not be returned")
+}
+
+func TestEmployeeRepo_FindByIDs_ReturnsMatchingNonDeleted(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	truncateAll(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	_, e1 := makeEmpUser(t, "findbyids-1@test.com", "Find ByIDs One")
+	_, e2 := makeEmpUser(t, "findbyids-2@test.com", "Find ByIDs Two")
+	_, e3 := makeEmpUser(t, "findbyids-3@test.com", "Find ByIDs Three")
+	require.NoError(t, testDB.Model(&models.Employee{}).Where("id = ?", e3.ID).Updates(map[string]interface{}{
+		"is_deleted": true,
+	}).Error)
+
+	emps, err := repo.FindByIDs(context.Background(), []uuid.UUID{e1.ID, e2.ID, e3.ID})
+	require.NoError(t, err)
+	ids := make(map[uuid.UUID]bool)
+	for _, e := range emps {
+		ids[e.ID] = true
+	}
+	assert.True(t, ids[e1.ID])
+	assert.True(t, ids[e2.ID])
+	assert.False(t, ids[e3.ID], "soft-deleted should be excluded")
+}
+
+func TestEmployeeRepo_FindByIDs_EmptySlice_ReturnsNil(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	emps, err := repo.FindByIDs(context.Background(), []uuid.UUID{})
+	require.NoError(t, err)
+	assert.Empty(t, emps)
+}
+
+func TestEmployeeRepo_FindByDepartmentIDs_ReturnsMatchingNonDeleted(t *testing.T) {
+	if testDB == nil {
+		t.Skip("no test DB")
+	}
+	skipIfNoDB(t)
+	truncateAll(t)
+	repo := repositories.NewEmployeeRepository(testDB)
+	dept := makeRawDept(t, "notify-dept-repo")
+	_, e1 := makeEmpUserInDept(t, "notifydept-repo-1@test.com", "Notify Dept One", dept.ID)
+	_, e2 := makeEmpUserInDept(t, "notifydept-repo-2@test.com", "Notify Dept Two", dept.ID)
+	_, e3 := makeEmpUser(t, "notifydept-nodept@test.com", "Notify No Dept")
+
+	emps, err := repo.FindByDepartmentIDs(context.Background(), []uuid.UUID{dept.ID})
+	require.NoError(t, err)
+	ids := make(map[uuid.UUID]bool)
+	for _, e := range emps {
+		ids[e.ID] = true
+	}
+	assert.True(t, ids[e1.ID])
+	assert.True(t, ids[e2.ID])
+	assert.False(t, ids[e3.ID], "employee in different dept should not appear")
+}
+
 // makeAnnouncement inserts an announcement row directly with the given status.
 func makeAnnouncement(t *testing.T, authorID uuid.UUID, status models.AnnouncementStatus) *models.Announcement {
 	t.Helper()
