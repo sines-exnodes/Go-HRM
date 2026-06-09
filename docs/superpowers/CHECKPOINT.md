@@ -1,8 +1,8 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (leave-requests parity committed locally; push + PR + FE doc + deploy + seed still needed)
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (leave-requests parity PUSHED to origin/main; deploy + seed still needed)
 
-**Last updated:** 2026-06-08
-**Stopped at:** Leave-requests parity — Plans A+B committed + **FE doc written** (`f7783ec`). All on **local `main`**, NOT YET pushed to `origin/main`. Next: push → PR → deploy → seed (see "How to resume" below).
-**Branch:** `main` local = `d632a69`. `origin/main` = `0a42ff1` (attendance parity merge). Two commits ahead.
+**Last updated:** 2026-06-09
+**Stopped at:** Leave-requests parity — Plans A+B + FE docs fully committed and **pushed to `origin/main`** (`a5b6a69`). Next: deploy (`docker restart exnodes-hrm-app`) + seed (auto on next boot). Then: Request Tickets module (EP-003).
+**Branch:** `main` — local = `origin/main` = `a5b6a69`. In sync.
 **DB migration version:** **21** (unchanged — leave-requests parity adds no migration). Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
@@ -17,7 +17,9 @@ Python↔Go leave-request audit → locked decisions D1–D7 → two plans, exec
 - **Plan A (`0132dd8`):** `leave_requests:approve_team` + `leave_requests:approve_all` permission constants; `ApproveScope` type + `checkCanApproveOrReject` BFS enforcement in service (mirrors Python `check_can_approve_or_reject`, reuses `emps.SubordinateIDs`); `resolveApproveScope` handler helper; perm gate moved out of router middleware into handler; seed: Admin/HR Manager → `approve_all`, Manager → `approve_team + update + delete`. Also: `PermLeaveApprove` removed from `AllPermissions()` (kept as constant for backward-compat runtime code path) to satisfy `TestPermissionGroupsContainsAll`.
 - **Plan B (`d632a69`):** G3 empty-PATCH no-op guard (no more Approved→Pending revert); G4 DOCX MIME detection via ZIP-sniff + `.docx` extension fallback; G5 attachment limit 10 MB → 5 MB; G6 dashboard limit 5 → 10; G7 `Cancel` returns `(read, wasApproved, error)` + handler embeds `was_approved` in response; G10 `GET /api/v1/leave-requests/export` → xlsx via excelize.
 - **Decisions delivered:** D1=A (full split + legacy compat) · D2=B (keep Go MIME types + DOCX + 5 MB) · D3/D5/D7 = recommended (fix dashboard, cancel wasApproved, Manager seed) · D6=A (Excel export).
-- **Deferred:** G9 leave-quota carry-forward endpoints (not in Python source per audit); no FE handoff yet.
+- **Deferred:** G9 leave-quota carry-forward endpoints (not in Python source per audit).
+- **FE docs — DONE:** `docs/superpowers/handoff-2026-06-08-leave-requests-fe-api-changes.md` (verbose handoff) + web repo `exnodes-hrm-web-nextjs/api_info_go/leave_requests.md` (concise developer reference, same style as `attendance.md`).
+- **Pushed to `origin/main`** — `a5b6a69` is the HEAD on remote.
 
 ## Attendance parity — Plan A + B (MERGED to `main`, PR #16 `0a42ff1`)
 
@@ -34,19 +36,14 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: finish leave-requests parity pipeline
+### IMMEDIATE: deploy leave-requests parity to dev
 
-Leave-requests parity Plans A+B are committed locally but NOT pushed. Steps remaining:
+Leave-requests parity Plans A+B are **committed and pushed** to `origin/main`. Steps remaining:
 
-1. **Push + PR** — run `superpowers:finishing-a-development-branch` → push local `main` (or create a branch `feat/leave-requests-parity` from the two commits) → open PR → merge.
-2. **FE doc** — ✅ DONE `f7783ec` — [`handoff-2026-06-08-leave-requests-fe-api-changes.md`](handoff-2026-06-08-leave-requests-fe-api-changes.md)
+1. ~~**Push + PR**~~ — ✅ DONE (`a5b6a69` is on `origin/main`)
+2. ~~**FE doc**~~ — ✅ DONE (`f7783ec` + web repo `api_info_go/leave_requests.md`)
 3. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is already on `main`)
-4. **Seed** — if the dev DB has existing Manager-role assignments using the old `leave_requests:approve` string, run a one-off SQL update:
-   ```sql
-   -- NOT needed for seed-created rows (seed re-runs on boot, replacing perms);
-   -- only needed for hand-assigned role permission overrides if any exist
-   ```
-   The seed service is idempotent and will update the Manager role on next boot.
+4. **Seed** — idempotent; the seed service will update Manager role (`approve_team + update + delete`) on next boot automatically. No manual SQL needed.
 
 ### Subsequent priorities (in descending value):
 

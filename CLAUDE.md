@@ -163,6 +163,7 @@ When skipping, state which phases you're skipping and why.
 | 5 Verify | `superpowers:verification-before-completion` | **ALWAYS — never skipped** | never |
 | 6 Review | `superpowers:requesting-code-review` | Feature / shared-code change | Docs/config-only or user waives |
 | 7 Complete | `superpowers:finishing-a-development-branch` | Verified + reviewed | — |
+| **8 Memorize** | CHECKPOINT.md + Serena memories | **ALWAYS — never skipped** | never |
 
 On-demand at any phase: `superpowers:systematic-debugging` (unexpected
 failure), `superpowers:receiving-code-review` (feedback), `superpowers:writing-skills`.
@@ -238,13 +239,42 @@ flowchart TD
    `find` / `ls -R` / `grep` of full directory trees — they're cheaper and
    more precise. Do **not** scan `internal/` before steps 1–3.
 
-### Mandatory checkpoint discipline
+### Mandatory end-of-session memory update (Phase 8 — never skipped)
 
-Update `docs/superpowers/CHECKPOINT.md` at the end of every significant
-session: what was done, what is verified, what is next, blockers. If a
-session was interrupted or failed, still update it noting the failure.
-Keep it concise. This applies to all agents and subagents (AGENTS.md
-Rule 10).
+At the end of **every** session — including interrupted or failed ones —
+you **must** complete both of the following before considering the session done:
+
+#### 1. Update `docs/superpowers/CHECKPOINT.md`
+
+Replace in place (do not append siblings). Include:
+- What was done this session and which commits land it
+- What is verified (curl/tests evidence)
+- What is next (immediate next task + any blockers)
+- Any follow-up items or known gaps
+
+If the session failed or was interrupted, record the failure state and
+what needs to be retried. Keep it concise. This applies to all agents
+and subagents (AGENTS.md Rule 10).
+
+#### 2. Update Serena memories (`.serena/memories/`)
+
+After any session that changes code, adds a module, or shifts the
+project state, update the relevant Serena memory files:
+
+- **`code_map.md`** — if new files, handlers, services, or repositories
+  were added, append them to the map so future agents know where things live.
+- **`resume_protocol.md`** — if the boot/resume steps changed (new
+  knowledge stores, new required reads), update accordingly.
+- Any other memory file whose pointer is now stale (e.g., phase status,
+  permission list, migration version).
+
+Serena memories are **pointers**, not snapshots — update the pointer
+(e.g., "see CHECKPOINT.md") rather than duplicating content.
+Use `mcp__serena__edit_memory` or `mcp__serena__write_memory` to persist.
+
+> **Why both are mandatory:** CHECKPOINT.md is the human-readable resume
+> point; Serena memories are the machine-readable bootstrap for the next
+> agent session. Skipping either means the next session starts blind.
 
 ## Language Notes
 
@@ -252,3 +282,47 @@ Requirements are written in **Vietnamese** with English technical terms.
 Key terms: Nhân viên / Employee, Người phụ thuộc / Dependent, Phòng ban /
 Department, Chức vụ / Position, Đơn nghỉ phép / Leave request, Chấm công /
 Attendance, Thông báo / Announcement, Phân quyền / Permission (RBAC).
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **Go-HRM** (9873 symbols, 23682 relationships, 286 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/Go-HRM/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/Go-HRM/clusters` | All functional areas |
+| `gitnexus://repo/Go-HRM/processes` | All execution flows |
+| `gitnexus://repo/Go-HRM/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->
