@@ -123,6 +123,9 @@ func main() {
 	orgSettingsSvc := services.NewOrganizationSettingsService(systemConfigRepo, employeeRepo)
 	inviteSvc := services.NewInviteService(cfg, inviteRepo, employeeRepo, userRepo, roleRepo, empSvc, emailSvc, db)
 
+	userContractRepo := repositories.NewUserContractRepository(db)
+	userContractSvc := services.NewUserContractService(userContractRepo, employeeRepo, uploadSvc)
+
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
 		log.Fatalf("seed: %v", err)
@@ -145,6 +148,7 @@ func main() {
 	orgSettingsH := handlers.NewOrganizationSettingsHandler(orgSettingsSvc)
 	inviteH := handlers.NewInviteHandler(inviteSvc)
 	notifH := handlers.NewNotificationHandler(pushSvc)
+	userContractH := handlers.NewUserContractHandler(userContractSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -215,6 +219,19 @@ func main() {
 		adminUsers.PATCH(":id/change-password", middleware.RequirePerms(authSvc, permissions.PermUsersChangePwd), userH.AdminChangePassword)
 		adminUsers.POST(":id/change-email", middleware.RequirePerms(authSvc, permissions.PermUsersUpdate), userH.AdminChangeEmail)
 		adminUsers.PUT(":id/roles", middleware.RequirePerms(authSvc, permissions.PermUsersManageRoles), userH.AssignRoles)
+
+		// ---- /users/:id/contracts ----
+		// IMPORTANT: :id must match the existing adminUsers wildcard name.
+		// Router-level gate: PermUsersContractsView. Write ops gated inside
+		// the handler via hasContractsManage.
+		userContracts := authed.Group("/users/:id/contracts")
+		userContracts.Use(middleware.RequirePerms(authSvc, permissions.PermUsersContractsView))
+		userContracts.GET("", userContractH.List)
+		userContracts.POST("", userContractH.Create)
+		userContracts.GET(":contractID", userContractH.Get)
+		userContracts.PATCH(":contractID", userContractH.Update)
+		userContracts.DELETE(":contractID", userContractH.Delete)
+		userContracts.POST(":contractID/attachment", userContractH.UploadAttachment)
 
 		// ---- /employees/me* self-service (auth only) ----
 		authed.GET("/employees/me", empH.GetMe)
