@@ -16,6 +16,6 @@ CREATE INDEX idx_user_contracts_employee_id
     ON user_contracts(employee_id)
     WHERE is_deleted = false;
 
-CREATE TRIGGER set_updated_at
+CREATE TRIGGER trg_user_contracts_set_updated_at
     BEFORE UPDATE ON user_contracts
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
