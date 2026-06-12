@@ -762,6 +762,21 @@ definitions:
     - body
     - title
     type: object
+  github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_UserContractRead:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.UserContractRead'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   github_com_exnodes_hrm-api_internal_dto.PositionCreate:
     properties:
       description:
@@ -829,10 +844,37 @@ definitions:
       success:
         type: boolean
     type: object
+  ? github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_UserContractRead
+  : properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_UserContractRead'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
   github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_TodayStatusRead:
     properties:
       data:
         $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.TodayStatusRead'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_UserContractAttachmentResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.UserContractAttachmentResponse'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_UserContractRead:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.UserContractRead'
       message:
         type: string
       success:
@@ -925,6 +967,63 @@ definitions:
       streak:
         type: integer
     type: object
+  github_com_exnodes_hrm-api_internal_dto.UserContractAttachmentResponse:
+    properties:
+      attachment_url:
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.UserContractCreate:
+    properties:
+      attachment_url:
+        type: string
+      contract_type:
+        enum:
+        - labour_contract
+        type: string
+      expiry_date:
+        type: string
+      is_endless:
+        type: boolean
+      signed_date:
+        type: string
+    required:
+    - contract_type
+    - signed_date
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.UserContractRead:
+    properties:
+      attachment_url:
+        type: string
+      contract_type:
+        type: string
+      created_at:
+        type: string
+      expiry_date:
+        type: string
+      id:
+        type: string
+      is_endless:
+        type: boolean
+      signed_date:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.UserContractUpdate:
+    properties:
+      attachment_url:
+        type: string
+      contract_type:
+        enum:
+        - labour_contract
+        type: string
+      expiry_date:
+        type: string
+      is_endless:
+        type: boolean
+      signed_date:
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.UserSummary:
     properties:
       email:
@@ -976,6 +1075,8 @@ definitions:
     - users:salary_manage
     - users:banking_view
     - users:banking_manage
+    - users:contracts_view
+    - users:contracts_manage
     - employees:read
     - employees:create
     - employees:update
@@ -1055,6 +1156,8 @@ definitions:
     - ""
     - ""
     - ""
+    - ""
+    - ""
     - kept for backward compat; prefer ApproveTeam/ApproveAll
     - approve own subordinate chain only (BFS)
     - approve any employee's request
@@ -1079,6 +1182,8 @@ definitions:
     - PermUsersSalaryManage
     - PermUsersBankingView
     - PermUsersBankingManage
+    - PermUsersContractsView
+    - PermUsersContractsManage
     - PermEmployeesRead
     - PermEmployeesCreate
     - PermEmployeesUpdate
@@ -3948,6 +4053,230 @@ paths:
       summary: Liveness probe
       tags:
       - system
+  /users/{id}/contracts:
+    get:
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: page size (default 10, max 50)
+        in: query
+        name: page_size
+        type: integer
+      - description: signed date from (RFC3339)
+        in: query
+        name: signed_from
+        type: string
+      - description: signed date to (RFC3339)
+        in: query
+        name: signed_to
+        type: string
+      - description: expiry date from (RFC3339)
+        in: query
+        name: expiry_from
+        type: string
+      - description: expiry date to (RFC3339)
+        in: query
+        name: expiry_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_UserContractRead'
+      security:
+      - BearerAuth: []
+      summary: List contracts for a user
+      tags:
+      - contracts
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: create payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.UserContractCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_UserContractRead'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      security:
+      - BearerAuth: []
+      summary: Create a contract for a user
+      tags:
+      - contracts
+  /users/{id}/contracts/{contractID}:
+    delete:
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: contract uuid
+        in: path
+        name: contractID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      security:
+      - BearerAuth: []
+      summary: Soft-delete a contract
+      tags:
+      - contracts
+    get:
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: contract uuid
+        in: path
+        name: contractID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_UserContractRead'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      security:
+      - BearerAuth: []
+      summary: Get a single contract
+      tags:
+      - contracts
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: contract uuid
+        in: path
+        name: contractID
+        required: true
+        type: string
+      - description: patch payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.UserContractUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_UserContractRead'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      security:
+      - BearerAuth: []
+      summary: Partial-patch a contract
+      tags:
+      - contracts
+  /users/{id}/contracts/{contractID}/attachment:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: user uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: contract uuid
+        in: path
+        name: contractID
+        required: true
+        type: string
+      - description: attachment (PDF/PNG/JPG/DOCX, max 5MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_UserContractAttachmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      security:
+      - BearerAuth: []
+      summary: Upload or replace a contract attachment
+      tags:
+      - contracts
 schemes:
 - http
 securityDefinitions:

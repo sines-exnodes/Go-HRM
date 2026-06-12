@@ -22,11 +22,11 @@ const (
 	// *_view gates whether the section is returned on reads; *_manage gates
 	// whether it can be set on create/update. Account number is masked on
 	// reads even to view holders (unmasked only on the write echo).
-	PermUsersSalaryView    Permission = "users:salary_view"
-	PermUsersSalaryManage  Permission = "users:salary_manage"
-	PermUsersBankingView   Permission = "users:banking_view"
-	PermUsersBankingManage Permission = "users:banking_manage"
-	PermUsersContractsView Permission = "users:contracts_view"
+	PermUsersSalaryView      Permission = "users:salary_view"
+	PermUsersSalaryManage    Permission = "users:salary_manage"
+	PermUsersBankingView     Permission = "users:banking_view"
+	PermUsersBankingManage   Permission = "users:banking_manage"
+	PermUsersContractsView   Permission = "users:contracts_view"
 	PermUsersContractsManage Permission = "users:contracts_manage"
 
 	// Employees
