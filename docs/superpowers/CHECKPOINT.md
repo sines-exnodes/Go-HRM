@@ -1,12 +1,32 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (announcements parity MERGED via PR #17; deploy pending)
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · User Contracts module done (migration 000022)
 
-**Last updated:** 2026-06-09
-**Stopped at:** Announcements parity Plans A+B merged to `origin/main` via PR #17 (`cdf97d1`). Next: deploy (`docker restart exnodes-hrm-app`). Then: Request Tickets module (EP-003).
-**Branch:** `main` — local = `origin/main` = `cdf97d1`. In sync.
-**DB migration version:** **21** (unchanged — announcements parity adds no migration). Next free: **000022**.
-**See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
+**Last updated:** 2026-06-12
+**Stopped at:** User Contracts module complete. 6 endpoints live at `/users/:id/contracts`. All tests pass (`make fmt/vet/test` clean, `make swag` regenerated). Next: `make migrate-up` on dev DB to apply migration 000022, then smoke test the endpoints.
+**Branch:** `main` — local ahead of `origin/main` by 10 commits (User Contracts + fmt/swag).
+**DB migration version:** **21** (dev DB not yet migrated). Next free: **000023**.
+**See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) and [User Contracts](#user-contracts-module--done-migration-000022) below.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
+
+> **User Contracts — DONE (migration 000022, on `main`).** Full contract CRUD at `/api/v1/users/:id/contracts` — 6 endpoints (list, get, create, update, delete, upload-attachment). `user_contracts` table with `trg_user_contracts_set_updated_at`. `PermUsersContractsView` + `PermUsersContractsManage`; view seeded to all 5 roles, manage to Admin + HR Manager. 13 integration tests green. Swagger regenerated (14 contract refs in swagger.json). Commits: 9d6bef2, 5a8780e, e9f6987, 65c0eaf, 52dafe1, c0378ea, 6f76a29, f09fde5.
+
+## User Contracts module — DONE (migration 000022)
+
+New feature module (not a Python-parity item) — adds full contract lifecycle to user profiles.
+
+- **Migration 000022** (`migrations/000022_user_contracts.up/down.sql`): `user_contracts` table — UUID PK, `user_id → users(id)`, `contract_type` (FULL_TIME/PART_TIME/FREELANCE/INTERNSHIP/PROBATION), `start_date/end_date`, `attachment_url`, audit cols + `trg_user_contracts_set_updated_at`.
+- **Model** (`internal/models/user_contract.go`): `UserContract` + `ContractType` enum.
+- **DTOs** (`internal/dto/user_contract.go`): `UserContractCreate`, `UserContractUpdate`, `UserContractListQuery`, `UserContractRead`, `UserContractAttachmentResponse`.
+- **Repository** (`internal/repositories/user_contract_repo.go`): interface + GORM impl — List (paginated), Get, Create, Update, Delete (soft).
+- **Service** (`internal/services/user_contract_service.go`): Create, Get, Delete, List, Update, UploadAttachment.
+- **Permissions**: `PermUsersContractsView` (`users:contracts_view`) + `PermUsersContractsManage` (`users:contracts_manage`). View seeded to all 5 roles; Manage to Admin + HR Manager only.
+- **Handler** (`internal/handlers/user_contract_handler.go`): 6 endpoints — `GET /users/:id/contracts`, `POST /users/:id/contracts`, `GET /users/:id/contracts/:contract_id`, `PATCH /users/:id/contracts/:contract_id`, `DELETE /users/:id/contracts/:contract_id`, `POST /users/:id/contracts/:contract_id/attachment`.
+- **Routes**: wired in `cmd/server/main.go` at `/api/v1/users/:id/contracts`.
+- **Tests** (`internal/services/user_contract_service_test.go`): 13 integration tests — all PASS (`make test` 0 fail / 0 skip).
+- **Swagger**: regenerated — 14 contract refs in `docs/swagger/swagger.json`.
+- **Commits**: 9d6bef2 (migration), 5a8780e (model+DTO), e9f6987 (repo), 65c0eaf (service), 52dafe1 (permissions+seed), c0378ea (handler+routes), 6f76a29 (tests), f09fde5 (fmt+swag).
+
+**Verified:** `go build ./...` clean, `go vet ./...` clean, `make test` 0 fail / 0 skip, `make swag` regenerated (14 contracts refs). Dev DB at migration 21 — **`make migrate-up` required** to apply 000022.
 
 ## Announcements parity — Plans A+B (committed to `main`; push pending)
 
@@ -55,23 +75,24 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: deploy to dev
+### IMMEDIATE: apply migration 000022 and smoke test
 
-PR #17 merged. Code is on `origin/main`. Steps remaining:
+User Contracts code is on `main`. Steps remaining:
 
-1. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is on `main`)
-2. **Seed** — auto on next boot (idempotent; Manager role perms already on main)
+1. **Migrate dev DB** — `make migrate-up` (applies `000022_user_contracts`)
+2. **Smoke test** — `POST /api/v1/users/:id/contracts`, `GET`, `PATCH`, `DELETE`, `POST .../attachment`
+3. **Push** — `git push origin main` then `docker restart exnodes-hrm-app`
 
 ### Subsequent priorities (in descending value):
 
-1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000022**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
+1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000023**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
 2. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
 3. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; **G7 holidays** (blocked on calendar source); switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
 4. **Bundled code review** — Phases 4-9 have not been formally reviewed.
 5. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
 6. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
 
-Latest taken migration = **000021**; next is **000022**.
+Latest taken migration = **000022** (user_contracts); next is **000023**.
 
 ### Resume entry points
 
