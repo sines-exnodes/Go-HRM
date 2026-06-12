@@ -1,8 +1,8 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (announcements parity on `main`; deploy + seed still needed)
+# Resume Checkpoint — MIGRATION COMPLETE 🎉 · post-migration API parity (announcements parity MERGED via PR #17; deploy pending)
 
 **Last updated:** 2026-06-09
-**Stopped at:** Announcements parity Plans A+B fully committed to `main` (`222b979`). Not yet pushed. Next: push + deploy (`docker restart exnodes-hrm-app`) + seed. Then: Request Tickets module (EP-003).
-**Branch:** `main` — local ahead of `origin/main` (origin = `a5b6a69`; local = `222b979`). **Push pending.**
+**Stopped at:** Announcements parity Plans A+B merged to `origin/main` via PR #17 (`cdf97d1`). Next: deploy (`docker restart exnodes-hrm-app`). Then: Request Tickets module (EP-003).
+**Branch:** `main` — local = `origin/main` = `cdf97d1`. In sync.
 **DB migration version:** **21** (unchanged — announcements parity adds no migration). Next free: **000022**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) below for current state.
 
@@ -55,13 +55,12 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: push + deploy announcements + leave-requests parity
+### IMMEDIATE: deploy to dev
 
-Both announcements and leave-requests parity are committed locally but not yet pushed or deployed.
+PR #17 merged. Code is on `origin/main`. Steps remaining:
 
-1. **Push** — `git push origin main` (carries announcements parity + leave-requests parity commits)
-2. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is on `main`)
-3. **Seed** — auto on next boot (Manager role perms updated by seed service idempotently)
+1. **Deploy** — `docker restart exnodes-hrm-app` (Air hot-reload; bind-mount is on `main`)
+2. **Seed** — auto on next boot (idempotent; Manager role perms already on main)
 
 ### Subsequent priorities (in descending value):
 
