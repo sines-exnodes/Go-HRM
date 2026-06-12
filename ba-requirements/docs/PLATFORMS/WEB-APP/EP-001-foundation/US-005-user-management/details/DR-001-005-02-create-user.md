@@ -9,9 +9,9 @@ detail_id: DR-001-005-02
 detail_name: "Create User"
 parent_requirement: FR-US-005-10
 status: draft
-version: "1.1"
+version: "1.3"
 created_date: "2026-03-24"
-last_updated: "2026-03-24"
+last_updated: "2026-05-20"
 related_documents:
   - path: "../REQUIREMENTS.md"
     relationship: parent
@@ -37,7 +37,7 @@ input_sources:
 **Story:** US-005-user-management
 **Epic:** EP-001 (Foundation)
 **Status:** Draft
-**Version:** 1.0
+**Version:** 1.3
 
 ---
 
@@ -50,13 +50,14 @@ As a **user with user management permission**, I want to **create a new user acc
 **Target Users:** Any user with user management permission (configured via US-004). Users with view-only permission cannot access this feature.
 
 **Key Functionality:**
-- 3-section form: Personal Information (7 fields + avatar), User Account (role + status toggle + send login URL toggle), Employee Profile (dept/position/experience + CV + skills)
-- 12 mandatory fields, 4 optional fields
-- Two-column layout — Personal Information (left), User Account + Employee Profile (right)
+- Multi-section form: Personal Information (extended with Marital status, Nationality, Permanent address, Temporary address), User Account (role + status toggle + send login URL toggle), Employee Profile (dept/position/experience/education level + optional Line Manager + CV + skills), ID Cards (front/back images + ID number + issue date), Emergency Contact (repeatable rows), Salary (permission-gated), Banking (permission-gated)
+- 14 mandatory fields, plus optional fields across all sections (including optional Line Manager assignment for reporting hierarchy)
+- Two-column layout extended into 4 rows — Personal Info + User Account, Personal Info cont. + Employee Profile, ID Cards + Emergency Contact, Salary + Banking (permission-gated)
 - Email uniqueness validation (server-side on submit — both inline error and error toast)
-- Dropdown selectors with built-in search for User Role, Department, Position
-- File uploads for Avatar (.png/.jpeg/.jpg/.webp, max 5MB) and CV/Resumé (PDF/DOCX, max 5MB)
-- Skills multi-select via "+ Add skills" button
+- Dropdown selectors with built-in search for User Role, Department, Position, Nationality, Bank
+- File uploads for Avatar (.png/.jpeg/.jpg/.webp, max 5MB), CV/Resumé (PDF/DOCX, max 5MB), and ID Card front/back images (.png/.jpeg/.jpg/.webp, max 5MB each)
+- Skills multi-select via "+ Add skills" button; Emergency Contacts repeatable via "+ Add contact" button
+- Salary and Banking sections hidden entirely without `user.salary.view` / `user.banking.view` permissions
 - Returns to User List on success or cancel
 
 ---
@@ -72,19 +73,24 @@ As a **user with user management permission**, I want to **create a new user acc
 **Main Flow:**
 1. User clicks "+ Add New" on the User List page
 2. System navigates to the Create A New User page
-3. System loads dropdown data from APIs: roles (US-004), departments (EP-008 US-001), positions (EP-008 US-002), gender options, skills (EP-008 US-003)
-4. Form displays with 3 empty cards: Personal Information (left), User Account (right top — Account status toggle ON by default), Employee Profile (right bottom)
-5. User fills **Personal Information**: enters first name, last name, email, phone number, date of birth, selects gender; optionally uploads avatar and enters address
-6. User fills **User Account**: selects a user role from dropdown (with search), sets account status toggle (default: Active), confirms "Send login URL" toggle (default: ON; disabled if Account status is Inactive)
-7. User fills **Employee Profile**: selects department and position from dropdowns (with search), enters experience year; optionally uploads CV/Resumé and adds skills
-8. User clicks **Save**
-9. System trims whitespace from all text fields
-10. System validates client-side: all mandatory fields filled, email format valid, date of birth is valid past date, experience year is valid and ≤ current year, file types/sizes valid
-11. System submits to server; server validates email uniqueness
-12. If all validations pass: system creates the user account
-13. If "Send login URL" toggle is ON: system sends a first-login invitation email to the user's email address
-14. System displays success toast: "User '[first name] [last name]' has been created"
-15. System redirects to User List — new user visible in list with Active (or Inactive) status badge
+3. System loads dropdown data from APIs: roles (US-004), departments (EP-008 US-001), positions (EP-008 US-002), gender options, marital status options, nationality (ISO country list), education levels, skills (EP-008 US-003), bank list (hardcoded VN banks)
+4. System evaluates current user's permissions: `user.salary.view`/`user.salary.manage` and `user.banking.view`/`user.banking.manage` — Salary and Banking cards are hidden if their `view` permission is absent
+5. Form displays with cards laid out in 4 rows: Row 1 (Personal Info top + User Account), Row 2 (Personal Info cont. + Employee Profile), Row 3 (ID Cards + Emergency Contact), Row 4 (Salary + Banking, if permission allows). Nationality defaults to "Vietnam"; Account status toggle ON by default
+6. User fills **Personal Information**: enters first name, last name, email, phone number, date of birth, selects gender, confirms or changes Nationality (mandatory); optionally selects Marital status, uploads avatar, enters Permanent address and Temporary address
+7. User fills **User Account**: selects a user role from dropdown (with search), sets account status toggle (default: Active), confirms "Send login URL" toggle (default: ON; disabled if Account status is Inactive)
+8. User fills **Employee Profile**: selects department, position, and Education level (mandatory) from dropdowns, enters experience year; optionally selects a Line Manager from the searchable user dropdown (or leaves as "No line manager"); optionally uploads CV/Resumé and adds skills
+9. User optionally fills **ID Cards**: uploads front/back images, enters ID number, picks issue date
+10. User optionally fills **Emergency Contact**: clicks "+ Add contact" to add 0..N rows, each containing full name, relationship, phone number; rows can be removed via X
+11. If visible — User optionally fills **Salary**: enters base salary and insurance salary in VND (thousand separators auto-formatted)
+12. If visible — User optionally fills **Banking**: selects bank, enters bank account number, account name, selects transfer method
+13. User clicks **Save**
+14. System trims whitespace from all text fields (including new fields)
+15. System validates client-side: all 14 mandatory fields filled, email format valid, date of birth is valid past date, experience year is valid and ≤ current year, file types/sizes valid, bank account number is 6-20 digits, salary values are non-negative numerics, ID card issue date is a valid past date
+16. System submits to server; server validates email uniqueness and re-validates permission-gated sections
+17. If all validations pass: system creates the user account with all provided data including ID cards, emergency contacts, salary, and banking
+18. If "Send login URL" toggle is ON: system sends a first-login invitation email to the user's email address
+19. System displays success toast: "User '[first name] [last name]' has been created"
+20. System redirects to User List — new user visible in list with Active (or Inactive) status badge
 
 **Alternative Flows:**
 
@@ -96,6 +102,15 @@ As a **user with user management permission**, I want to **create a new user acc
 - **Alt 6 — Cancel (form modified):** System shows "Discard unsaved changes?" dialog. Confirm → redirect to User List. Cancel → stay on form.
 - **Alt 7 — Cancel (form untouched):** System redirects to User List immediately without confirmation.
 - **Alt 8 — Dropdown API fails:** Error message in affected section with retry option. Other sections remain functional.
+- **Alt 9 — Nationality not selected:** Inline error "Nationality is required" below the Nationality dropdown. Default "Vietnam" prevents this in typical flow.
+- **Alt 10 — Education level not selected:** Inline error "Education level is required" below the Education level dropdown.
+- **Alt 11 — Invalid ID Card image:** Inline error below the affected front/back upload: "Only PNG, JPEG, JPG, and WEBP files are accepted" or "File size must not exceed 5MB".
+- **Alt 12 — ID Card issue date in future:** Inline error: "Issue date cannot be in the future".
+- **Alt 13 — Invalid bank account number:** Inline error below Bank account number: "Bank account number must be 6 to 20 digits".
+- **Alt 14 — Negative salary value:** Inline error: "Salary cannot be negative".
+- **Alt 15 — Emergency contact remove:** Clicking X on an emergency contact row removes that row immediately — no confirmation. If only one empty row remains, the section returns to its empty state.
+- **Alt 16 — Salary/Banking section hidden:** If current user lacks `user.salary.view`, the entire Salary card is omitted from the layout (not greyed out). Same for Banking.
+- **Alt 17 — Selected Line Manager became inactive:** If the selected Line Manager was deactivated between dropdown load and form save, server returns an error. Both inline error "Selected line manager is no longer active" below the Line Manager field AND error toast displayed. User selects a different line manager or chooses "No line manager".
 
 **Exit Points:**
 - **Success:** User created → toast → redirect to User List
@@ -117,7 +132,10 @@ As a **user with user management permission**, I want to **create a new user acc
 | Phone number | Text input | Not empty; trimmed | Yes (*) | Empty | 20 chars | Placeholder: "Enter phone number" (278px, right half) |
 | Date of birth | Date picker | Not empty; must be a valid date in the past | Yes (*) | Empty | N/A | Placeholder: "Enter date of birth" with calendar icon (278px, left half) |
 | Gender | Dropdown | Not empty; must select a value | Yes (*) | "Select gender" | N/A | Options: Male, Female, Other, Prefer not to say (pending PO). No dropdown search (3-4 options). (278px, right half) |
-| Address | Text input | Trimmed; no other validation | No | Empty | 500 chars | Placeholder: "Enter address" (576px, full width) |
+| Marital status | Dropdown | Trimmed; no other validation | No | "Select marital status" | N/A | Options: Single, Married, Other. No dropdown search (3 options). (278px, left half) |
+| Nationality | Searchable dropdown | Not empty; must select a value | Yes (*) | "Vietnam" | N/A | Options: full ISO country list. Includes search field. Placeholder: "Select nationality". (278px, right half) |
+| Permanent address | Text input | Trimmed; no other validation | No | Empty | 500 chars | Placeholder: "Enter permanent address" (576px, full width). Previously named "Address". |
+| Temporary address | Text input | Trimmed; no other validation | No | Empty | 500 chars | Placeholder: "Enter temporary address" (576px, full width) |
 
 ### Input Fields — User Account
 
@@ -134,8 +152,53 @@ As a **user with user management permission**, I want to **create a new user acc
 | Department | Dropdown with search | Not empty; must select a department | Yes (*) | "Select department" | Options loaded from EP-008 US-001. Dropdown includes search field. (278px, left half) |
 | Position | Dropdown with search | Not empty; must select a position | Yes (*) | "Select position" | Options loaded from EP-008 US-002. Dropdown includes search field. (278px, right half) |
 | Experience from (year) | Text/number input | Not empty; valid 4-digit year; must be ≤ current year | Yes (*) | Empty | Placeholder: "Enter year" (576px) |
+| Education level | Dropdown | Not empty; must select a value | Yes (*) | "Select education level" | Options: High school, College, Bachelor's degree, Master's degree, Doctorate. No dropdown search (5 options). (576px) |
+| Line Manager | Searchable user dropdown | Server-side validates selected user is still active at save time | No | "No line manager" | Options: active users loaded dynamically from API (inactive users excluded server-side). Top-of-list special option: "No line manager". Option display format: `Full Name — Position, Department` (e.g., `Sarah Le — CTO, Engineering`). Search matches name, position, or department (case-insensitive). Placeholder: "Select line manager (optional)". (576px, full width) |
 | CV/Resumé | File input | PDF, DOCX; max 5MB; validated client-side on file selection | No | No file chosen | "Choose File / No file chosen" (576px) |
 | Skills | Multi-select | No minimum required | No | None selected | "+ Add skills" button opens selector. Skills loaded from EP-008 US-003. |
+
+### Input Fields — ID Cards
+
+| Field Name | Field Type | Validation Rule | Mandatory | Default | Max Length | Description |
+|------------|------------|-----------------|-----------|---------|------------|-------------|
+| Front image | Image upload | PNG, JPEG, JPG, WEBP; max 5MB; validated client-side on file selection | No | No file chosen | N/A | Upload area for ID card front side. Format hint ".png/.jpeg/.jpg/.webp". (left half) |
+| Back image | Image upload | PNG, JPEG, JPG, WEBP; max 5MB; validated client-side on file selection | No | No file chosen | N/A | Upload area for ID card back side. Format hint ".png/.jpeg/.jpg/.webp". (right half) |
+| ID number | Text input | Trimmed; plain text (no format validation) | No | Empty | 50 chars | Placeholder: "Enter ID number" (278px, left half) |
+| Issue date | Date picker | Valid date in the past | No | Empty | N/A | Placeholder: "Enter issue date" with calendar icon (278px, right half) |
+
+### Input Fields — Emergency Contact (repeatable rows, 0..N)
+
+| Field Name | Field Type | Validation Rule | Mandatory | Default | Max Length | Description |
+|------------|------------|-----------------|-----------|---------|------------|-------------|
+| Full name | Text input | Trimmed; no other validation | No | Empty | 100 chars | Placeholder: "Enter full name" |
+| Relationship | Text input | Trimmed; no other validation | No | Empty | 50 chars | Placeholder: "Enter relationship" (e.g., Spouse, Parent, Sibling) |
+| Phone number | Text input | Trimmed; no other validation | No | Empty | 20 chars | Placeholder: "Enter phone number" |
+
+- Section is entirely optional — saving with zero contacts is allowed
+- Unlimited rows; "+ Add contact" button below last row
+- Each row has remove (X) button — removing a row deletes it immediately, no confirmation
+
+### Input Fields — Salary (permission-gated: `user.salary.view` / `user.salary.manage`)
+
+| Field Name | Field Type | Validation Rule | Mandatory | Default | Description |
+|------------|------------|-----------------|-----------|---------|-------------|
+| Base salary | Numeric input | Non-negative number; min 0 | No | Empty | VND with thousand separators auto-formatted (e.g., "15,000,000"). Placeholder: "Enter base salary" (278px, left half) |
+| Insurance salary | Numeric input | Non-negative number; min 0 | No | Empty | VND with thousand separators auto-formatted. Placeholder: "Enter insurance salary" (278px, right half) |
+
+- Section hidden entirely without `user.salary.view`
+- Section visible but read-only without `user.salary.manage`
+
+### Input Fields — Banking (permission-gated: `user.banking.view` / `user.banking.manage`)
+
+| Field Name | Field Type | Validation Rule | Mandatory | Default | Max Length | Description |
+|------------|------------|-----------------|-----------|---------|------------|-------------|
+| Bank | Searchable dropdown | Must select from list | No | "Select bank" | N/A | Options: Vietcombank, BIDV, Techcombank, MB Bank, VPBank, Agribank, ACB, VIB, Sacombank, TPBank, SHB, HDBank, Eximbank, OCB, SeABank, MSB, LienVietPostBank, NCB, ABBank, NamABank, PVcomBank. Includes search field. (278px, left half) |
+| Bank account number | Text input | Numeric; 6 to 20 digits | No | Empty | 20 chars | Placeholder: "Enter bank account number" (278px, right half) |
+| Account name | Text input | Trimmed; no other validation | No | Empty | 100 chars | Placeholder: "Enter account name" (278px, left half) |
+| Transfer method | Dropdown | Must select if not empty | No | "Select transfer method" | N/A | Options: Bank transfer, Cash. (278px, right half) |
+
+- Section hidden entirely without `user.banking.view`
+- Section visible but read-only without `user.banking.manage`
 
 ### Interaction Elements
 
@@ -145,6 +208,10 @@ As a **user with user management permission**, I want to **create a new user acc
 | Save | Button (primary) | Right in action bar | Always visible; disabled + spinner while saving | Validate → save → toast → redirect | Save and return to User List |
 | Upload Avatar | Button | Inside avatar upload area | Always visible | Opens file picker for image | Upload profile photo |
 | + Add skills | Button (secondary) | Inside Employee Profile card | Always visible | Opens skills selector | Add skills to user profile |
+| Upload Front (ID Card) | Button | Inside ID Cards card (left) | Always visible | Opens file picker for image | Upload ID card front image |
+| Upload Back (ID Card) | Button | Inside ID Cards card (right) | Always visible | Opens file picker for image | Upload ID card back image |
+| + Add contact | Button (secondary) | Inside Emergency Contact card, below last row | Always visible | Adds a new empty contact row | Add an emergency contact row |
+| X (remove contact) | Icon button | Inside each Emergency Contact row | Always visible per row | Removes that row immediately | Remove an emergency contact row |
 
 ### Validation Error Messages
 
@@ -161,6 +228,14 @@ As a **user with user management permission**, I want to **create a new user acc
 | Future date of birth | "Date of birth cannot be in the future" | Inline, below Date of birth |
 | Experience year invalid | "Please enter a valid year" | Inline, below Experience from |
 | Experience year in future | "Year cannot be in the future" | Inline, below Experience from |
+| Nationality empty | "Nationality is required" | Inline, below Nationality |
+| Education level empty | "Education level is required" | Inline, below Education level |
+| Invalid ID Card image type | "Only PNG, JPEG, JPG, and WEBP files are accepted" | Inline, below the affected upload |
+| ID Card image too large | "File size must not exceed 5MB" | Inline, below the affected upload |
+| ID Card issue date in future | "Issue date cannot be in the future" | Inline, below Issue date |
+| Invalid bank account number | "Bank account number must be 6 to 20 digits" | Inline, below Bank account number |
+| Negative salary value | "Salary cannot be negative" | Inline, below the affected salary field |
+| Selected line manager became inactive (server-side, on save) | "Selected line manager is no longer active" | **Both:** inline below Line Manager field + error toast |
 
 ---
 
@@ -179,7 +254,10 @@ As a **user with user management permission**, I want to **create a new user acc
 | Phone number | Text input | Placeholder: "Enter phone number" | 278px, right half | Contact number |
 | Date of birth | Date picker | Placeholder: "Enter date of birth" + calendar icon | 278px, left half | Birth date |
 | Gender | Dropdown | Placeholder: "Select gender" | 278px, right half | Gender |
-| Address | Text input | Placeholder: "Enter address" | 576px, full width | Address (optional) |
+| Marital status | Dropdown | Placeholder: "Select marital status" | 278px, left half | Marital status (optional) |
+| Nationality | Searchable dropdown | Default: "Vietnam" | 278px, right half | Country of citizenship (mandatory) |
+| Permanent address | Text input | Placeholder: "Enter permanent address" | 576px, full width | Permanent residence address (optional) |
+| Temporary address | Text input | Placeholder: "Enter temporary address" | 576px, full width | Current temporary address (optional) |
 
 **User Account card (right column top, 600×200px):**
 
@@ -196,8 +274,46 @@ As a **user with user management permission**, I want to **create a new user acc
 | Department | Dropdown with search | Placeholder: "Select department" | 278px, left half | Org assignment |
 | Position | Dropdown with search | Placeholder: "Select position" | 278px, right half | Job assignment |
 | Experience from (year) | Text/number | Placeholder: "Enter year" | 576px | Career start year |
+| Education level | Dropdown | Placeholder: "Select education level" | 576px | Highest education completed (mandatory) |
+| Line Manager | Searchable user dropdown | Placeholder: "Select line manager (optional)" | 576px, full width | Who this user reports to (optional) |
 | CV/Resumé | File input | "Choose File / No file chosen" | 576px | Resume document |
 | Skills | Multi-select | "+ Add skills" button only | Button → selector → chips | Competency tags |
+
+**ID Cards card (row 3 left column):**
+
+| Data Name | Data Type | Display When Empty | Format | Business Meaning |
+|-----------|-----------|-------------------|--------|------------------|
+| Front image | Image upload | "Upload Front" button + ".png/.jpeg/.jpg/.webp" hint | 278px, left half | ID card front side photo |
+| Back image | Image upload | "Upload Back" button + ".png/.jpeg/.jpg/.webp" hint | 278px, right half | ID card back side photo |
+| ID number | Text input | Placeholder: "Enter ID number" | 278px, left half | Government ID number |
+| Issue date | Date picker | Placeholder: "Enter issue date" + calendar icon | 278px, right half | Date ID was issued |
+
+**Emergency Contact card (row 3 right column, repeatable):**
+
+| Data Name | Data Type | Display When Empty | Format | Business Meaning |
+|-----------|-----------|-------------------|--------|------------------|
+| Contact row | Composite (3 fields + remove icon) | No rows initially; "+ Add contact" button visible | Each row: full name, relationship, phone + X remove | One emergency contact entry |
+| + Add contact | Button | Always visible below last row | Secondary button | Adds an empty contact row |
+
+**Salary card (row 4 left column, permission-gated):**
+
+| Data Name | Data Type | Display When Empty | Format | Business Meaning |
+|-----------|-----------|-------------------|--------|------------------|
+| Base salary | Numeric input | Placeholder: "Enter base salary" | 278px, left half; VND thousand separators | Monthly base salary (optional) |
+| Insurance salary | Numeric input | Placeholder: "Enter insurance salary" | 278px, right half; VND thousand separators | Salary used for insurance calculation (optional) |
+
+Card entirely hidden when current user lacks `user.salary.view`. Read-only when user has `view` but lacks `manage`.
+
+**Banking card (row 4 right column, permission-gated):**
+
+| Data Name | Data Type | Display When Empty | Format | Business Meaning |
+|-----------|-----------|-------------------|--------|------------------|
+| Bank | Searchable dropdown | Placeholder: "Select bank" | 278px, left half | Bank for salary disbursement |
+| Bank account number | Text input | Placeholder: "Enter bank account number" | 278px, right half | Account number (numeric, 6-20 digits) |
+| Account name | Text input | Placeholder: "Enter account name" | 278px, left half | Name on the bank account |
+| Transfer method | Dropdown | Placeholder: "Select transfer method" | 278px, right half | How salary is paid (Bank transfer / Cash) |
+
+Card entirely hidden when current user lacks `user.banking.view`. Read-only when user has `view` but lacks `manage`.
 
 ### Display States
 
@@ -219,6 +335,17 @@ As a **user with user management permission**, I want to **create a new user acc
 | Saving | Save clicked, request in progress | Save button shows spinner + disabled; Cancel disabled |
 | Success | User created | Toast: "User '[First] [Last]' has been created" → redirect to User List |
 | Discard confirmation | Cancel with modified form | Modal: "Discard unsaved changes?" with Confirm and Cancel |
+| Nationality default | Page loads | Nationality dropdown pre-filled with "Vietnam" |
+| Emergency Contact empty | No rows added | Card shows only the "+ Add contact" button |
+| Emergency Contact row added | "+ Add contact" clicked | New empty row appears with Full name, Relationship, Phone + X remove icon |
+| Emergency Contact row removed | X icon clicked on a row | That row is removed immediately, no confirmation |
+| Salary section hidden | User lacks `user.salary.view` | Salary card not rendered; surviving Row 4 section spans full width |
+| Salary section read-only | User has `view` but lacks `manage` | Salary fields visible but disabled — cannot be edited |
+| Banking section hidden | User lacks `user.banking.view` | Banking card not rendered; surviving Row 4 section spans full width |
+| Banking section read-only | User has `view` but lacks `manage` | Banking fields visible but disabled — cannot be edited |
+| Both Salary + Banking hidden | User lacks both `view` permissions | Row 4 omitted entirely |
+| Salary thousand separator | User types "15000000" in Base salary | Field auto-formats to "15,000,000" |
+| ID Card image selected | Valid image uploaded | Preview thumbnail replaces upload area for that side |
 
 ### Page Layout (from Figma)
 
@@ -228,23 +355,46 @@ As a **user with user management permission**, I want to **create a new user acc
 ├──────────────┬──────────────────────────────────────────────────────────────┤
 │  [Sidebar]   │  Create A New User                       [Cancel]    [Save] │
 │              │                                                             │
+│              │  Row 1                                                      │
 │              │  ┌─────────────────────────┐  ┌─────────────────────────┐   │
 │              │  │ Personal Information    │  │ User Account            │   │
-│              │  │                         │  │                         │   │
 │              │  │  ┌───────────────────┐  │  │ * User Role    [▾ 🔍]  │   │
 │              │  │  │  Upload Avatar    │  │  │ * Account status  [⊙]  │   │
 │              │  │  │  .png/.jpeg/...   │  │  │   Activate/Deactivate  │   │
-│              │  │  └───────────────────┘  │  └─────────────────────────┘   │
-│              │  │                         │                                │
-│              │  │ *First name  *Last name │  ┌─────────────────────────┐   │
-│              │  │ *Email     *Phone number│  │ Employee Profile        │   │
-│              │  │ *DOB [📅]  *Gender [▾] │  │                         │   │
-│              │  │  Address                │  │ *Dept [▾ 🔍] *Pos [▾ 🔍]│   │
-│              │  └─────────────────────────┘  │ *Experience from (year) │   │
+│              │  │  └───────────────────┘  │  │ * Send login URL  [⊙]  │   │
+│              │  │ *First name  *Last name │  └─────────────────────────┘   │
+│              │  │ *Email     *Phone number│                                │
+│              │  │ *DOB [📅]  *Gender [▾] │  Row 2                         │
+│              │  │  Marital status [▾]     │  ┌─────────────────────────┐   │
+│              │  │  *Nationality [▾ 🔍]    │  │ Employee Profile        │   │
+│              │  │  Permanent address      │  │ *Dept [▾ 🔍] *Pos [▾ 🔍]│   │
+│              │  │  Temporary address      │  │ *Experience from (year) │   │
+│              │  └─────────────────────────┘  │ *Education level [▾]    │   │
+│              │                               │  Line Manager [▾ 🔍]    │   │
 │              │                               │  CV/Resumé [Choose File]│   │
 │              │                               │  Skills [+ Add skills]  │   │
 │              │                               └─────────────────────────┘   │
+│              │                                                             │
+│              │  Row 3                                                      │
+│              │  ┌─────────────────────────┐  ┌─────────────────────────┐   │
+│              │  │ ID Cards                │  │ Emergency Contact       │   │
+│              │  │ [Upload Front][UpldBack]│  │  Full name              │   │
+│              │  │  ID number  Issue date  │  │  Relationship  Phone X  │   │
+│              │  │                         │  │  [+ Add contact]        │   │
+│              │  └─────────────────────────┘  └─────────────────────────┘   │
+│              │                                                             │
+│              │  Row 4  (permission-gated — hidden if user lacks `view`)    │
+│              │  ┌─────────────────────────┐  ┌─────────────────────────┐   │
+│              │  │ Salary 🔒               │  │ Banking 🔒              │   │
+│              │  │  Base salary (VND)      │  │  Bank [▾ 🔍]            │   │
+│              │  │  Insurance salary (VND) │  │  Account number         │   │
+│              │  │                         │  │  Account name           │   │
+│              │  │                         │  │  Transfer method [▾]    │   │
+│              │  └─────────────────────────┘  └─────────────────────────┘   │
 └──────────────┴──────────────────────────────────────────────────────────────┘
+
+Layout note: If one Row 4 section is hidden by permission, the surviving
+section spans full width. If both are hidden, Row 4 is omitted entirely.
 ```
 
 ---
@@ -255,7 +405,7 @@ As a **user with user management permission**, I want to **create a new user acc
 
 **Page Display:**
 - **AC-01:** Create User page displays with page title "Create A New User" in Geist Semibold 24px
-- **AC-02:** Form uses a two-column layout: Personal Information (left), User Account + Employee Profile (right)
+- **AC-02:** Form uses a two-column, 4-row layout: Row 1 (Personal Information top + User Account), Row 2 (Personal Information cont. + Employee Profile), Row 3 (ID Cards + Emergency Contact), Row 4 (Salary + Banking, permission-gated). When permission-gated sections are hidden, the surviving Row 4 section spans full width; if both are hidden, Row 4 is omitted entirely.
 - **AC-03:** Two buttons visible: Cancel and Save (no "Save & Create Another")
 
 **Personal Information:**
@@ -264,7 +414,7 @@ As a **user with user management permission**, I want to **create a new user acc
 - **AC-06:** First name and Last name are displayed side-by-side (278px each)
 - **AC-07:** Email and Phone number are displayed side-by-side (278px each)
 - **AC-08:** Date of birth shows a date picker (calendar icon) and Gender shows a dropdown — side-by-side
-- **AC-09:** Address is full-width (576px) and optional (no asterisk)
+- **AC-09:** Permanent address (previously "Address") and Temporary address are each full-width (576px) and optional (no asterisk). Both accept up to 500 characters and are trimmed on save.
 
 **User Account:**
 - **AC-10:** User Role dropdown loads available roles from US-004 dynamically and includes a search field for quick option finding
@@ -285,8 +435,8 @@ As a **user with user management permission**, I want to **create a new user acc
 - **AC-18:** Skills are loaded from EP-008 US-003 (Skill Management)
 
 **Mandatory Field Validation (client-side):**
-- **AC-19:** User cannot save without filling all 12 mandatory fields — inline error "[Field name] is required" shown for each empty field
-- **AC-20:** Mandatory fields: First name, Last name, Email, Phone number, Date of birth, Gender, User Role, Account status, Send login URL, Department, Position, Experience from (year)
+- **AC-19:** User cannot save without filling all 14 mandatory fields — inline error "[Field name] is required" shown for each empty field
+- **AC-20:** Mandatory fields: First name, Last name, Email, Phone number, Date of birth, Gender, Nationality, User Role, Account status, Send login URL, Department, Position, Experience from (year), Education level
 - **AC-21:** All mandatory fields are marked with asterisk (*)
 
 **Email Validation:**
@@ -325,6 +475,57 @@ As a **user with user management permission**, I want to **create a new user acc
 - **AC-42:** Create User page is accessible only to users with user management permission
 - **AC-43:** Direct URL access by unauthorized users redirects to an appropriate fallback page
 
+**Personal Information — New Fields:**
+- **AC-49:** Marital status dropdown is optional and displays options: Single, Married, Other. No dropdown search.
+- **AC-50:** Nationality dropdown is mandatory, defaults to "Vietnam", includes a search field, and accepts the full ISO country list.
+- **AC-51:** Permanent address (renamed from "Address") and Temporary address are independent optional fields, each accepting up to 500 trimmed characters.
+
+**Employee Profile — Education Level:**
+- **AC-52:** Education level dropdown is mandatory and displays options: High school, College, Bachelor's degree, Master's degree, Doctorate. Inline error "Education level is required" if empty on save.
+
+**ID Cards Section:**
+- **AC-53:** ID Cards card displays as Row 3 left column, with Front image and Back image upload areas (each accepting PNG/JPEG/JPG/WEBP, max 5MB) and ID number + Issue date fields below.
+- **AC-54:** All ID Cards fields are optional — the user can save without any ID Card data.
+- **AC-55:** ID number is plain text (no format validation), trimmed, max 50 characters.
+- **AC-56:** Issue date must be a valid past date when provided; inline error "Issue date cannot be in the future" otherwise.
+
+**Emergency Contact Section:**
+- **AC-57:** Emergency Contact card displays as Row 3 right column. Initial state shows only the "+ Add contact" button — no rows.
+- **AC-58:** Clicking "+ Add contact" adds an empty row with Full name, Relationship, Phone number, and an X (remove) icon.
+- **AC-59:** User can add unlimited contact rows; all fields per row are optional.
+- **AC-60:** Clicking X on a contact row removes it immediately without confirmation.
+- **AC-61:** Saving with zero emergency contacts is allowed.
+
+**Salary Section (permission-gated):**
+- **AC-62:** Salary card is hidden entirely from the layout if the current user lacks `user.salary.view`. The surviving Row 4 section spans full width.
+- **AC-63:** Salary card is read-only (visible but disabled) if the user has `user.salary.view` but lacks `user.salary.manage`.
+- **AC-64:** Both Base salary and Insurance salary are optional and accept non-negative numeric values; inline error "Salary cannot be negative" otherwise.
+- **AC-65:** Salary input auto-formats with thousand separators (e.g., entering "15000000" displays as "15,000,000").
+- **AC-66:** Currency is VND only (no currency selector).
+
+**Banking Section (permission-gated):**
+- **AC-67:** Banking card is hidden entirely from the layout if the current user lacks `user.banking.view`. The surviving Row 4 section spans full width.
+- **AC-68:** Banking card is read-only (visible but disabled) if the user has `user.banking.view` but lacks `user.banking.manage`.
+- **AC-69:** Bank dropdown is searchable and displays the hardcoded VN bank list (Vietcombank, BIDV, Techcombank, MB Bank, VPBank, Agribank, ACB, VIB, Sacombank, TPBank, SHB, HDBank, Eximbank, OCB, SeABank, MSB, LienVietPostBank, NCB, ABBank, NamABank, PVcomBank).
+- **AC-70:** Bank account number accepts 6 to 20 numeric digits; inline error "Bank account number must be 6 to 20 digits" otherwise.
+- **AC-71:** Account name is optional text, max 100 characters, trimmed.
+- **AC-72:** Transfer method dropdown displays options: Bank transfer, Cash.
+- **AC-73:** All Banking fields are optional — the user can save without any Banking data (when section is visible and editable).
+
+**Layout Behavior:**
+- **AC-74:** If both Salary and Banking sections are hidden (user has neither `view` permission), Row 4 is omitted entirely from the page.
+- **AC-75:** Form-dirty detection includes all new fields (Marital status, Nationality, Permanent address, Temporary address, Education level, all ID Cards fields, all Emergency Contact rows, all Salary fields, all Banking fields). Any change triggers the discard confirmation on Cancel.
+
+**Line Manager (Employee Profile):**
+- **AC-76:** Line Manager field appears in the Employee Profile section as a full-width (576px) row positioned after Education level and before CV/Resumé.
+- **AC-77:** Line Manager is optional and defaults to "No line manager" (top-of-list special option).
+- **AC-78:** Line Manager dropdown displays each option in the format `Full Name — Position, Department` (e.g., `Sarah Le — CTO, Engineering`).
+- **AC-79:** Line Manager dropdown is searchable; search is case-insensitive and matches across name, position, and department.
+- **AC-80:** Line Manager dropdown options are loaded dynamically from the active user list; inactive users are excluded server-side and do not appear as options.
+- **AC-81:** If the selected Line Manager was deactivated between dropdown load and form save, the server rejects the save and the form displays both inline error "Selected line manager is no longer active" below the Line Manager field AND an error toast.
+- **AC-82:** User can be saved with no line manager (the "No line manager" option selected) — supports the top-of-hierarchy case (e.g., CEO, org founder).
+- **AC-83:** Mandatory field count remains 14 — Line Manager is optional and does NOT change the mandatory field count.
+
 **Testing Scenarios:**
 
 | Scenario | Input | Expected Output | Priority |
@@ -355,6 +556,36 @@ As a **user with user management permission**, I want to **create a new user acc
 | Send login URL re-enabled | Toggle Account status back to Active | Send login URL re-enabled, defaults ON | Medium |
 | Dropdown API fails | Role API unavailable | Error in Role dropdown with retry | Medium |
 | Unauthorized access | User without permission visits URL | Redirect / access denied | High |
+| Nationality default | Page loads | Nationality dropdown pre-filled with "Vietnam" | High |
+| Nationality empty save | Clear Nationality, click Save | Inline error "Nationality is required" | High |
+| Education level mandatory | Leave Education level empty, click Save | Inline error "Education level is required" | High |
+| Marital status optional | Save without selecting marital status | User created successfully | Medium |
+| Permanent + Temporary address | Fill both addresses | Both saved independently, each trimmed | Medium |
+| ID Card optional skip | Save without any ID Card data | User created successfully | High |
+| ID Card front image upload | Upload 3MB PNG to Front image | Preview thumbnail shown | Medium |
+| ID Card image too large | Upload 7MB JPG | Inline error "File size must not exceed 5MB" | Medium |
+| ID Card issue date future | Enter future date | Inline error "Issue date cannot be in the future" | Medium |
+| Emergency contact add | Click "+ Add contact" 3 times | 3 empty rows appear with X icons | Medium |
+| Emergency contact remove | Click X on middle of 3 rows | That row removed immediately, 2 remain | Medium |
+| Emergency contact save empty | Save with zero contacts | User created successfully | High |
+| Salary thousand separator | Type "15000000" in Base salary | Auto-formats to "15,000,000" | High |
+| Salary negative | Enter "-1000" in Base salary | Inline error "Salary cannot be negative" | Medium |
+| Salary hidden (no view) | User without `user.salary.view` opens form | Salary card not rendered; Banking spans full width if visible | High |
+| Salary read-only | User with `view` but no `manage` | Salary fields visible but disabled | High |
+| Banking hidden (no view) | User without `user.banking.view` opens form | Banking card not rendered; Salary spans full width if visible | High |
+| Banking read-only | User with `view` but no `manage` | Banking fields visible but disabled | High |
+| Both Row 4 hidden | User lacks both `salary.view` and `banking.view` | Row 4 omitted entirely | High |
+| Bank dropdown search | Type "Vietco" in Bank dropdown | Only "Vietcombank" appears | Medium |
+| Bank account number invalid | Enter "abc123" or "12345" (5 digits) | Inline error "Bank account number must be 6 to 20 digits" | Medium |
+| Bank account number valid | Enter "12345678901234" (14 digits) | Accepted, no error | Medium |
+| Transfer method Cash | Select Cash | Bank/account fields can remain empty; user saved | Medium |
+| Form dirty new field | Modify only Temporary address, click Cancel | "Discard unsaved changes?" dialog appears | Medium |
+| Line Manager — happy path with selection | Select a line manager from dropdown, save | User created with line manager assigned | High |
+| Line Manager — happy path no manager | Leave as "No line manager", save | User created with no line manager (top-of-hierarchy case) | High |
+| Line Manager — search by department | Type a department name in Line Manager dropdown search | Only users in that department appear | Medium |
+| Line Manager — search by position | Type a position name in Line Manager dropdown search | Only users with that position appear | Medium |
+| Line Manager — selected user becomes inactive | Line manager deactivated between load and save | Server error + inline error "Selected line manager is no longer active" + error toast | High |
+| Line Manager — dropdown excludes inactive | Open Line Manager dropdown | Only active users listed; inactive users absent | High |
 
 ---
 
@@ -364,7 +595,7 @@ As a **user with user management permission**, I want to **create a new user acc
 - **SR-01:** Only users with user management permission can access the Create User page
 - **SR-02:** Permissions are configured via US-004 (Role & Permission Management). No role names are hardcoded.
 - **SR-03:** Email must be unique organization-wide — checked **server-side on form submission only**. If duplicate, both inline error and error toast displayed.
-- **SR-04:** All text fields (first name, last name, email, phone, address) are trimmed of leading/trailing whitespace before saving
+- **SR-04:** All text fields (first name, last name, email, phone, permanent address, temporary address, ID number, emergency contact full name/relationship/phone, banking account name) are trimmed of leading/trailing whitespace before saving
 - **SR-05:** Account status defaults to Active (toggle ON) when creating a new user. Administrator can switch to Inactive before saving if needed.
 - **SR-06:** A newly created user with Active status can log in immediately — no additional activation step required
 - **SR-07:** A newly created user with Inactive status cannot log in until activated by an administrator
@@ -381,7 +612,29 @@ As a **user with user management permission**, I want to **create a new user acc
 - **SR-18:** If "Send login URL" is OFF at save time, the user account is created but no invitation email is sent. The administrator must manually share login information with the user.
 - **SR-19:** Dropdown search fields (User Role, Department, Position) filter options client-side — no server round-trip for dropdown filtering. Consistent with User List filter dropdown pattern.
 - **SR-20:** When Account status is set to Inactive, the "Send login URL" toggle is automatically disabled and forced to OFF — since an inactive user cannot log in, sending a login URL would be misleading. When Account status is toggled back to Active, the "Send login URL" toggle is re-enabled and defaults back to ON.
-- **SR-21:** "Form dirty" detection compares all 16 fields against their initial values. Any change triggers the discard confirmation on Cancel.
+- **SR-21:** "Form dirty" detection compares all fields against their initial values — including all new fields (Marital status, Nationality, Permanent address, Temporary address, Education level, all ID Cards fields, all Emergency Contact rows, all Salary fields, all Banking fields). Any change triggers the discard confirmation on Cancel.
+- **SR-22:** "Address" field is renamed to "Permanent address" everywhere in the form, validation messages, and saved data. A new "Temporary address" field is added with the same validation rules (optional, trimmed, max 500 chars).
+- **SR-23:** Nationality is a mandatory field, defaults to "Vietnam", and is sourced from the full ISO country list. The dropdown includes a search field.
+- **SR-24:** Marital status is an optional field with options: Single, Married, Other. No dropdown search (only 3 options).
+- **SR-25:** Education level is a mandatory field with options: High school, College, Bachelor's degree, Master's degree, Doctorate. No dropdown search (only 5 options).
+- **SR-26:** ID Cards section is entirely optional — all four fields (Front image, Back image, ID number, Issue date) can be left empty. ID number is plain text with no format validation (max 50 chars). Issue date must be a valid past date when provided.
+- **SR-27:** ID Card front and back images accept PNG, JPEG, JPG, WEBP. Max file size: 5MB each. Validated client-side on file selection.
+- **SR-28:** Emergency Contact section is entirely optional (0 contacts allowed) and supports unlimited rows. Each row has Full name, Relationship, Phone number — all optional. The X icon removes a row immediately without confirmation.
+- **SR-29:** Salary section is visibility-gated by `user.salary.view`. Without this permission, the entire Salary card is omitted from the page (not greyed out). With `view` but without `user.salary.manage`, the fields are visible but disabled (read-only).
+- **SR-30:** Salary fields accept non-negative numeric values in VND, auto-formatted with thousand separators (e.g., "15,000,000"). Both Base salary and Insurance salary are optional.
+- **SR-31:** Banking section is visibility-gated by `user.banking.view`. Without this permission, the entire Banking card is omitted from the page. With `view` but without `user.banking.manage`, the fields are visible but disabled (read-only).
+- **SR-32:** Banking bank list is hardcoded (Vietnamese banks): Vietcombank, BIDV, Techcombank, MB Bank, VPBank, Agribank, ACB, VIB, Sacombank, TPBank, SHB, HDBank, Eximbank, OCB, SeABank, MSB, LienVietPostBank, NCB, ABBank, NamABank, PVcomBank.
+- **SR-33:** Banking bank account number must be 6 to 20 numeric digits when provided.
+- **SR-34:** When a Row 4 permission-gated section is hidden, the surviving section spans full width. When both are hidden, Row 4 is omitted entirely from the page.
+- **SR-35:** Permission-gating is enforced both in the UI (hide / disable) and on the server (forbid). UI hiding alone is not security — the API must reject any payload that contains salary or banking data from a user without the corresponding `manage` permission.
+- **SR-36:** Line Manager is OPTIONAL. Top-of-hierarchy users (e.g., CEO, org founder) may legitimately have no line manager — the "No line manager" option supports this case.
+- **SR-37:** Line Manager candidate pool is any ACTIVE user — no role restriction, no department restriction. Cross-department assignment is allowed (e.g., an Engineering user can report to an Operations manager).
+- **SR-38:** Line Manager is stored as a reference (user ID), NOT a snapshot. Display values (full name, position, department) resolve at query time, so they remain accurate as the referenced user's profile changes.
+- **SR-39:** Line Manager dropdown options are loaded dynamically from the active user list. Inactive users are excluded server-side and do not appear in the dropdown. The user being created is not applicable on Create (the user does not exist yet, so self-assignment and cycle validation are n/a on Create).
+- **SR-40:** Line Manager option display format: `Full Name — Position, Department` (e.g., `Sarah Le — CTO, Engineering`). Dropdown search is case-insensitive and matches across name, position, OR department.
+- **SR-41:** Server-side, on save, the system re-validates that the selected Line Manager is still active. If not (the user was deactivated between dropdown load and save submission), the save is rejected with both inline error "Selected line manager is no longer active" below the Line Manager field and an error toast.
+- **SR-42:** Line Manager interacts with downstream permissions via the `.team` / `.all` scope split documented in the design spec (`docs/superpowers/specs/2026-05-20-user-management-line-manager-design.md`). When downstream stories add `<action>.team` permissions (e.g., `leave.approve.team`), holders can only act on requests from users in their subordinate chain (resolved via Line Manager). Holders of `<action>.all` can act on anyone. This DR does NOT introduce new permissions itself.
+- **SR-43:** Edit access for the Line Manager field is gated by the existing `user.edit` permission — no new permission is introduced for Line Manager management.
 
 **State Transitions:**
 ```
@@ -401,7 +654,11 @@ As a **user with user management permission**, I want to **create a new user acc
 - **Depends on:** EP-008 US-001 (Department Management) — provides department dropdown options
 - **Depends on:** EP-008 US-002 (Position Management) — provides position dropdown options
 - **Depends on:** EP-008 US-003 (Skill Management) — provides skills selector options
+- **Depends on:** US-004 (Role & Permission Management) — provides the new `user.salary.view`, `user.salary.manage`, `user.banking.view`, `user.banking.manage` permissions used to gate the Salary and Banking sections (catalog update handled separately in US-004)
+- **Depends on:** Existing user list API (DR-001-005-01) — provides the active user list used to populate the Line Manager dropdown (with name, position, department for display formatting; inactive users filtered server-side)
 - **Consumed by:** User List (DR-001-005-01) — new user appears in list after creation
+- **Consumed by:** User Details (DR-001-005-03) — displays all new fields and sections read-only with the same permission gating
+- **Consumed by:** Update User Information (DR-001-005-04) — mirrors this extended structure for editing
 - **Consumed by:** All modules — new user's role-permission data used for access control
 
 ---
@@ -462,6 +719,16 @@ As a **user with user management permission**, I want to **create a new user acc
 - Assigning multiple roles to a single user (one role per user)
 - Department-Position dependency (filtering positions based on selected department — all positions shown regardless; pending PO confirmation)
 - User duplication / cloning
+- Permission catalog update for new permissions (`user.salary.view`, `user.salary.manage`, `user.banking.view`, `user.banking.manage`) — handled separately in US-004 (Role & Permission Management)
+- Mobile/responsive layout for the new sections (Row 3 and Row 4)
+- Bank list management UI — hardcoded for now per PO decision
+- Insurance salary calculation logic — admin manual input per existing business rule
+- Audit logging for Salary and Banking field changes — separate logging story
+- ID Card image storage and retention policy — handled by file storage service
+- Bulk line manager assignment / reassignment tool (e.g., reassigning all subordinates of a departing manager) — separate story
+- Org-chart visualization (graphical reporting hierarchy view) — separate story
+- Acting manager / temporary delegation (assigning a stand-in manager while the primary is unavailable) — out of scope for this release
+- Multiple / matrix line managers (a user reporting to more than one manager) — single primary line manager only
 
 ### Open Questions
 - [ ] **Gender dropdown options:** Male, Female, Other, Prefer not to say assumed — confirm exact values. — **Owner:** Product Owner — **Status:** Pending
@@ -471,6 +738,14 @@ As a **user with user management permission**, I want to **create a new user acc
 - [ ] **Department-Position dependency:** Should selecting a department filter the Position dropdown to only positions in that department? Or are they independent? — **Owner:** Product Owner — **Status:** Pending
 - [ ] **Avatar dimensions:** Should uploaded images be auto-resized/cropped to a standard size (e.g., 200×200px)? — **Owner:** Product Owner — **Status:** Pending
 - [ ] **Edit User screen:** When will Design Team deliver the Edit User Figma screen? — **Owner:** Design Team — **Status:** Pending
+- [ ] **Bank list:** Confirm exact set of Vietnamese banks supported (current draft list of 21 banks needs PO sign-off). — **Owner:** Product Owner — **Status:** Pending
+- [ ] **Nationality dropdown source:** Should it use the full ISO 3166 country list or a curated subset relevant to the company's workforce? — **Owner:** Product Owner — **Status:** Pending
+- [ ] **ID Card permission gating:** Are stored ID card images sensitive enough to require a dedicated `user.idcards.view` permission similar to Salary/Banking? Currently they are gated only by base `user.view`. — **Owner:** Product Owner / Security — **Status:** Pending
+- [ ] **Salary currency:** VND only, or is multi-currency support needed for any cross-border employee scenarios? — **Owner:** Product Owner — **Status:** Pending
+- [ ] **Emergency Contact phone format:** Should phone numbers be validated against Vietnam mobile format or remain free text? — **Owner:** Product Owner — **Status:** Pending
+- [ ] **Banking account number validation:** Beyond 6-20 digits, should the system run a Luhn check or other structural validation? — **Owner:** Product Owner / Finance — **Status:** Pending
+- [ ] **First-user Line Manager default:** Should "No line manager" be the default for the very first user created (org founder), or should the form force a selection? — **Owner:** Product Owner — **Status:** Pending
+- [ ] **Cross-department warning:** Should the form display a warning when selecting a Line Manager from a different department, in case the assignment is unintentional? — **Owner:** Product Owner — **Status:** Pending
 
 ### Related Features
 
@@ -484,6 +759,9 @@ As a **user with user management permission**, I want to **create a new user acc
 | EP-008 US-001: Department Management | Provides Department dropdown options |
 | EP-008 US-002: Position Management | Provides Position dropdown options |
 | EP-008 US-003: Skill Management | Provides Skills selector options |
+| DR-001-005-03: User Details | Read-only display of all fields and sections created here, with the same permission gating for Salary and Banking |
+| DR-001-005-04: Update User Information | Edit form mirrors this Create form's extended structure (ID Cards, Emergency Contact, Salary, Banking) |
+| Design Spec: User Management Extended Fields (2026-05-18) | Authoritative spec for the 4 new sections + Personal/Work Profile field extensions across all 3 User DRs |
 
 ### Notes
 - This is the **most complex create form** in the entire HRM platform — 16 fields across 3 card sections in a two-column layout. All other create forms have 1–3 fields in a single centered card.
@@ -514,3 +792,5 @@ As a **user with user management permission**, I want to **create a new user acc
 |---------|------|--------|---------|
 | 1.0 | 2026-03-24 | BA Agent | Initial draft — full 8-section detail requirement with Figma design context; most complex create form in platform |
 | 1.1 | 2026-03-24 | BA Agent | Added "Send login URL" toggle field (AC-44 through AC-48, SR-17/18/20); resolved login credentials open question |
+| 1.2 | 2026-05-18 | BA Agent | Added ID Cards, Emergency Contact, Salary (permission-gated), Banking (permission-gated) sections; added Nationality (mandatory) + Marital status + Temporary address + Education level (mandatory) fields; renamed Address → Permanent address |
+| 1.3 | 2026-05-20 | BA Agent | Added optional Line Manager field to Employee Profile (searchable user dropdown showing "Name — Position, Department"); excludes inactive users; field is optional for top-of-hierarchy users; documented two-variant `.team`/`.all` permission pattern for downstream approval stories (see design spec 2026-05-20-user-management-line-manager-design.md); no new permissions added in this DR |

@@ -6,8 +6,8 @@ epic_id: EP-001
 story_id: US-004
 story_name: "Role & Permission Management"
 status: draft
-version: "0.1"
-last_updated: "2026-03-24"
+version: "0.2"
+last_updated: "2026-05-18"
 add_on_sections: ["UI Specifications"]
 approved_by: null
 related_documents:
@@ -72,6 +72,8 @@ revision_history: []
 | BR-US-004-02 | Roles are a flat list — no role inheritance or hierarchy |
 | BR-US-004-03 | A role with ≥1 user assigned cannot be deleted |
 | BR-US-004-04 | Permission changes take effect immediately for all assigned users |
+| BR-US-004-05 | The Users module supports fine-grained permissions for sensitive sub-data: `user.salary.view`, `user.salary.manage`, `user.banking.view`, `user.banking.manage` (added 2026-05-18 to gate Salary and Banking sections on user profiles) |
+| BR-US-004-06 | View and Manage permissions for sensitive sub-data are independent — a role may have View without Manage (read-only access), but Manage implies the ability to also see the data being managed |
 
 ---
 
@@ -191,15 +193,28 @@ revision_history: []
 
 | Module Group | Permissions | Layout | Figma Node |
 |-------------|-------------|--------|------------|
-| **Users** | View Users, Create Users, Edit Users, Delete Users | 4 checkboxes in 1 row | `3089:1785` |
+| **Users** | View Users, Create Users, Edit Users, Delete Users, View Salary, Manage Salary, View Banking, Manage Banking | 4 checkboxes × 2 rows (expanded 2026-05-18) | `3089:1785` |
 | **Roles** | View Roles, Create Roles, Edit Roles, Delete Roles | 4 checkboxes in 1 row | `3089:1791` |
 | **Module** (placeholder) | 8× "Permission" placeholder | 4 checkboxes × 2 rows | `3089:1812` |
 | **Module** (placeholder) | 8× "Permission" placeholder | 4 checkboxes × 2 rows | `3089:1851` |
 
+**Users module permission keys (system-defined):**
+
+| Permission Key | Display Label | Purpose |
+|---------------|---------------|---------|
+| `user.view` | View Users | List users + view basic profile |
+| `user.create` | Create Users | Add new users |
+| `user.edit` | Edit Users | Modify user profile (basic fields) |
+| `user.delete` | Delete Users | Remove users |
+| `user.salary.view` | View Salary | See Base/Insurance salary on profile |
+| `user.salary.manage` | Manage Salary | Edit Base/Insurance salary on profile |
+| `user.banking.view` | View Banking | See bank fields on profile (account number masked to last 4 digits) |
+| `user.banking.manage` | Manage Banking | Edit bank fields on profile (full account number visible while editing) |
+
 **Permission group pattern:**
 - Module label (Geist Regular 14px, 20px line-height) at top
 - Checkbox Group instances arranged in 4-column grid
-- If >4 permissions per module, wraps to additional rows
+- If >4 permissions per module, wraps to additional rows (Users module now wraps to 2 rows)
 - Each checkbox: Checkbox Group component instance with label
 - Horizontal separator line between groups
 
@@ -212,7 +227,7 @@ revision_history: []
 - **AC-UI-14:** Permissions card displays below Role Information with grouped checkboxes
 - **AC-UI-15:** Permission checkboxes are grouped by module with a module label header
 - **AC-UI-16:** Each module group shows permission checkboxes in a 4-column grid layout
-- **AC-UI-17:** Users module shows: View Users, Create Users, Edit Users, Delete Users
+- **AC-UI-17:** Users module shows 8 permissions in a 4×2 grid: View Users, Create Users, Edit Users, Delete Users, View Salary, Manage Salary, View Banking, Manage Banking
 - **AC-UI-18:** Roles module shows: View Roles, Create Roles, Edit Roles, Delete Roles
 - **AC-UI-19:** Horizontal separator lines divide each permission module group
 - **AC-UI-20:** All checkboxes are unchecked by default (new role starts with no permissions)
@@ -223,7 +238,7 @@ revision_history: []
 | # | Gap | Impact | Action Required |
 |---|-----|--------|-----------------|
 | 8 | Placeholder "Module" labels (×2) | Cannot determine full module list | Product Owner: confirm which modules appear in permission matrix |
-| 9 | Placeholder "Permission" labels (×16) | Cannot determine permission names for other modules | Product Owner: confirm permission names per module |
+| 9 | Placeholder "Permission" labels (×16) for the 2 placeholder Modules | Cannot determine permission names for non-Users/Roles modules | Product Owner: confirm permission names per module (Users module now fully specified — see §5.12; expanded with `user.salary.*` and `user.banking.*` on 2026-05-18 for US-005 integration) |
 | 10 | No validation error states | Cannot define error presentation for duplicate/empty name | Design Team: provide inline error state |
 | 11 | No success confirmation | Cannot define post-save behavior | Product Owner: redirect to Role List with toast, or stay on form? |
 | 12 | No "Select All" per module | Administrator must check individually | Product Owner: consider adding Select All for efficiency |
@@ -240,7 +255,14 @@ revision_history: []
 
 ---
 
-**Document Version:** 0.1
-**Last Updated:** 2026-03-19
+**Document Version:** 0.2
+**Last Updated:** 2026-05-18
 **Author:** BA Agent
 **Reviewer:** Pending
+
+**Version History:**
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 0.1 | 2026-03-19 | BA Agent | Stub with preliminary functional requirements + UI specs from Figma (Role List, Create Role) |
+| 0.2 | 2026-05-18 | BA Agent | Added BR-US-004-05/06; expanded Users module Permission Groups table with 4 new fine-grained permissions (`user.salary.view`, `user.salary.manage`, `user.banking.view`, `user.banking.manage`); added Users module permission key inventory table; updated AC-UI-17 to include 8 permissions in 4×2 grid; refined Gap #9 to note Users is now fully specified |

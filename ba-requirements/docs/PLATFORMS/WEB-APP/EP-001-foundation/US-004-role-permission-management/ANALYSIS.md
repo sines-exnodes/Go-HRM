@@ -6,8 +6,8 @@ epic_id: EP-001
 story_id: US-004
 story_name: "Role & Permission Management"
 status: draft
-version: "1.0"
-last_updated: "2026-03-24"
+version: "1.1"
+last_updated: "2026-05-18"
 add_on_sections: ["Design Context"]
 approved_by: null
 related_documents:
@@ -373,12 +373,29 @@ Sidebar: 200px │ Content: 1694px │ Form card: 600px centered
 
 | Module Group | Permissions Shown | Pattern |
 |-------------|-------------------|---------|
-| **Users** | View Users, Create Users, Edit Users, Delete Users | CRUD (4 checkboxes) |
+| **Users** | View Users, Create Users, Edit Users, Delete Users, View Salary, Manage Salary, View Banking, Manage Banking | Extended CRUD + fine-grained (8 checkboxes in 4×2 grid) |
 | **Roles** | View Roles, Create Roles, Edit Roles, Delete Roles | CRUD (4 checkboxes) |
 | **Module** (placeholder) | 8× "Permission" placeholder | Extended CRUD (4+4 checkboxes in 2 rows) |
 | **Module** (placeholder) | 8× "Permission" placeholder | Extended CRUD (4+4 checkboxes in 2 rows) |
 
-> **Key insight:** The permission matrix uses a **module-grouped checkbox pattern** where each module has its own set of permissions. The confirmed modules (Users, Roles) follow a standard View/Create/Edit/Delete pattern. Placeholder modules show up to 8 permissions per module in a 4-column grid.
+> **Key insight:** The permission matrix uses a **module-grouped checkbox pattern** where each module has its own set of permissions. The Roles module follows a standard View/Create/Edit/Delete pattern. The Users module follows an extended pattern: standard CRUD plus fine-grained permissions for sensitive sub-data (Salary, Banking) — added 2026-05-18 to support permission-controlled access to compensation and banking fields on user profiles.
+
+#### Users Module — Permission Inventory (expanded 2026-05-18)
+
+| Permission Key | Display Label | Scope |
+|---------------|---------------|-------|
+| `user.view` | View Users | Read user list and user details (basic profile fields) |
+| `user.create` | Create Users | Add new users to the system |
+| `user.edit` | Edit Users | Modify user profile (excluding role, email, status, salary, banking) |
+| `user.delete` | Delete Users | Remove users from the system |
+| `user.salary.view` | View Salary | View Base salary and Insurance salary on user profiles |
+| `user.salary.manage` | Manage Salary | Edit Base salary and Insurance salary on user profiles |
+| `user.banking.view` | View Banking | View bank account fields on user profiles (account number masked to last 4 digits) |
+| `user.banking.manage` | Manage Banking | Edit bank account fields on user profiles (full account number visible while editing) |
+
+**Rationale:** Salary and banking are sensitive employee data. Splitting view and manage permissions allows HR/Finance to view compensation data without granting edit rights, and supports separation of duties.
+
+**UI implication:** The Users module in the Create/Edit Role permission matrix will render 8 checkboxes in a 4×2 grid (consistent with existing "Module" placeholder pattern). The actual checkbox list still loads dynamically from the API — see Rule 9 in DR-001-004-02.
 
 #### Design Tokens Referenced (Create Role specific)
 
@@ -462,13 +479,21 @@ Sidebar: 200px │ Content: 1694px │ Form card: 600px centered
 - [ ] **Cancel button behavior:** Should Cancel redirect to Role List immediately, or show a "discard changes?" confirmation dialog? — **Owner:** Product Owner — **Status:** Pending
 - [ ] **Post-save behavior:** After saving a new role, should the system redirect to Role List with success toast, or stay on the form? — **Owner:** Product Owner — **Status:** Pending
 - [ ] **Select All per module:** Should each permission module group have a "Select All" checkbox for efficiency? — **Owner:** Product Owner — **Status:** Pending
-- [ ] **Full module list:** Which modules appear in the permission matrix? Only Users and Roles are confirmed in design; placeholders suggest more. — **Owner:** Product Owner — **Status:** Pending
+- [ ] **Full module list:** Which modules appear in the permission matrix? Users (now expanded to 8 fine-grained permissions, see Section 7) and Roles are confirmed; placeholders suggest more. — **Owner:** Product Owner — **Status:** Pending
+- [ ] **Self-grant guard for sensitive permissions:** Should the system prevent an administrator from granting themselves `user.salary.manage` or `user.banking.manage` without dual approval? — **Owner:** Product Owner — **Status:** Pending (added 2026-05-18)
 - [ ] **User count column:** Should a "No. of Users" column be added to the Role List (similar to "No. of Employees" in Department/Position lists)? — **Owner:** Product Owner — **Status:** Pending
 - [ ] **Gear icon actions:** Confirmed as Edit + Delete? Any other options (e.g., Duplicate role)? — **Owner:** Product Owner — **Status:** Pending
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2026-03-19
+**Document Version:** 1.1
+**Last Updated:** 2026-05-18
 **Author:** BA Agent
 **Reviewer:** Pending
+
+**Version History:**
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0 | 2026-03-19 | BA Agent | Initial analysis with Figma design context for Role List and Create Role |
+| 1.1 | 2026-05-18 | BA Agent | Expanded Users module permission inventory with 4 new fine-grained permissions (`user.salary.view`, `user.salary.manage`, `user.banking.view`, `user.banking.manage`) to support permission-gated Salary and Banking sections in US-005 User Management DRs |

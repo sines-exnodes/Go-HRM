@@ -7,7 +7,7 @@ story_id: US-005
 story_name: "User Management"
 status: draft
 version: "1.0"
-last_updated: "2026-03-24"
+last_updated: "2026-06-12"
 add_on_sections: ["Design Context"]
 approved_by: null
 related_documents:
@@ -33,6 +33,14 @@ input_sources:
     description: "Update Information screen (User Details sub-page)"
     node_id: "3122:6323"
     extraction_date: "2026-03-26"
+  - type: figma
+    description: "Contracts list screen (User Details sub-page)"
+    node_id: "3513:5418"
+    extraction_date: "2026-06-12"
+  - type: figma
+    description: "Create Contract screen (separate full page)"
+    node_id: "3518:4594"
+    extraction_date: "2026-06-12"
 ---
 
 # Analysis: User Management
@@ -544,7 +552,120 @@ This should be replaced with text describing email change behavior. **Design Tea
 
 ---
 
+### Screen: Contracts (User Details Sub-Page)
+
+> Extracted from Figma on 2026-06-12.
+> Source: [Contracts](https://www.figma.com/design/YEHeFgVZau7wmo9BZBVuZC?node-id=3513-5418) (node `3513:5418`, inside section "Contracts" `3518:4831`)
+
+#### Layout Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Breadcrumb / Breadcrumb / Breadcrumb                            [Top Bar] │
+├──────────────┬──────────────────────────────────────────────────────────────┤
+│  [Sidebar]   │  ← User Details  > Henry Tran                              │
+│              │                                                             │
+│              │  ┌──────────────┐ [📅 Signed date][📅 Expiry date][Reset ⟳]│
+│              │  │ Overview     │                              [+ Add New] │
+│              │  │ Update Info  │ ┌─────────────────────────────────────┐  │
+│              │  │ [Contracts]◄ │ │Contract type│Signed date│Expiry date│  │
+│              │  │ Change Role  │ │             │           │Attachment │  │
+│              │  │ Change Email │ │─────────────┼───────────┼───│Action │  │
+│              │  │ Reset Pass   │ │ Text        │ Text      │...│  ⚙   │  │
+│              │  │ Act/Deact    │ │ Text        │ Text      │...│  ⚙   │  │
+│              │  │ Delete User  │ │ (6 rows)    │           │   │       │  │
+│              │  └──────────────┘ └─────────────────────────────────────┘  │
+│              │                  Rows per page [10]  Page 1 of 10  ‹ 1…5 › │
+└──────────────┴──────────────────────────────────────────────────────────────┘
+```
+
+#### Component Inventory — Contracts List
+
+| Component | Node ID | Business Purpose | Design Status |
+|-----------|---------|-----------------|---------------|
+| Left action panel (8 buttons, 181px) | `3513:5483` | Overview, Update Information, **Contracts** (active, position 3), Change User Role, Change Email, Reset Password, Activate/Deactivate, Delete User | Designed |
+| Filter button "Signed date" | `3514:4553` | Opens signed-date range filter (calendar icon) | Designed |
+| Filter button "Expiry date" | `3514:4559` | Opens expiry-date range filter (calendar icon) | Designed |
+| Reset button | `3513:5500` | Clears active filters (refresh icon) | Designed |
+| "+ Add New" button (primary, dark) | `3513:5503` | Navigates to Create Contract page — top-right of action bar | Designed |
+| Table columns ×5 | `3513:5505`–`3513:5513` | Contract type / Signed date / Expiry date / Attachment / Action (gear icon per row) | Designed |
+| Pagination | `3513:5514` | "Rows per page [10]" + "Page 1 of 10" + numbered page controls | Designed |
+
+#### Design Details
+
+- **Table columns (5):** Contract type, Signed date, Expiry date, Attachment, Action — **no Status badge column and no Contract Number column** in the design
+- **Action bar:** two date filter buttons (Signed date, Expiry date) + Reset on the left; "+ Add New" primary button on the right — **no Contract Type filter** in the design
+- **Pagination present** — standard component (Rows per page selector, page numbers), unlike other User Details sub-pages
+- Date field naming is **"Signed date"** (not "Start date") throughout
+- In-panel list — the table renders in the right panel of User Details while the left action panel stays visible
+
+---
+
+### Screen: Create Contract (Separate Full Page)
+
+> Extracted from Figma on 2026-06-12.
+> Source: [Create Contract](https://www.figma.com/design/YEHeFgVZau7wmo9BZBVuZC?node-id=3518-4594) (node `3518:4594`, inside section "Contracts" `3518:4831`)
+
+#### Layout Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Breadcrumb / Breadcrumb / Breadcrumb                            [Top Bar] │
+├──────────────┬──────────────────────────────────────────────────────────────┤
+│  [Sidebar]   │  Create Contract                        [Cancel]  [Save]   │
+│              │                                                             │
+│              │            ┌──────────────────────────────────┐             │
+│              │            │ Contract Information      600px  │             │
+│              │            │ * Contract type                  │             │
+│              │            │ [Select contract type        ▾]  │             │
+│              │            │ (toggle) Endless contract        │             │
+│              │            │ * Signed date    * Expiry date   │             │
+│              │            │ [Select date 📅] [Select date 📅]│             │
+│              │            │ Attachment                       │             │
+│              │            │ [Choose File  No file chosen]    │             │
+│              │            └──────────────────────────────────┘             │
+└──────────────┴──────────────────────────────────────────────────────────────┘
+```
+
+#### Component Inventory — Create Contract
+
+| Component | Node ID | Business Purpose | Design Status |
+|-----------|---------|-----------------|---------------|
+| Page title "Create Contract" | `3518:4652` | Heading 3 (24px Semibold) | Designed |
+| Cancel button (secondary) | `3518:4654` | Header top-right, #f5f5f5 background, square-x icon | Designed |
+| Save button (primary) | `3518:4655` | Header top-right, #171717 background, save icon, white text | Designed |
+| Form card "Contract Information" | `3518:4657` | 600px centered card, single section | Designed |
+| Contract type dropdown | `3518:4773` | "* Contract type" — placeholder "Select contract type", chevron-down | Designed |
+| Endless contract toggle | `3519:4892` | ToggleLeft (32px) + label, positioned between Contract type and the date pair | Designed |
+| Signed date picker | `3518:4769` | "* Signed date" — placeholder "Select signed date", calendar icon, 278px left half | Designed |
+| Expiry date picker | `3518:4770` | "* Expiry date" — placeholder "Select expiry date", calendar icon, 278px right half | Designed |
+| Attachment file input | `3518:4664` | "Choose File / No file chosen", 576px full width | Designed |
+
+#### Design Details
+
+- **Form fields (5, in order):** Contract type → Endless contract toggle → Signed date + Expiry date (side by side) → Attachment — **no Contract Number field and no Note field** in the design
+- Contract type shows the placeholder "Select contract type" — **not pre-selected**
+- Both Signed date and Expiry date carry the mandatory asterisk (Expiry conditional on the Endless toggle is behavior, not visible in the static frame)
+- Header pattern matches Create A New User: page title left, Cancel (secondary) + Save (primary) top-right
+- Design tokens: Geist family, `general/primary` #171717 (Save), `general/secondary` #f5f5f5 (Cancel), `general/border` #e5e5e5, `general/muted foreground` #737373, heading 3 24px Semibold, paragraph small 14/20
+
+#### Key Differences from the Pre-Design DR (v1.1)
+
+| Topic | DR v1.1 assumed | Figma design shows |
+|-------|------------------|--------------------|
+| Date field name | "Start Date" | **"Signed date"** |
+| Status badge column | Derived Active/Expired badge | **No Status column** |
+| Contract Number field/column | Optional field + column | **Absent** |
+| Note field | Optional multiline | **Absent** |
+| Type filter | Multi-select chip | **Absent** (only two date filters + Reset) |
+| Pagination | Omitted (small list) | **Present** (standard component) |
+| Add button label | "+ Add Contract" | **"+ Add New"** |
+| Create page title | "Add Contract" | **"Create Contract"** |
+| Contract type default | Pre-selected "Labour Contract" | **Placeholder "Select contract type"** |
+
+---
+
 **Document Version:** 1.0
-**Last Updated:** 2026-03-26
+**Last Updated:** 2026-06-12
 **Author:** BA Agent
 **Reviewer:** Pending
