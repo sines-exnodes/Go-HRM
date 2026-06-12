@@ -74,6 +74,7 @@ func defaultRoles() []roleSeed {
 				// manages payroll, so holds both view and manage on each.
 				permissions.PermUsersSalaryView, permissions.PermUsersSalaryManage,
 				permissions.PermUsersBankingView, permissions.PermUsersBankingManage,
+				permissions.PermUsersContractsView, permissions.PermUsersContractsManage,
 				permissions.PermRolesRead, permissions.PermRolesCreate, permissions.PermRolesUpdate,
 				// Employee HR profile management — added in the full-verify fix
 				// (full-verify.md). Pre-existing seed gap: Admin could not GET /
@@ -109,6 +110,7 @@ func defaultRoles() []roleSeed {
 				// manages payroll, so holds both view and manage on each.
 				permissions.PermUsersSalaryView, permissions.PermUsersSalaryManage,
 				permissions.PermUsersBankingView, permissions.PermUsersBankingManage,
+				permissions.PermUsersContractsView, permissions.PermUsersContractsManage,
 				permissions.PermRolesRead,
 				// Employee HR profile management — same fix as Admin (above).
 				// HR mirrors the rest of HR's perm shape: Read/Create/Update but
@@ -135,7 +137,7 @@ func defaultRoles() []roleSeed {
 			Level:       50,
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
-				permissions.PermUsersRead,
+				permissions.PermUsersRead, permissions.PermUsersContractsView,
 				permissions.PermDepartmentsRead,
 				permissions.PermPositionsRead,
 				permissions.PermSkillsRead,
@@ -150,6 +152,7 @@ func defaultRoles() []roleSeed {
 			Level:       10,
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
+				permissions.PermUsersContractsView,
 				// Self-service on own leave requests: Read+Create were already
 				// here; Update/Cancel/Delete are the load-bearing fix surfaced
 				// by Phase 5 live verification (REVISION NOTES #4 had claimed

@@ -26,6 +26,8 @@ const (
 	PermUsersSalaryManage  Permission = "users:salary_manage"
 	PermUsersBankingView   Permission = "users:banking_view"
 	PermUsersBankingManage Permission = "users:banking_manage"
+	PermUsersContractsView Permission = "users:contracts_view"
+	PermUsersContractsManage Permission = "users:contracts_manage"
 
 	// Employees
 	PermEmployeesRead   Permission = "employees:read"
@@ -95,6 +97,7 @@ func AllPermissions() []Permission {
 		PermUsersRead, PermUsersCreate, PermUsersUpdate, PermUsersDelete,
 		PermUsersManageRoles, PermUsersChangePwd,
 		PermUsersSalaryView, PermUsersSalaryManage, PermUsersBankingView, PermUsersBankingManage,
+		PermUsersContractsView, PermUsersContractsManage,
 		PermEmployeesRead, PermEmployeesCreate, PermEmployeesUpdate, PermEmployeesDelete,
 		PermDependentsManage,
 		PermRolesRead, PermRolesCreate, PermRolesUpdate, PermRolesDelete,
@@ -160,6 +163,8 @@ var PermissionGroups = []PermissionGroup{
 			{PermUsersSalaryManage, "Manage Salary", "Set/edit salary fields on the employee profile"},
 			{PermUsersBankingView, "View Banking", "See banking fields (account number masked) on the employee profile"},
 			{PermUsersBankingManage, "Manage Banking", "Set/edit banking fields on the employee profile"},
+			{PermUsersContractsView, "View Contracts", "See the contracts list and details for a user profile"},
+			{PermUsersContractsManage, "Manage Contracts", "Create, edit, and delete employment contracts on a user profile"},
 		},
 	},
 	{
