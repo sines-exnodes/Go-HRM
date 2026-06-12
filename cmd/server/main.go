@@ -222,16 +222,16 @@ func main() {
 
 		// ---- /users/:id/contracts ----
 		// IMPORTANT: :id must match the existing adminUsers wildcard name.
-		// Router-level gate: PermUsersContractsView. Write ops gated inside
-		// the handler via hasContractsManage.
+		// Router-level gate: PermUsersContractsView on all routes (read gate);
+		// write routes additionally require PermUsersContractsManage (defense-in-depth).
 		userContracts := authed.Group("/users/:id/contracts")
 		userContracts.Use(middleware.RequirePerms(authSvc, permissions.PermUsersContractsView))
 		userContracts.GET("", userContractH.List)
-		userContracts.POST("", userContractH.Create)
 		userContracts.GET(":contractID", userContractH.Get)
-		userContracts.PATCH(":contractID", userContractH.Update)
-		userContracts.DELETE(":contractID", userContractH.Delete)
-		userContracts.POST(":contractID/attachment", userContractH.UploadAttachment)
+		userContracts.POST("", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.Create)
+		userContracts.PATCH(":contractID", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.Update)
+		userContracts.DELETE(":contractID", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.Delete)
+		userContracts.POST(":contractID/attachment", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.UploadAttachment)
 
 		// ---- /employees/me* self-service (auth only) ----
 		authed.GET("/employees/me", empH.GetMe)

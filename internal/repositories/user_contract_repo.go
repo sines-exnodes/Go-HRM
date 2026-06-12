@@ -42,17 +42,32 @@ func (r *userContractRepository) Get(ctx context.Context, id uuid.UUID) (*models
 }
 
 func (r *userContractRepository) Update(ctx context.Context, c *models.UserContract) error {
-	return r.db.WithContext(ctx).Save(c).Error
+	return r.db.WithContext(ctx).Model(&models.UserContract{}).
+		Where("id = ? AND is_deleted = false", c.ID).
+		Updates(map[string]any{
+			"contract_type":  c.ContractType,
+			"signed_date":    c.SignedDate,
+			"expiry_date":    c.ExpiryDate,
+			"is_endless":     c.IsEndless,
+			"attachment_url": c.AttachmentURL,
+		}).Error
 }
 
 func (r *userContractRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	now := time.Now()
-	return r.db.WithContext(ctx).Model(&models.UserContract{}).
-		Where("id = ?", id).
+	result := r.db.WithContext(ctx).Model(&models.UserContract{}).
+		Where("id = ? AND is_deleted = false", id).
 		Updates(map[string]any{
 			"is_deleted": true,
 			"deleted_at": now,
-		}).Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *userContractRepository) List(ctx context.Context, employeeID uuid.UUID, q dto.UserContractListQuery) ([]models.UserContract, int64, error) {
