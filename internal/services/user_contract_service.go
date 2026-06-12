@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"errors"
+	"math"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -153,17 +155,120 @@ func (s *UserContractService) Delete(ctx context.Context, userID, contractID uui
 	return nil
 }
 
-// List — stubbed, implemented in a follow-up task.
-func (s *UserContractService) List(_ context.Context, _ uuid.UUID, _ dto.UserContractListQuery) (dto.PaginatedData[dto.UserContractRead], *apperrors.AppError) {
-	return dto.PaginatedData[dto.UserContractRead]{}, nil
+// List returns a paginated, optionally filtered list of contracts for the user.
+func (s *UserContractService) List(ctx context.Context, userID uuid.UUID, q dto.UserContractListQuery) (dto.PaginatedData[dto.UserContractRead], *apperrors.AppError) {
+	emp, aerr := s.resolveEmployee(ctx, userID)
+	if aerr != nil {
+		return dto.PaginatedData[dto.UserContractRead]{}, aerr
+	}
+	if q.Page < 1 {
+		q.Page = 1
+	}
+	if q.PageSize < 1 || q.PageSize > 50 {
+		q.PageSize = 10
+	}
+	contracts, total, err := s.repo.List(ctx, emp.ID, q)
+	if err != nil {
+		return dto.PaginatedData[dto.UserContractRead]{}, apperrors.ErrInternal(err.Error())
+	}
+	items := make([]dto.UserContractRead, len(contracts))
+	for i, c := range contracts {
+		items[i] = toUserContractRead(c)
+	}
+	totalPages := 0
+	if total > 0 {
+		totalPages = int(math.Ceil(float64(total) / float64(q.PageSize)))
+	}
+	return dto.PaginatedData[dto.UserContractRead]{
+		Items:      items,
+		Total:      total,
+		Page:       q.Page,
+		PageSize:   q.PageSize,
+		TotalPages: totalPages,
+	}, nil
 }
 
-// Update — stubbed, implemented in a follow-up task.
-func (s *UserContractService) Update(_ context.Context, _, _ uuid.UUID, _ dto.UserContractUpdate) (*dto.UserContractRead, *apperrors.AppError) {
-	return nil, nil
+// Update applies a partial PATCH. Only non-nil DTO fields are applied.
+func (s *UserContractService) Update(ctx context.Context, userID, contractID uuid.UUID, req dto.UserContractUpdate) (*dto.UserContractRead, *apperrors.AppError) {
+	emp, aerr := s.resolveEmployee(ctx, userID)
+	if aerr != nil {
+		return nil, aerr
+	}
+	c, aerr := s.fetchAndCheckOwnership(ctx, contractID, emp.ID)
+	if aerr != nil {
+		return nil, aerr
+	}
+	if req.ContractType != nil {
+		c.ContractType = models.ContractType(*req.ContractType)
+	}
+	if req.SignedDate != nil {
+		c.SignedDate = *req.SignedDate
+	}
+	if req.IsEndless != nil {
+		c.IsEndless = *req.IsEndless
+	}
+	if req.ExpiryDate != nil {
+		c.ExpiryDate = req.ExpiryDate
+	}
+	if req.AttachmentURL != nil {
+		if *req.AttachmentURL == "" {
+			c.AttachmentURL = nil
+		} else {
+			c.AttachmentURL = req.AttachmentURL
+		}
+	}
+	// If endless, always clear expiry.
+	if c.IsEndless {
+		c.ExpiryDate = nil
+	}
+	if aerr := validateContractDates(c.IsEndless, c.SignedDate, c.ExpiryDate); aerr != nil {
+		return nil, aerr
+	}
+	if err := s.repo.Update(ctx, c); err != nil {
+		return nil, apperrors.ErrInternal(err.Error())
+	}
+	out := toUserContractRead(*c)
+	return &out, nil
 }
 
-// UploadAttachment — stubbed, implemented in a follow-up task.
-func (s *UserContractService) UploadAttachment(_ context.Context, _, _ uuid.UUID, _ []byte, _ string) (*dto.UserContractAttachmentResponse, *apperrors.AppError) {
-	return nil, nil
+// UploadAttachment validates, uploads, and stores the attachment URL on the contract.
+// ext is the lowercase file extension (e.g. ".pdf").
+func (s *UserContractService) UploadAttachment(ctx context.Context, userID, contractID uuid.UUID, content []byte, ext string) (*dto.UserContractAttachmentResponse, *apperrors.AppError) {
+	emp, aerr := s.resolveEmployee(ctx, userID)
+	if aerr != nil {
+		return nil, aerr
+	}
+	c, aerr := s.fetchAndCheckOwnership(ctx, contractID, emp.ID)
+	if aerr != nil {
+		return nil, aerr
+	}
+	if s.uploads == nil {
+		return nil, apperrors.ErrInternal("storage is not configured; cannot upload attachment")
+	}
+	if len(content) == 0 {
+		return nil, apperrors.ErrBadRequest("attachment file is empty")
+	}
+	if len(content) > contractAttachmentMaxBytes {
+		return nil, apperrors.ErrBadRequest("attachment must not exceed 5 MB")
+	}
+	sniffLen := len(content)
+	if sniffLen > 512 {
+		sniffLen = 512
+	}
+	sniffed := http.DetectContentType(content[:sniffLen])
+	if sniffed == "application/zip" && ext == ".docx" {
+		sniffed = contractDocxMIME
+	}
+	if !allowedContractMIME[sniffed] {
+		return nil, apperrors.ErrBadRequest("attachment must be PDF, PNG, JPG, or DOCX")
+	}
+	url, err := s.uploads.Upload(ctx, contractAttachmentSubdir, ext, content, sniffed)
+	if err != nil {
+		return nil, apperrors.ErrInternal(err.Error())
+	}
+	c.AttachmentURL = &url
+	if err := s.repo.Update(ctx, c); err != nil {
+		return nil, apperrors.ErrInternal(err.Error())
+	}
+	return &dto.UserContractAttachmentResponse{AttachmentURL: url}, nil
 }

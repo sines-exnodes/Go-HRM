@@ -160,3 +160,168 @@ func TestUserContract_Delete_SoftDeletes(t *testing.T) {
 	testDB.Raw("SELECT COUNT(*) FROM user_contracts WHERE id = ? AND is_deleted = true", created.ID).Scan(&count)
 	assert.Equal(t, int64(1), count)
 }
+
+// ---- List + Filters ----
+
+func TestUserContract_List_FilterSignedDate(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc := newContractSvc(t)
+
+	u, _ := makeEmpUser(t, "list1@example.com", "List User")
+	expiry := dateUTC(2027, 12, 31)
+
+	_, aerr := svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType: "labour_contract",
+		SignedDate:   dateUTC(2026, 6, 1),
+		ExpiryDate:   &expiry,
+	})
+	require.Nil(t, aerr)
+
+	_, aerr = svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType: "labour_contract",
+		SignedDate:   dateUTC(2024, 1, 1),
+		ExpiryDate:   &expiry,
+	})
+	require.Nil(t, aerr)
+
+	from := dateUTC(2026, 1, 1)
+	to := dateUTC(2026, 12, 31)
+	result, aerr := svc.List(context.Background(), u.ID, dto.UserContractListQuery{
+		Page: 1, PageSize: 10,
+		SignedFrom: &from,
+		SignedTo:   &to,
+	})
+	require.Nil(t, aerr)
+	assert.Equal(t, int64(1), result.Total)
+	assert.Len(t, result.Items, 1)
+}
+
+func TestUserContract_List_ExpiryFilter_ExcludesEndless(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc := newContractSvc(t)
+
+	u, _ := makeEmpUser(t, "list2@example.com", "List User 2")
+
+	_, aerr := svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType: "labour_contract",
+		SignedDate:   dateUTC(2026, 1, 1),
+		IsEndless:    true,
+	})
+	require.Nil(t, aerr)
+
+	expiry := dateUTC(2027, 6, 30)
+	_, aerr = svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType: "labour_contract",
+		SignedDate:   dateUTC(2026, 1, 1),
+		ExpiryDate:   &expiry,
+	})
+	require.Nil(t, aerr)
+
+	from := dateUTC(2027, 1, 1)
+	to := dateUTC(2027, 12, 31)
+	result, aerr := svc.List(context.Background(), u.ID, dto.UserContractListQuery{
+		Page: 1, PageSize: 10,
+		ExpiryFrom: &from,
+		ExpiryTo:   &to,
+	})
+	require.Nil(t, aerr)
+	assert.Equal(t, int64(1), result.Total, "endless contract must not appear in expiry filter results")
+}
+
+func TestUserContract_List_Pagination(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc := newContractSvc(t)
+
+	u, _ := makeEmpUser(t, "list3@example.com", "Paginated User")
+	for i := 0; i < 3; i++ {
+		expiry := dateUTC(2027+i, 12, 31)
+		_, aerr := svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+			ContractType: "labour_contract",
+			SignedDate:   dateUTC(2026+i, 1, 1),
+			ExpiryDate:   &expiry,
+		})
+		require.Nil(t, aerr)
+	}
+
+	result, aerr := svc.List(context.Background(), u.ID, dto.UserContractListQuery{Page: 1, PageSize: 2})
+	require.Nil(t, aerr)
+	assert.Equal(t, int64(3), result.Total)
+	assert.Len(t, result.Items, 2)
+	assert.Equal(t, 2, result.TotalPages)
+}
+
+// ---- Update ----
+
+func TestUserContract_Update_RemoveAttachment(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc := newContractSvc(t)
+
+	u, _ := makeEmpUser(t, "upd1@example.com", "Update User")
+	url := "https://example.com/file.pdf"
+	expiry := dateUTC(2027, 12, 31)
+	created, aerr := svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType:  "labour_contract",
+		SignedDate:    dateUTC(2026, 1, 1),
+		ExpiryDate:    &expiry,
+		AttachmentURL: &url,
+	})
+	require.Nil(t, aerr)
+
+	empty := ""
+	updated, aerr := svc.Update(context.Background(), u.ID, created.ID, dto.UserContractUpdate{
+		AttachmentURL: &empty,
+	})
+	require.Nil(t, aerr)
+	assert.Nil(t, updated.AttachmentURL)
+}
+
+func TestUserContract_Update_EndlessToggleOn(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc := newContractSvc(t)
+
+	u, _ := makeEmpUser(t, "upd2@example.com", "Endless Toggle")
+	expiry := dateUTC(2027, 6, 30)
+	created, aerr := svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType: "labour_contract",
+		SignedDate:   dateUTC(2026, 1, 1),
+		ExpiryDate:   &expiry,
+	})
+	require.Nil(t, aerr)
+	assert.False(t, created.IsEndless)
+
+	endless := true
+	updated, aerr := svc.Update(context.Background(), u.ID, created.ID, dto.UserContractUpdate{
+		IsEndless: &endless,
+	})
+	require.Nil(t, aerr)
+	assert.True(t, updated.IsEndless)
+	assert.Nil(t, updated.ExpiryDate, "turning endless ON must clear the expiry date")
+}
+
+func TestUserContract_Update_EndlessToggleOff_RequiresExpiry(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc := newContractSvc(t)
+
+	u, _ := makeEmpUser(t, "upd3@example.com", "Endless Off")
+	created, aerr := svc.Create(context.Background(), u.ID, dto.UserContractCreate{
+		ContractType: "labour_contract",
+		SignedDate:   dateUTC(2026, 1, 1),
+		IsEndless:    true,
+	})
+	require.Nil(t, aerr)
+
+	notEndless := false
+	_, aerr = svc.Update(context.Background(), u.ID, created.ID, dto.UserContractUpdate{
+		IsEndless:  &notEndless,
+		ExpiryDate: nil,
+	})
+	require.NotNil(t, aerr)
+	assert.Equal(t, 400, aerr.HTTP)
+	assert.Contains(t, aerr.Message, "expiry date is required")
+}
