@@ -37,7 +37,14 @@ CREATE TABLE holiday_templates (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_holiday_templates_year ON holiday_templates (year);
+-- Unique name per year among non-deleted template rows
+CREATE UNIQUE INDEX uq_holiday_templates_name_year
+    ON holiday_templates (year, LOWER(name))
+    WHERE is_deleted = FALSE;
+
+CREATE INDEX idx_holiday_templates_year
+    ON holiday_templates (year)
+    WHERE is_deleted = FALSE;
 
 CREATE TRIGGER trg_holiday_templates_set_updated_at
     BEFORE UPDATE ON holiday_templates
