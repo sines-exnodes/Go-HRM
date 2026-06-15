@@ -71,8 +71,10 @@ func (r *holidayRepo) List(ctx context.Context, q HolidayListQuery) ([]models.Ho
 
 func (r *holidayRepo) Get(ctx context.Context, id uuid.UUID) (*models.Holiday, error) {
 	var h models.Holiday
-	err := r.base(ctx).First(&h, "id = ?", id).Error
-	return &h, err
+	if err := r.base(ctx).First(&h, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &h, nil
 }
 
 func (r *holidayRepo) Create(ctx context.Context, h *models.Holiday) error {
@@ -80,14 +82,21 @@ func (r *holidayRepo) Create(ctx context.Context, h *models.Holiday) error {
 }
 
 func (r *holidayRepo) Update(ctx context.Context, h *models.Holiday) error {
-	return r.db.WithContext(ctx).
+	res := r.db.WithContext(ctx).
 		Model(h).
 		Where("id = ? AND is_deleted = false", h.ID).
 		Updates(map[string]any{
 			"name":      h.Name,
 			"from_date": h.FromDate,
 			"to_date":   h.ToDate,
-		}).Error
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func (r *holidayRepo) Delete(ctx context.Context, id uuid.UUID) error {
