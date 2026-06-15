@@ -66,6 +66,7 @@ func main() {
 	systemConfigRepo := repositories.NewSystemConfigRepository(db)
 	inviteRepo := repositories.NewInviteRepository(db)
 	holidayRepo := repositories.NewHolidayRepository(db)
+	holidayTemplateRepo := repositories.NewHolidayTemplateRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -126,6 +127,7 @@ func main() {
 
 	userContractRepo := repositories.NewUserContractRepository(db)
 	userContractSvc := services.NewUserContractService(userContractRepo, employeeRepo, uploadSvc)
+	holidaySvc := services.NewHolidayService(holidayRepo, holidayTemplateRepo, leaveRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -150,6 +152,7 @@ func main() {
 	inviteH := handlers.NewInviteHandler(inviteSvc)
 	notifH := handlers.NewNotificationHandler(pushSvc)
 	userContractH := handlers.NewUserContractHandler(userContractSvc)
+	holidayH := handlers.NewHolidayHandler(holidaySvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -233,6 +236,18 @@ func main() {
 		userContracts.PATCH(":contractID", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.Update)
 		userContracts.DELETE(":contractID", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.Delete)
 		userContracts.POST(":contractID/attachment", middleware.RequirePerms(authSvc, permissions.PermUsersContractsManage), userContractH.UploadAttachment)
+
+		// ---- /holidays ----
+		// Static sub-paths (/years, /templates, /import) must be registered
+		// BEFORE the /:id wildcard routes to avoid Gin routing conflicts.
+		holidays := authed.Group("/holidays")
+		holidays.GET("/years", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysView), holidayH.GetYears)
+		holidays.GET("/templates", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.ListTemplates)
+		holidays.POST("/import", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Import)
+		holidays.GET("", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysView), holidayH.List)
+		holidays.POST("", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Create)
+		holidays.PATCH("/:id", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Update)
+		holidays.DELETE("/:id", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Delete)
 
 		// ---- /employees/me* self-service (auth only) ----
 		authed.GET("/employees/me", empH.GetMe)
