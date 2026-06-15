@@ -131,7 +131,7 @@ func truncateAll(t *testing.T) {
 	// EnsureExists() themselves OR rely on this re-seed).
 	// Phase-9: invites must precede employees (invited_by → employees(id)
 	// RESTRICT). Listed early in the chain.
-	if err := testDB.Exec(`TRUNCATE TABLE user_contracts, invites, system_config, announcement_views, announcement_attachments, announcement_target_users, announcement_target_departments, announcement_labels, announcements, labels, employee_skills, skills, device_tokens, user_notification_settings, attendance_sessions, attendance, leave_requests, employee_leave_quotas, employee_emergency_contacts, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
+	if err := testDB.Exec(`TRUNCATE TABLE holidays, holiday_templates, user_contracts, invites, system_config, announcement_views, announcement_attachments, announcement_target_users, announcement_target_departments, announcement_labels, announcements, labels, employee_skills, skills, device_tokens, user_notification_settings, attendance_sessions, attendance, leave_requests, employee_leave_quotas, employee_emergency_contacts, dependents, employees, positions, departments, user_roles, users, roles RESTART IDENTITY CASCADE`).Error; err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 }
