@@ -64,6 +64,15 @@ type LeaveRequestRepository interface {
 	// Used by the attendance matrix to overlay leave on cells. employeeIDs
 	// empty → no rows.
 	ApprovedForEmployeesInRange(ctx context.Context, employeeIDs []uuid.UUID, from, to time.Time) ([]models.LeaveRequest, error)
+
+	// FindApprovedOverlapping returns all Approved (non-deleted) leave requests
+	// whose [from_date, to_date] overlaps [from, to]. Used by HolidayService
+	// when recalculating leaves after a holiday mutation.
+	FindApprovedOverlapping(ctx context.Context, from, to time.Time) ([]models.LeaveRequest, error)
+
+	// BulkUpdateTotalDays updates total_days for the given request IDs.
+	// Returns the count of rows actually updated (skips already-deleted rows).
+	BulkUpdateTotalDays(ctx context.Context, updates []TotalDaysUpdate) (int, error)
 }
 
 // LeaveDaysCount carries the per-type aggregate result of SumApprovedDays.
@@ -71,6 +80,13 @@ type LeaveRequestRepository interface {
 type LeaveDaysCount struct {
 	Days  float64
 	Count int64
+}
+
+// TotalDaysUpdate pairs a leave request ID with its recomputed total_days.
+// Used by BulkUpdateTotalDays.
+type TotalDaysUpdate struct {
+	ID        uuid.UUID
+	TotalDays float64
 }
 
 type leaveRequestRepo struct{ db *gorm.DB }
@@ -273,4 +289,30 @@ func (r *leaveRequestRepo) ApprovedForEmployeesInRange(ctx context.Context, empl
 		Where("from_date <= ? AND to_date >= ?", to, from).
 		Find(&items).Error
 	return items, err
+}
+
+func (r *leaveRequestRepo) FindApprovedOverlapping(ctx context.Context, from, to time.Time) ([]models.LeaveRequest, error) {
+	var rows []models.LeaveRequest
+	err := r.base(ctx).
+		Where("status = ? AND from_date <= ? AND to_date >= ?", models.LeaveStatusApproved, to, from).
+		Find(&rows).Error
+	return rows, err
+}
+
+func (r *leaveRequestRepo) BulkUpdateTotalDays(ctx context.Context, updates []TotalDaysUpdate) (int, error) {
+	if len(updates) == 0 {
+		return 0, nil
+	}
+	total := 0
+	for _, u := range updates {
+		res := r.db.WithContext(ctx).
+			Model(&models.LeaveRequest{}).
+			Where("id = ? AND is_deleted = false", u.ID).
+			Update("total_days", u.TotalDays)
+		if res.Error != nil {
+			return total, res.Error
+		}
+		total += int(res.RowsAffected)
+	}
+	return total, nil
 }
