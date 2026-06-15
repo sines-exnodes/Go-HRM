@@ -16,11 +16,16 @@ type DateRange struct {
 // calendar days that fall within a company holiday range.
 //
 // Full-day leave: each overlapping holiday calendar day subtracts 1.0.
-// Half-day leave: each overlapping holiday day subtracts 0.5 (AC-12).
+// Half-day leave (single calendar day only): each overlapping holiday day subtracts 0.5 (AC-12).
 // Result is clamped to 0 — it never returns negative.
+// Precondition: from <= to. Inverted range returns 0.
 func CalcLeaveDays(from, to time.Time, period models.LeavePeriod, holidays []DateRange) float64 {
 	from = truncDay(from)
 	to = truncDay(to)
+
+	if to.Before(from) {
+		return 0
+	}
 
 	calendarDays := int(to.Sub(from).Hours()/24) + 1
 

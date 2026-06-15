@@ -49,3 +49,9 @@ func TestCalcLeaveDays_ClampAtZero(t *testing.T) {
 	result := utils.CalcLeaveDays(d(2025, 4, 29), d(2025, 4, 30), models.LeavePeriodFullDay, holidays)
 	assert.Equal(t, 0.0, result)
 }
+
+func TestCalcLeaveDays_InvertedRange_ReturnsZero(t *testing.T) {
+	// from > to is invalid input; both full-day and half-day must return 0, not 0.5.
+	assert.Equal(t, 0.0, utils.CalcLeaveDays(d(2025, 5, 5), d(2025, 5, 3), models.LeavePeriodFullDay, nil))
+	assert.Equal(t, 0.0, utils.CalcLeaveDays(d(2025, 5, 5), d(2025, 5, 3), models.LeavePeriodMorningHalf, nil))
+}
