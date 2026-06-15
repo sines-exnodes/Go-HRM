@@ -96,6 +96,7 @@ func defaultRoles() []roleSeed {
 				// managed, so Admin must hold the perm directly.
 				permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
+				permissions.PermOrgHolidaysView, permissions.PermOrgHolidaysManage,
 				permissions.PermInviteManage,
 			},
 		},
@@ -128,6 +129,7 @@ func defaultRoles() []roleSeed {
 				// system and therefore also manage announcement labels.
 				permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
+				permissions.PermOrgHolidaysView, permissions.PermOrgHolidaysManage,
 				permissions.PermInviteManage,
 			},
 		},
@@ -144,6 +146,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveRead, permissions.PermLeaveCreate, permissions.PermLeaveUpdate, permissions.PermLeaveDelete,
 				permissions.PermLeaveApproveTeam, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
+				permissions.PermOrgHolidaysView,
 			},
 		},
 		{
@@ -164,6 +167,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveUpdate, permissions.PermLeaveCancel,
 				permissions.PermLeaveDelete,
 				permissions.PermAttendanceRead,
+				permissions.PermOrgHolidaysView,
 			},
 		},
 	}

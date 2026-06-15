@@ -83,6 +83,10 @@ const (
 	// Organization Settings
 	PermOrgSettings Permission = "organization_settings:manage"
 
+	// Holidays
+	PermOrgHolidaysView   Permission = "organization:holidays_view"
+	PermOrgHolidaysManage Permission = "organization:holidays_manage"
+
 	// Announcements
 	PermAnnounceManage Permission = "announcements:manage"
 
@@ -109,6 +113,7 @@ func AllPermissions() []Permission {
 		PermLeaveQuotaManage,
 		PermAttendanceRead, PermAttendanceManage,
 		PermOrgSettings,
+		PermOrgHolidaysView, PermOrgHolidaysManage,
 		PermAnnounceManage,
 		PermInviteManage,
 	}
@@ -248,6 +253,13 @@ var PermissionGroups = []PermissionGroup{
 		Resource: "organization_settings", Label: "Organization Settings",
 		Permissions: []PermissionItem{
 			{PermOrgSettings, "Manage Organization Settings", "View and update organization-wide settings such as late arrival threshold"},
+		},
+	},
+	{
+		Resource: "organization_holidays", Label: "Holidays",
+		Permissions: []PermissionItem{
+			{PermOrgHolidaysView, "View Holidays", "Browse the company holiday calendar"},
+			{PermOrgHolidaysManage, "Manage Holidays", "Create, edit, delete, and import company holidays"},
 		},
 	},
 	{
