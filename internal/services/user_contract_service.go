@@ -51,7 +51,7 @@ func NewUserContractService(
 func (s *UserContractService) resolveEmployee(ctx context.Context, userID uuid.UUID) (*models.Employee, *apperrors.AppError) {
 	emp, err := s.employeeRepo.FindByUserID(ctx, userID)
 	if err != nil || emp == nil {
-		return nil, apperrors.ErrNotFound("employee profile not found")
+		return nil, apperrors.ErrNotFound("employee profile")
 	}
 	return emp, nil
 }
