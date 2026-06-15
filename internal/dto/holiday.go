@@ -16,7 +16,7 @@ type HolidayCreate struct {
 
 // HolidayUpdate is the PATCH /holidays/:id request body (all optional).
 type HolidayUpdate struct {
-	Name     *string    `json:"name"`
+	Name     *string    `json:"name"      binding:"omitempty,max=100"`
 	FromDate *time.Time `json:"from_date"`
 	ToDate   *time.Time `json:"to_date"`
 }
@@ -54,7 +54,7 @@ type HolidayTemplateRead struct {
 // HolidayImportRequest is the POST /holidays/import request body.
 type HolidayImportRequest struct {
 	Year        int         `json:"year"         binding:"required,min=2000,max=2100"`
-	TemplateIDs []uuid.UUID `json:"template_ids" binding:"required,min=1"`
+	TemplateIDs []uuid.UUID `json:"template_ids" binding:"required,gt=0,dive,required"`
 }
 
 // HolidayImportResult is the POST /holidays/import response data.

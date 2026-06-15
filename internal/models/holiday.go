@@ -11,6 +11,8 @@ type Holiday struct {
 	ToDate   time.Time `gorm:"type:date;not null"  json:"to_date"`
 }
 
+func (Holiday) TableName() string { return "holidays" }
+
 // HolidayTemplate is a read-only preset used for importing holidays.
 // Seeded in migration 000023; never mutated at runtime.
 type HolidayTemplate struct {
@@ -20,3 +22,5 @@ type HolidayTemplate struct {
 	FromDate time.Time `gorm:"type:date;not null"  json:"from_date"`
 	ToDate   time.Time `gorm:"type:date;not null"  json:"to_date"`
 }
+
+func (HolidayTemplate) TableName() string { return "holiday_templates" }
