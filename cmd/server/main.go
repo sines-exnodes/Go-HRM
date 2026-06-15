@@ -65,6 +65,7 @@ func main() {
 	announcementRepo := repositories.NewAnnouncementRepository(db)
 	systemConfigRepo := repositories.NewSystemConfigRepository(db)
 	inviteRepo := repositories.NewInviteRepository(db)
+	holidayRepo := repositories.NewHolidayRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -93,7 +94,7 @@ func main() {
 	positionSvc := services.NewPositionService(positionRepo)
 	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
-	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc)
+	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
 	// Phase 7 — SSE hub singleton + announcement service + handler.

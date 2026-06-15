@@ -15,6 +15,7 @@ import (
 	apperrors "github.com/exnodes/hrm-api/internal/errors"
 	"github.com/exnodes/hrm-api/internal/models"
 	"github.com/exnodes/hrm-api/internal/repositories"
+	"github.com/exnodes/hrm-api/pkg/utils"
 )
 
 // ApproveScope is the approval authority resolved by the handler from JWT claims.
@@ -69,12 +70,13 @@ type AttachmentUpload struct {
 // `asAdmin` bool from the user's effective permission set and passes it
 // down. The service enforces ownership + status invariants.
 type LeaveService struct {
-	leaves  repositories.LeaveRequestRepository
-	emps    repositories.EmployeeRepository
-	depts   repositories.DepartmentRepository
-	pos     repositories.PositionRepository
-	quota   repositories.LeaveQuotaRepository
-	uploads Uploader // optional; nil means attachment upload is unavailable
+	leaves   repositories.LeaveRequestRepository
+	emps     repositories.EmployeeRepository
+	depts    repositories.DepartmentRepository
+	pos      repositories.PositionRepository
+	quota    repositories.LeaveQuotaRepository
+	uploads  Uploader // optional; nil means attachment upload is unavailable
+	holidays repositories.HolidayRepository
 }
 
 // NewLeaveService constructs a LeaveService. Pass nil for `uploads` if the
@@ -87,14 +89,16 @@ func NewLeaveService(
 	pos repositories.PositionRepository,
 	quota repositories.LeaveQuotaRepository,
 	uploads Uploader,
+	holidays repositories.HolidayRepository,
 ) *LeaveService {
 	return &LeaveService{
-		leaves:  leaves,
-		emps:    emps,
-		depts:   depts,
-		pos:     pos,
-		quota:   quota,
-		uploads: uploads,
+		leaves:   leaves,
+		emps:     emps,
+		depts:    depts,
+		pos:      pos,
+		quota:    quota,
+		uploads:  uploads,
+		holidays: holidays,
 	}
 }
 
@@ -384,10 +388,18 @@ func (s *LeaveService) Create(ctx context.Context, currentUserID uuid.UUID, asAd
 	if err := validateLeavePeriod(in.LeavePeriod); err != nil {
 		return nil, err
 	}
-	totalDays, err := validateDateInputs(in.FromDate, in.ToDate, in.LeavePeriod)
-	if err != nil {
+	if _, err := validateDateInputs(in.FromDate, in.ToDate, in.LeavePeriod); err != nil {
 		return nil, err
 	}
+	holidayRows, err := s.holidays.FindInRange(ctx, in.FromDate, in.ToDate)
+	if err != nil {
+		return nil, apperrors.ErrInternal(err.Error())
+	}
+	hRanges := make([]utils.DateRange, len(holidayRows))
+	for i, h := range holidayRows {
+		hRanges[i] = utils.DateRange{From: h.FromDate, To: h.ToDate}
+	}
+	totalDays := utils.CalcLeaveDays(in.FromDate, in.ToDate, in.LeavePeriod, hRanges)
 	if strings.TrimSpace(in.Reason) == "" {
 		return nil, apperrors.ErrBadRequest("Reason cannot be blank")
 	}
@@ -531,13 +543,20 @@ func (s *LeaveService) Update(ctx context.Context, id uuid.UUID, currentUserID u
 
 	// Recompute total_days whenever dates or period might have changed.
 	// Cheaper to recompute unconditionally than to track a dirty flag.
-	totalDays, err := validateDateInputs(row.FromDate, row.ToDate, row.LeavePeriod)
-	if err != nil {
+	if _, err := validateDateInputs(row.FromDate, row.ToDate, row.LeavePeriod); err != nil {
 		return nil, err
 	}
-	row.TotalDays = totalDays
 	row.FromDate = truncateToDate(row.FromDate)
 	row.ToDate = truncateToDate(row.ToDate)
+	holidayRows, err := s.holidays.FindInRange(ctx, row.FromDate, row.ToDate)
+	if err != nil {
+		return nil, apperrors.ErrInternal(err.Error())
+	}
+	hRanges := make([]utils.DateRange, len(holidayRows))
+	for i, h := range holidayRows {
+		hRanges[i] = utils.DateRange{From: h.FromDate, To: h.ToDate}
+	}
+	row.TotalDays = utils.CalcLeaveDays(row.FromDate, row.ToDate, row.LeavePeriod, hRanges)
 
 	// Status: approved + admin patch -> revert to pending (Python contract).
 	if row.Status == models.LeaveStatusApproved {

@@ -27,7 +27,8 @@ func newLeaveSvc(t *testing.T, up services.Uploader) (*services.LeaveService, re
 	depts := repositories.NewDepartmentRepository(testDB)
 	pos := repositories.NewPositionRepository(testDB)
 	quotaRepo := repositories.NewLeaveQuotaRepository(testDB)
-	return services.NewLeaveService(lr, emps, depts, pos, quotaRepo, up), lr, quotaRepo
+	holidayRepo := repositories.NewHolidayRepository(testDB)
+	return services.NewLeaveService(lr, emps, depts, pos, quotaRepo, up, holidayRepo), lr, quotaRepo
 }
 
 // makeLeaveQuota seeds a quota row for an employee. The leave service falls
