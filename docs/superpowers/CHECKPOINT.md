@@ -1,14 +1,33 @@
-# Resume Checkpoint — Holiday Management module done (migration 000023)
+# Resume Checkpoint — Monthly Workdays API done (no migration)
 
 **Last updated:** 2026-06-16
-**Stopped at:** Holiday Management fully verified. 7 endpoints live at `/api/v1/holidays`. Handler bug found and fixed during verification (typed-nil `*AppError` in error interface). Dev DB at migration 000023. Swagger regenerated. Tests green (except pre-existing `leave_approve_test.go` failures unrelated to holidays). Next: commit all changes, then continue with Request Tickets module (EP-003/US-003) or other backlog items.
-**Branch:** `main` — changes not yet committed (handler fix + verification log + CHECKPOINT).
+**Stopped at:** Monthly Workdays API fully implemented and verified on `feat/monthly-workdays`. 1 endpoint live at `GET /api/v1/workdays?year=<year>`. All 5 tasks complete, spec + quality reviews pass, end-to-end curl verified (12 months, correct error codes). Branch ready to push and open PR. Next: push branch, open PR, then continue with Request Tickets module (EP-003/US-003) or Attendance G7 (holiday cells).
+**Branch:** `feat/monthly-workdays` — all changes committed, ready to push.
 **DB migration version:** **23** (applied). Next free: **000024**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) and [User Contracts](#user-contracts-module--done-migration-000022) below.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
 
 > **User Contracts — DONE (migration 000022, on `main`).** Full contract CRUD at `/api/v1/users/:id/contracts` — 6 endpoints (list, get, create, update, delete, upload-attachment). `user_contracts` table with `trg_user_contracts_set_updated_at`. `PermUsersContractsView` + `PermUsersContractsManage`; view seeded to all 5 roles, manage to Admin + HR Manager. 13 integration tests green. Swagger regenerated (14 contract refs in swagger.json). Commits: 9d6bef2, 5a8780e, e9f6987, 65c0eaf, 52dafe1, c0378ea, 6f76a29, f09fde5.
+
+## Monthly Workdays API — DONE (no migration, `feat/monthly-workdays`)
+
+Computed endpoint that returns workday counts for each month of a given year. No new DB table — reads from existing `holidays` table (migration 000023). All computation is pure Go: `workdays = total_days − weekends − holidays` (holiday-weekend overlap intentionally not deduplicated per AC-05).
+
+- **No migration** — reads from existing `holidays` table.
+- **DTOs** (`internal/dto/workday.go`): `WorkdayQuery`, `MonthWorkdaysRead`, `WorkdayTotalRead`, `WorkdayYearRead`.
+- **Repository extension** (`internal/repositories/holiday_repo.go`): `FindByYear(ctx, year int)` added to `HolidayRepository` interface + implementation.
+- **Service** (`internal/services/workday_service.go`): `WorkdayService.GetYear` — iterates 12 months, counts weekends via `time.Weekday()`, clamps holiday ranges per month (cross-month split), sums total row.
+- **Permissions**: `PermOrgWorkdaysView = "organization:workdays_view"`. Group `organization_workdays` "Monthly Workdays". Seeded to all 5 roles (Super Admin via `*`, Admin, HR Manager, Manager, Employee).
+- **Handler** (`internal/handlers/workday_handler.go`): `WorkdayHandler.GetYear` — `ShouldBindQuery` + `AppError` propagation + `dto.Response` envelope.
+- **Route**: `authed.GET("/workdays", middleware.RequirePerms(authSvc, permissions.PermOrgWorkdaysView), workdayH.GetYear)` in `cmd/server/main.go`.
+- **Tests** (`internal/services/workday_service_test.go`): 7 integration tests — no holidays, holiday on weekday, holiday on weekend (AC-05), cross-month holiday (AC-06), leap year, non-leap year, total row.
+- **Swagger**: regenerated after handler completion.
+- **Key commits**: `3256b6e` (DTOs), `445408d` (FindByYear), `ee6a219` (perms+seed), `9bc7dad` (service+7 tests), `e344f18` (handler+route+swag), `0463790` (verification log).
+
+**Verified:** `go build ./...` clean, 7 tests skip cleanly without DB, Docker container rebuilt with new image, curl smoke: 12 months correct shape + `workdays=total−weekends−holidays` per month + 400/401 error cases. Verification log: [`docs/superpowers/verification/phase-workdays.md`](verification/phase-workdays.md).
+
+---
 
 ## Holiday Management module — DONE (migration 000023)
 
@@ -94,17 +113,11 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: commit and push pending changes
+### IMMEDIATE: push `feat/monthly-workdays` and open PR
 
-Changes on `main` not yet committed:
-1. `internal/handlers/holiday_handler.go` — typed-nil bug fix (2 lines changed in Update + Delete)
-2. `docs/superpowers/verification/phase-holidays.md` — new verification log
-3. `docs/superpowers/CHECKPOINT.md` — this update
-
-```
-git add internal/handlers/holiday_handler.go docs/superpowers/verification/phase-holidays.md docs/superpowers/CHECKPOINT.md
-git commit -m "fix(holidays): typed-nil *AppError in Update/Delete handlers + verification log"
-git push origin main
+```bash
+git push -u origin feat/monthly-workdays
+# Then open a PR: feat/monthly-workdays → main
 ```
 
 ### Subsequent priorities (in descending value):
