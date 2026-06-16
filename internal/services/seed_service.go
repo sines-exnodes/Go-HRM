@@ -97,6 +97,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
 				permissions.PermOrgHolidaysView, permissions.PermOrgHolidaysManage,
+				permissions.PermOrgWorkdaysView,
 				permissions.PermInviteManage,
 			},
 		},
@@ -130,6 +131,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
 				permissions.PermOrgHolidaysView, permissions.PermOrgHolidaysManage,
+				permissions.PermOrgWorkdaysView,
 				permissions.PermInviteManage,
 			},
 		},
@@ -147,6 +149,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveApproveTeam, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
 				permissions.PermOrgHolidaysView,
+				permissions.PermOrgWorkdaysView,
 			},
 		},
 		{
@@ -168,6 +171,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveDelete,
 				permissions.PermAttendanceRead,
 				permissions.PermOrgHolidaysView,
+				permissions.PermOrgWorkdaysView,
 			},
 		},
 	}

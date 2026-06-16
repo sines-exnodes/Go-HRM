@@ -87,6 +87,9 @@ const (
 	PermOrgHolidaysView   Permission = "organization:holidays_view"
 	PermOrgHolidaysManage Permission = "organization:holidays_manage"
 
+	// Workdays (Monthly Workdays summary — read-only, no manage counterpart)
+	PermOrgWorkdaysView Permission = "organization:workdays_view"
+
 	// Announcements
 	PermAnnounceManage Permission = "announcements:manage"
 
@@ -114,6 +117,7 @@ func AllPermissions() []Permission {
 		PermAttendanceRead, PermAttendanceManage,
 		PermOrgSettings,
 		PermOrgHolidaysView, PermOrgHolidaysManage,
+		PermOrgWorkdaysView,
 		PermAnnounceManage,
 		PermInviteManage,
 	}
@@ -260,6 +264,12 @@ var PermissionGroups = []PermissionGroup{
 		Permissions: []PermissionItem{
 			{PermOrgHolidaysView, "View Holidays", "Browse the company holiday calendar"},
 			{PermOrgHolidaysManage, "Manage Holidays", "Create, edit, delete, and import company holidays"},
+		},
+	},
+	{
+		Resource: "organization_workdays", Label: "Monthly Workdays",
+		Permissions: []PermissionItem{
+			{PermOrgWorkdaysView, "View Monthly Workdays", "View the monthly workday summary table"},
 		},
 	},
 	{
