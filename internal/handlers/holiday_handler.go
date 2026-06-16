@@ -91,9 +91,9 @@ func (h *HolidayHandler) Create(c *gin.Context) {
 // @Failure      409  {object}  dto.Response[any]
 // @Router       /holidays/{id} [patch]
 func (h *HolidayHandler) Update(c *gin.Context) {
-	id, aerr := parseIDParam(c, "id")
-	if aerr != nil {
-		_ = c.Error(aerr)
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 	var req dto.HolidayUpdate
@@ -123,9 +123,9 @@ func (h *HolidayHandler) Update(c *gin.Context) {
 // @Failure      404  {object}  dto.Response[any]
 // @Router       /holidays/{id} [delete]
 func (h *HolidayHandler) Delete(c *gin.Context) {
-	id, aerr := parseIDParam(c, "id")
-	if aerr != nil {
-		_ = c.Error(aerr)
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
 		return
 	}
 	affected, aerr := h.svc.Delete(c.Request.Context(), id)

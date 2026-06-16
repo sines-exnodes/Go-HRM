@@ -4310,6 +4310,312 @@ const docTemplate = `{
                 }
             }
         },
+        "/holidays": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "List holidays for a year",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "calendar year (e.g. 2025)",
+                        "name": "year",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "name search",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 20, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Create a holiday",
+                "parameters": [
+                    {
+                        "description": "create payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayCreate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_HolidayRead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/holidays/import": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Import selected holiday presets into a year",
+                "parameters": [
+                    {
+                        "description": "import payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayImportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_HolidayImportResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/holidays/templates": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "List Vietnamese holiday presets for a year",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "calendar year",
+                        "name": "year",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-array_github_com_exnodes_hrm-api_internal_dto_HolidayTemplateRead"
+                        }
+                    }
+                }
+            }
+        },
+        "/holidays/years": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "List years that have holidays",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-array_int"
+                        }
+                    }
+                }
+            }
+        },
+        "/holidays/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Soft-delete a holiday",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "holiday uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "holidays"
+                ],
+                "summary": "Partial-update a holiday",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "holiday uuid",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "patch payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayUpdate"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_HolidayRead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/users/{id}/contracts": {
             "get": {
                 "security": [
@@ -5594,6 +5900,131 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.HolidayCreate": {
+            "type": "object",
+            "required": [
+                "from_date",
+                "name",
+                "to_date",
+                "year"
+            ],
+            "properties": {
+                "from_date": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "to_date": {
+                    "type": "string"
+                },
+                "year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.HolidayImportRequest": {
+            "type": "object",
+            "required": [
+                "template_ids",
+                "year"
+            ],
+            "properties": {
+                "template_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "year": {
+                    "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.HolidayImportResult": {
+            "type": "object",
+            "properties": {
+                "imported": {
+                    "type": "integer"
+                },
+                "skipped": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.HolidayRead": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "from_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "to_date": {
+                    "type": "string"
+                },
+                "total_days": {
+                    "description": "computed: (to_date - from_date).Days + 1",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.HolidayTemplateRead": {
+            "type": "object",
+            "properties": {
+                "from_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "to_date": {
+                    "type": "string"
+                },
+                "total_days": {
+                    "type": "integer"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.HolidayUpdate": {
+            "type": "object",
+            "properties": {
+                "from_date": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100
+                },
+                "to_date": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.InviteAccept": {
             "type": "object",
             "required": [
@@ -5744,6 +6175,29 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayRead"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_UserContractRead": {
             "type": "object",
             "properties": {
@@ -5822,6 +6276,23 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.Response-array_github_com_exnodes_hrm-api_internal_dto_HolidayTemplateRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayTemplateRead"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-array_github_com_exnodes_hrm-api_internal_permissions_PermissionGroup": {
             "type": "object",
             "properties": {
@@ -5830,6 +6301,51 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_permissions.PermissionGroup"
                     }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-array_int": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_HolidayImportResult": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayImportResult"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_HolidayRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayRead"
                 },
                 "message": {
                     "type": "string"
@@ -5858,6 +6374,20 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.LogoutResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead"
                 },
                 "message": {
                     "type": "string"
@@ -6240,6 +6770,8 @@ const docTemplate = `{
                 "attendance:read",
                 "attendance:manage_data",
                 "organization_settings:manage",
+                "organization:holidays_view",
+                "organization:holidays_manage",
                 "announcements:manage",
                 "invites:manage"
             ],
@@ -6298,6 +6830,8 @@ const docTemplate = `{
                 "",
                 "",
                 "",
+                "",
+                "",
                 ""
             ],
             "x-enum-varnames": [
@@ -6349,6 +6883,8 @@ const docTemplate = `{
                 "PermAttendanceRead",
                 "PermAttendanceManage",
                 "PermOrgSettings",
+                "PermOrgHolidaysView",
+                "PermOrgHolidaysManage",
                 "PermAnnounceManage",
                 "PermInviteManage"
             ]

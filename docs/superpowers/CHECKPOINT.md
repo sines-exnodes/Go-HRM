@@ -1,14 +1,33 @@
-# Resume Checkpoint — MIGRATION COMPLETE 🎉 · User Contracts module done (migration 000022)
+# Resume Checkpoint — Holiday Management module done (migration 000023)
 
-**Last updated:** 2026-06-12
-**Stopped at:** User Contracts module complete. 6 endpoints live at `/users/:id/contracts`. All tests pass (`make fmt/vet/test` clean, `make swag` regenerated). Next: `make migrate-up` on dev DB to apply migration 000022, then smoke test the endpoints.
-**Branch:** `main` — local ahead of `origin/main` by 10 commits (User Contracts + fmt/swag).
-**DB migration version:** **21** (dev DB not yet migrated). Next free: **000023**.
+**Last updated:** 2026-06-16
+**Stopped at:** Holiday Management fully verified. 7 endpoints live at `/api/v1/holidays`. Handler bug found and fixed during verification (typed-nil `*AppError` in error interface). Dev DB at migration 000023. Swagger regenerated. Tests green (except pre-existing `leave_approve_test.go` failures unrelated to holidays). Next: commit all changes, then continue with Request Tickets module (EP-003/US-003) or other backlog items.
+**Branch:** `main` — changes not yet committed (handler fix + verification log + CHECKPOINT).
+**DB migration version:** **23** (applied). Next free: **000024**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) and [User Contracts](#user-contracts-module--done-migration-000022) below.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
 
 > **User Contracts — DONE (migration 000022, on `main`).** Full contract CRUD at `/api/v1/users/:id/contracts` — 6 endpoints (list, get, create, update, delete, upload-attachment). `user_contracts` table with `trg_user_contracts_set_updated_at`. `PermUsersContractsView` + `PermUsersContractsManage`; view seeded to all 5 roles, manage to Admin + HR Manager. 13 integration tests green. Swagger regenerated (14 contract refs in swagger.json). Commits: 9d6bef2, 5a8780e, e9f6987, 65c0eaf, 52dafe1, c0378ea, 6f76a29, f09fde5.
+
+## Holiday Management module — DONE (migration 000023)
+
+New feature module implementing company holiday calendar with leave-recalculation integration.
+
+- **Migration 000023** (`migrations/000023_holidays.up/down.sql`): `holidays` table (UUID PK, `year`, `name`, `from_date`, `to_date`, audit cols + `trg_holidays_set_updated_at`) + `holiday_templates` table (Vietnamese public holiday presets, seeded via migration).
+- **Models** (`internal/models/holiday.go`): `Holiday` + `HolidayTemplate`.
+- **DTOs** (`internal/dto/holiday.go`): `HolidayCreate`, `HolidayUpdate`, `HolidayListQuery`, `HolidayRead`, `HolidayTemplateRead`, `HolidayImportRequest`, `HolidayImportResult`.
+- **Permissions**: `PermOrgHolidaysView` (`org:holidays_view`) + `PermOrgHolidaysManage` (`org:holidays_manage`). View seeded to all 5 roles; Manage to Admin + HR Manager.
+- **Repository** (`internal/repositories/holiday_repo.go`): `HolidayRepository` interface + GORM impl — List (paginated/year-scoped), Get, Create, Update, Delete (soft), FindInRange, YearsWithHolidays, ExistsByNameAndYear. `HolidayTemplateRepository` with ListByYear.
+- **Service** (`internal/services/holiday_service.go`): Create, Update, Delete, List, GetYears, ListTemplates, Import. `recalculateAffectedLeaves` recalculates `total_days` on all Approved leave requests overlapping a mutated holiday range via `leaveRepo.FindApprovedOverlapping` + `BulkUpdateTotalDays`. Leave-aware from day 1.
+- **Handler** (`internal/handlers/holiday_handler.go`): 7 endpoints — `GET /holidays`, `POST /holidays`, `PATCH /holidays/:id`, `DELETE /holidays/:id`, `GET /holidays/years`, `GET /holidays/templates`, `POST /holidays/import`.
+- **Routes**: wired in `cmd/server/main.go` under `/api/v1/holidays`.
+- **Tests** (`internal/services/holiday_service_test.go`): integration tests covering Create (duplicate 409), Update (name change, date change, not-found), Delete (recalc, not-found), List (pagination, year scoping), GetYears (inject current), ListTemplates, Import (skip duplicates). All PASS.
+- **Swagger**: regenerated after handler completion.
+- **Bug fixed during verification**: typed-nil `*AppError` in `error` interface in `Update` and `Delete` handlers. `parseIDParam` returns `(uuid.UUID, error)` (interface). Reassigning the same `aerr` variable from a service call returning `*apperrors.AppError` boxed a nil `*AppError` into a non-nil `error` interface, causing a panic in error middleware when accessing `ae.HTTP` on a nil `*AppError`. Fix: rename `parseIDParam` result to `err` (matching all other handlers), so the service `:=` freshly declares `aerr` as `*apperrors.AppError`. Verified: PATCH 200 + DELETE 200 + error paths 404.
+- **Key commits**: `04b4167`, `dc22fb9`, `bcd2dcf`, `1ec11cb`, `174233a` (holiday repo, service, injection, permissions, handler+routes).
+
+**Verified:** `go build ./...` clean, `go vet ./...` clean, migration 000023 applied, Swagger regenerated, all 7 endpoints curl-verified end-to-end, bug found + fixed + re-verified. Verification log: [`docs/superpowers/verification/phase-holidays.md`](verification/phase-holidays.md).
 
 ## User Contracts module — DONE (migration 000022)
 
@@ -75,24 +94,30 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: apply migration 000022 and smoke test
+### IMMEDIATE: commit and push pending changes
 
-User Contracts code is on `main`. Steps remaining:
+Changes on `main` not yet committed:
+1. `internal/handlers/holiday_handler.go` — typed-nil bug fix (2 lines changed in Update + Delete)
+2. `docs/superpowers/verification/phase-holidays.md` — new verification log
+3. `docs/superpowers/CHECKPOINT.md` — this update
 
-1. **Migrate dev DB** — `make migrate-up` (applies `000022_user_contracts`)
-2. **Smoke test** — `POST /api/v1/users/:id/contracts`, `GET`, `PATCH`, `DELETE`, `POST .../attachment`
-3. **Push** — `git push origin main` then `docker restart exnodes-hrm-app`
+```
+git add internal/handlers/holiday_handler.go docs/superpowers/verification/phase-holidays.md docs/superpowers/CHECKPOINT.md
+git commit -m "fix(holidays): typed-nil *AppError in Update/Delete handlers + verification log"
+git push origin main
+```
 
 ### Subsequent priorities (in descending value):
 
-1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000023**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
-2. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
-3. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; **G7 holidays** (blocked on calendar source); switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
-4. **Bundled code review** — Phases 4-9 have not been formally reviewed.
-5. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
-6. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
+1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000024**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
+2. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
+3. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
+4. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
+5. **Bundled code review** — Phases 4-9 have not been formally reviewed.
+6. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
+7. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
 
-Latest taken migration = **000022** (user_contracts); next is **000023**.
+Latest taken migration = **000023** (holidays); next is **000024**.
 
 ### Resume entry points
 
