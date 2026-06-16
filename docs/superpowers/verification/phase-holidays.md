@@ -121,3 +121,6 @@ Already-deleted ID → 404 `{"success":false,"message":"holiday not found","code
 
 ### Note on test coverage gap
 The service-level integration tests (`TestHolidayService_Update_*`, `TestHolidayService_Delete_*`) pass because they bypass the handler layer. The handler-level typed-nil bug was only catchable via end-to-end curl — confirming the necessity of the curl verification step.
+
+### Note on two-session verification
+This module was verified across two agent sessions (the first ran out of context). Create/List/GetYears/ListTemplates/Import were verified in session 1 (row names: `Tết Nguyên Đán`/2025). Update/Delete were verified in session 2 after applying the typed-nil fix (row name: `Test Holiday UpdateDelete`/2026). All 7 endpoints are covered; the data differs between sessions because the DB was live between them.
