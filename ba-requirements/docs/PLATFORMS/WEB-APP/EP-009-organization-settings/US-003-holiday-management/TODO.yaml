@@ -1,0 +1,125 @@
+# TODO Tracking for Holiday Management
+# Story: US-003-holiday-management
+
+metadata:
+  document_type: TODO
+  platform: WEB-APP
+  epic_id: EP-009
+  story_id: US-003
+  story_name: "Holiday Management"
+  status: in_progress
+  version: "1.0"
+  last_updated: "2026-06-15"
+  add_on_sections: []
+  approved_by: null
+  total_tasks: 9
+  completed_tasks: 0
+  in_progress_tasks: 1
+  blocked_tasks: 0
+  completion_percentage: 0
+  task_id_range:
+    start: 1
+    end: 99
+    next_available: 9
+  design_task_id_range:
+    start: 1
+    end: 99
+    next_available: 2
+  related_documents:
+    - path: "./ANALYSIS.md"
+      relationship: sibling
+    - path: "./FLOWCHART.md"
+      relationship: sibling
+  revision_history: []
+
+tasks:
+  - id: "TK-003-01"
+    title: "Write Detail Requirement — Holiday Management"
+    description: "Use dr-agent to write DR-009-003-01 covering list, create, edit, delete, import, and leave recalculation"
+    status: "in_progress"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 16
+    blocker: null
+    notes: "Design spec approved 2026-06-15; Figma list frame 3537:3821 available"
+    updated_at: "2026-06-15T00:00:00Z"
+
+  - id: "TK-003-02"
+    title: "Create FLOWCHART.md business process diagrams"
+    description: "Document holiday management workflows using Mermaid flowcharts (create, import, delete+recalculate)"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 8
+    blocker: null
+    dependencies: ["TK-003-01"]
+    notes: ""
+    updated_at: "2026-06-15T00:00:00Z"
+
+  - id: "TK-003-03"
+    title: "Resolve open questions with Product Owner"
+    description: "Confirm default roles for holidays.manage permission; employee notification on recalculation"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-003-01"]
+    notes: ""
+    updated_at: "2026-06-15T00:00:00Z"
+
+  - id: "TK-003-04"
+    title: "Stakeholder review and formal approval"
+    description: "Present BA documents to stakeholders for review and sign-off"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 8
+    blocker: null
+    dependencies: ["TK-003-01", "TK-003-02", "TK-003-03"]
+    notes: ""
+    updated_at: "2026-06-15T00:00:00Z"
+
+  - id: "TK-003-05"
+    title: "Define UAT acceptance criteria"
+    description: "Document UAT scenarios for holiday CRUD, import, and leave recalculation"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 6
+    blocker: null
+    dependencies: ["TK-003-01"]
+    notes: ""
+    updated_at: "2026-06-15T00:00:00Z"
+
+  - id: "TK-003-06"
+    title: "Create end-user documentation"
+    description: "Write user guide for HR: how to manage holidays and what happens to leave when holidays change"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "Documentation Team"
+    estimated_hours: 8
+    blocker: null
+    dependencies: ["TK-003-01"]
+    notes: ""
+    updated_at: "2026-06-15T00:00:00Z"
+
+  - id: "TK-003-D01"
+    title: "Extract Figma design context — create/edit form frame"
+    description: "When Design Team delivers the Create/Edit Holiday page frame, run /ennam-ba:figma-extract to update ANALYSIS.md and DR"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    category: "design_documentation"
+    notes: "List frame (3537:3821) already extracted. Create/Edit frame pending from Design Team."
+    updated_at: "2026-06-15T00:00:00Z"
+
+summary:
+  total_tasks: 7
+  pending: 6
+  in_progress: 1
+  completed: 0
+  blocked: 0
+  completion_percentage: 0
+  estimated_total_hours: 52

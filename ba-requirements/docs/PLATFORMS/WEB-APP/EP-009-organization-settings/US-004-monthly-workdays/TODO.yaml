@@ -1,0 +1,90 @@
+# TODO Tracking for Monthly Workdays
+# Story: US-004-monthly-workdays
+
+metadata:
+  document_type: TODO
+  platform: WEB-APP
+  epic_id: EP-009
+  story_id: US-004
+  story_name: "Monthly Workdays"
+  status: in_progress
+  version: "1.0"
+  last_updated: "2026-06-16"
+  add_on_sections: []
+  approved_by: null
+  total_tasks: 5
+  completed_tasks: 0
+  in_progress_tasks: 1
+  blocked_tasks: 0
+  completion_percentage: 0
+  related_documents:
+    - path: "./ANALYSIS.md"
+      relationship: sibling
+    - path: "./FLOWCHART.md"
+      relationship: sibling
+  revision_history: []
+
+tasks:
+  - id: "TK-004-01"
+    title: "Write Detail Requirement — Monthly Workdays"
+    description: "Use dr-agent to write DR-009-004-01 covering table layout, calculation rules, year filter, edge cases"
+    status: "in_progress"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 8
+    blocker: null
+    notes: "Design spec approved 2026-06-16. No Figma frame yet."
+    updated_at: "2026-06-16T00:00:00Z"
+
+  - id: "TK-004-02"
+    title: "Create FLOWCHART.md — workday calculation flow"
+    description: "Document the monthly workday calculation logic as a Mermaid flowchart"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-004-01"]
+    updated_at: "2026-06-16T00:00:00Z"
+
+  - id: "TK-004-03"
+    title: "Resolve open questions with Product Owner"
+    description: "Confirm visibility rule for users without workdays.view permission"
+    status: "pending"
+    priority: "medium"
+    assigned_to: "BA Lead"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-004-01"]
+    updated_at: "2026-06-16T00:00:00Z"
+
+  - id: "TK-004-04"
+    title: "Stakeholder review and formal approval"
+    description: "Present BA documents to stakeholders for sign-off"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Lead"
+    estimated_hours: 4
+    blocker: null
+    dependencies: ["TK-004-01", "TK-004-02", "TK-004-03"]
+    updated_at: "2026-06-16T00:00:00Z"
+
+  - id: "TK-004-D01"
+    title: "Extract Figma design context when frame is delivered"
+    description: "When Design Team delivers the Monthly Workdays frame, run /ennam-ba:figma-extract to update ANALYSIS.md and DR"
+    status: "pending"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    category: "design_documentation"
+    notes: "No Figma frame exists yet."
+    updated_at: "2026-06-16T00:00:00Z"
+
+summary:
+  total_tasks: 5
+  pending: 4
+  in_progress: 1
+  completed: 0
+  blocked: 0
+  completion_percentage: 0
+  estimated_total_hours: 20

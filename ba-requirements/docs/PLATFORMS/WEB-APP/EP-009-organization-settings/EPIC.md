@@ -23,6 +23,14 @@ user_stories:
     name: "Attendance Settings"
     status: draft
     description: "Configure attendance policies including late arrival threshold"
+  - id: US-003
+    name: "Holiday Management"
+    status: draft
+    description: "Set up and manage company holidays per year; affects leave request calculations and future payslip generation"
+  - id: US-004
+    name: "Monthly Workdays"
+    status: draft
+    description: "Read-only auto-calculated view of workdays per month per year (excludes weekends and company holidays); feeds future payroll calculation"
 ---
 
 # Epic: Organization Settings
@@ -58,6 +66,8 @@ Provide administrators with a centralized settings portal to configure organizat
 |----|-----------|-------------|--------|
 | US-001 | Company Profile | Manage organization profile: company name, address, logo | Draft |
 | US-002 | Attendance Settings | Configure attendance policies: late arrival threshold | Draft |
+| US-003 | Holiday Management | Set up company holidays per year; affects leave calculations and future payslip | Draft |
+| US-004 | Monthly Workdays | Read-only auto-calculated workdays per month (excludes weekends + holidays); feeds payroll | Draft |
 
 ### Dependencies
 
@@ -99,6 +109,42 @@ Provide administrators with a centralized settings portal to configure organizat
 **Status:** Draft
 
 **Documentation:** [US-002-attendance-settings/](./US-002-attendance-settings/)
+
+---
+
+### US-003: Holiday Management
+
+**Business Purpose:** Enable administrators to maintain a company holiday calendar per year, used by the system to exclude non-working days from leave request calculations and future payslip generation.
+
+**Key Deliverables:**
+- Holiday list page with year filter, search, and pagination
+- Create / Edit holiday form (full page, date range: From Date → To Date)
+- Import from Vietnamese public holiday system preset
+- Auto-recalculation of approved leave requests when holidays are added, edited, or deleted
+
+**User Value:** HR can accurately track how many leave days employees use, with holidays automatically excluded from leave day counts.
+
+**Status:** Draft
+
+**Documentation:** [US-003-holiday-management/](./US-003-holiday-management/)
+
+---
+
+### US-004: Monthly Workdays
+
+**Business Purpose:** Provide a read-only reference view of workdays per month for each year, automatically derived from the company holiday calendar and weekend exclusion. Serves as the foundation for future payroll calculation.
+
+**Key Deliverables:**
+- Monthly Workdays list page with year filter (dropdown)
+- 12-row table (one per month) + pinned Total row
+- Columns: Month, Total Days, Weekends, Holidays, Workdays
+- Pure computed view — no stored values, no mutations
+
+**User Value:** HR and payroll administrators can instantly see how many workdays exist in any month/year without manual calculation, with confidence that holidays are correctly excluded.
+
+**Status:** Draft
+
+**Documentation:** [US-004-monthly-workdays/](./US-004-monthly-workdays/)
 
 ---
 
