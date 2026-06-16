@@ -4965,6 +4965,58 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/workdays": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the workday count for each month of the given year, computed live from the company holiday calendar. Workdays = Total Days − Weekends − Holidays. A holiday falling on a weekend still reduces Workdays.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "workdays"
+                ],
+                "summary": "Monthly workday summary for a year",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "calendar year (2000–2100)",
+                        "name": "year",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_WorkdayYearRead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -6148,6 +6200,29 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.MonthWorkdaysRead": {
+            "type": "object",
+            "properties": {
+                "holidays": {
+                    "type": "integer"
+                },
+                "month": {
+                    "type": "integer"
+                },
+                "month_name": {
+                    "type": "string"
+                },
+                "total_days": {
+                    "type": "integer"
+                },
+                "weekends": {
+                    "type": "integer"
+                },
+                "workdays": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest": {
             "type": "object",
             "properties": {
@@ -6453,6 +6528,20 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_WorkdayYearRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.WorkdayYearRead"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData": {
             "type": "object",
             "properties": {
@@ -6691,6 +6780,40 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.WorkdayTotalRead": {
+            "type": "object",
+            "properties": {
+                "holidays": {
+                    "type": "integer"
+                },
+                "total_days": {
+                    "type": "integer"
+                },
+                "weekends": {
+                    "type": "integer"
+                },
+                "workdays": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.WorkdayYearRead": {
+            "type": "object",
+            "properties": {
+                "months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.MonthWorkdaysRead"
+                    }
+                },
+                "total": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.WorkdayTotalRead"
+                },
+                "year": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_models.AnnouncementStatus": {
             "type": "string",
             "enum": [
@@ -6772,6 +6895,7 @@ const docTemplate = `{
                 "organization_settings:manage",
                 "organization:holidays_view",
                 "organization:holidays_manage",
+                "organization:workdays_view",
                 "announcements:manage",
                 "invites:manage"
             ],
@@ -6823,6 +6947,7 @@ const docTemplate = `{
                 "kept for backward compat; prefer ApproveTeam/ApproveAll",
                 "approve own subordinate chain only (BFS)",
                 "approve any employee's request",
+                "",
                 "",
                 "",
                 "",
@@ -6885,6 +7010,7 @@ const docTemplate = `{
                 "PermOrgSettings",
                 "PermOrgHolidaysView",
                 "PermOrgHolidaysManage",
+                "PermOrgWorkdaysView",
                 "PermAnnounceManage",
                 "PermInviteManage"
             ]

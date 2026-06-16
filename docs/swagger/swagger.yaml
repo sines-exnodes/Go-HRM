@@ -829,6 +829,21 @@ definitions:
         example: Logged out
         type: string
     type: object
+  github_com_exnodes_hrm-api_internal_dto.MonthWorkdaysRead:
+    properties:
+      holidays:
+        type: integer
+      month:
+        type: integer
+      month_name:
+        type: string
+      total_days:
+        type: integer
+      weekends:
+        type: integer
+      workdays:
+        type: integer
+    type: object
   github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest:
     properties:
       notifications_enabled:
@@ -1029,6 +1044,15 @@ definitions:
       success:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_WorkdayYearRead:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.WorkdayYearRead'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
   github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData:
     properties:
       data:
@@ -1188,6 +1212,28 @@ definitions:
           $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.RoleSummary'
         type: array
     type: object
+  github_com_exnodes_hrm-api_internal_dto.WorkdayTotalRead:
+    properties:
+      holidays:
+        type: integer
+      total_days:
+        type: integer
+      weekends:
+        type: integer
+      workdays:
+        type: integer
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.WorkdayYearRead:
+    properties:
+      months:
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.MonthWorkdaysRead'
+        type: array
+      total:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.WorkdayTotalRead'
+      year:
+        type: integer
+    type: object
   github_com_exnodes_hrm-api_internal_models.AnnouncementStatus:
     enum:
     - draft
@@ -1262,6 +1308,7 @@ definitions:
     - organization_settings:manage
     - organization:holidays_view
     - organization:holidays_manage
+    - organization:workdays_view
     - announcements:manage
     - invites:manage
     type: string
@@ -1312,6 +1359,7 @@ definitions:
     - kept for backward compat; prefer ApproveTeam/ApproveAll
     - approve own subordinate chain only (BFS)
     - approve any employee's request
+    - ""
     - ""
     - ""
     - ""
@@ -1373,6 +1421,7 @@ definitions:
     - PermOrgSettings
     - PermOrgHolidaysView
     - PermOrgHolidaysManage
+    - PermOrgWorkdaysView
     - PermAnnounceManage
     - PermInviteManage
   github_com_exnodes_hrm-api_internal_permissions.PermissionGroup:
@@ -4622,6 +4671,41 @@ paths:
       summary: Upload or replace a contract attachment
       tags:
       - contracts
+  /workdays:
+    get:
+      description: Returns the workday count for each month of the given year, computed
+        live from the company holiday calendar. Workdays = Total Days − Weekends −
+        Holidays. A holiday falling on a weekend still reduces Workdays.
+      parameters:
+      - description: calendar year (2000–2100)
+        in: query
+        name: year
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_WorkdayYearRead'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      security:
+      - BearerAuth: []
+      summary: Monthly workday summary for a year
+      tags:
+      - workdays
 schemes:
 - http
 securityDefinitions:
