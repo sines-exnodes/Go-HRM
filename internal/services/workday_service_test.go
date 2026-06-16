@@ -68,7 +68,8 @@ func TestWorkday_NoHolidays(t *testing.T) {
 	assert.Equal(t, sumWD, out.Total.Workdays)
 }
 
-// TestWorkday_HolidayOnWeekday verifies a holiday on a weekday subtracts from Workdays.
+// TestWorkday_HolidayOnWeekday verifies a holiday on a weekday appears in Holidays
+// but does NOT reduce Workdays (DR-009-004-01 v1.1 AC-04: Workdays = TotalDays - Weekends).
 // Jan 1 2026 is Thursday.
 func TestWorkday_HolidayOnWeekday(t *testing.T) {
 	skipIfNoDB(t)
@@ -82,13 +83,13 @@ func TestWorkday_HolidayOnWeekday(t *testing.T) {
 
 	jan := out.Months[0]
 	assert.Equal(t, 31, jan.TotalDays)
-	assert.Equal(t, 1, jan.Holidays)
-	// workdays = TotalDays - Weekends - 1
-	assert.Equal(t, jan.TotalDays-jan.Weekends-1, jan.Workdays)
+	assert.Equal(t, 1, jan.Holidays, "holiday must appear in Holidays column")
+	assert.Equal(t, jan.TotalDays-jan.Weekends, jan.Workdays, "holiday must NOT reduce Workdays")
 }
 
-// TestWorkday_HolidayOnWeekend verifies that a holiday on a weekend still counts
-// as a holiday and reduces Workdays (AC-05: no deduplication).
+// TestWorkday_HolidayOnWeekend verifies that a holiday on a weekend still appears in
+// the Holidays display column but does NOT affect Workdays (AC-05: holidays are
+// informational only — DR-009-004-01 v1.1).
 // Jan 3 2026 is Saturday.
 func TestWorkday_HolidayOnWeekend(t *testing.T) {
 	skipIfNoDB(t)
@@ -101,9 +102,8 @@ func TestWorkday_HolidayOnWeekend(t *testing.T) {
 	require.Nil(t, aerr)
 
 	jan := out.Months[0]
-	assert.Equal(t, 1, jan.Holidays, "holiday on weekend must still count in Holidays")
-	// Workdays is further reduced even though the holiday falls on a weekend
-	assert.Equal(t, jan.TotalDays-jan.Weekends-1, jan.Workdays, "workdays must subtract both weekend and holiday (AC-05)")
+	assert.Equal(t, 1, jan.Holidays, "holiday on weekend must still appear in Holidays column")
+	assert.Equal(t, jan.TotalDays-jan.Weekends, jan.Workdays, "holiday must NOT affect Workdays regardless of day-of-week")
 }
 
 // TestWorkday_CrossMonthHoliday verifies that a holiday spanning two months is split:

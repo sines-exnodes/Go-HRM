@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	apperrors "github.com/exnodes/hrm-api/internal/errors"
 	"github.com/exnodes/hrm-api/internal/dto"
+	apperrors "github.com/exnodes/hrm-api/internal/errors"
 	"github.com/exnodes/hrm-api/internal/repositories"
 )
 
@@ -59,7 +59,7 @@ func (s *WorkdayService) GetYear(ctx context.Context, year int) (*dto.WorkdayYea
 			}
 		}
 
-		wd := td - we - h
+		wd := td - we // holidays are informational only (DR-009-004-01 v1.1 AC-04)
 
 		months[m-1] = dto.MonthWorkdaysRead{
 			Month:     m,
@@ -82,7 +82,7 @@ func (s *WorkdayService) GetYear(ctx context.Context, year int) (*dto.WorkdayYea
 			TotalDays: totalDays,
 			Weekends:  totalWeekends,
 			Holidays:  totalHolidays,
-			Workdays:  totalDays - totalWeekends - totalHolidays,
+			Workdays:  totalDays - totalWeekends,
 		},
 	}, nil
 }
