@@ -7,7 +7,7 @@ story_name: "Monthly Workdays"
 detail_id: DR-009-004-01
 detail_name: "Monthly Workdays"
 status: draft
-version: "1.0"
+version: "1.1"
 created_date: "2026-06-16"
 last_updated: "2026-06-16"
 related_documents:
@@ -33,7 +33,7 @@ input_sources:
 **Story:** US-004 — Monthly Workdays
 **Detail ID:** DR-009-004-01
 **Status:** Draft
-**Version:** 1.0
+**Version:** 1.1
 
 ---
 
@@ -41,11 +41,11 @@ input_sources:
 
 ### User Story
 
-As an HR or payroll administrator, I want to see the exact number of workdays in each month for any selected year, automatically calculated from the company holiday calendar and weekend exclusion, so that I can use accurate workday counts for payroll calculations, daily salary rates, OT thresholds, and pro-rated salary adjustments — without manual counting or error.
+As an HR or payroll administrator, I want to see the exact number of workdays in each month for any selected year, automatically calculated by excluding Saturdays and Sundays from calendar days, so that I can use accurate workday counts for payroll calculations, daily salary rates, OT thresholds, and pro-rated salary adjustments — without manual counting or error.
 
 ### Business Purpose
 
-Currently, HR administrators must manually calculate workdays per month by subtracting weekends and company holidays from calendar days. This process is error-prone, time-consuming, and risks payroll errors when holiday calendars change. The Monthly Workdays page provides a single authoritative read-only reference derived live from the existing holiday calendar, eliminating manual calculation.
+Currently, HR administrators must manually calculate workdays per month by subtracting weekends from calendar days. This process is error-prone and time-consuming. The Monthly Workdays page provides a single authoritative read-only reference computed live from the calendar, eliminating manual calculation. Company holidays are shown alongside workdays as informational context but do not reduce the workday count.
 
 ### Target Users
 
@@ -60,7 +60,8 @@ All access controlled by the `organization.workdays.view` permission, assigned t
 ### Business Value
 
 - Eliminates manual monthly workday calculation for HR and payroll administrators
-- Ensures consistency with the company holiday calendar (US-003) — changes to holidays reflect automatically on next page visit
+- Provides an always-accurate workday count per month based on the calendar year (weekends excluded)
+- Shows company holiday counts alongside workdays for reference without affecting the workday figure
 - Provides the foundational data for future payroll integration
 - Reduces payroll errors caused by miscounted workdays
 
@@ -91,14 +92,6 @@ The user must hold the `organization.workdays.view` permission to access this pa
 4. Table reloads with computed values for the selected year
 5. No other controls exist on the action bar (no search, no Add New, no export)
 
-### No Holidays Configured Flow
-
-1. User selects a year with no holidays configured in US-003
-2. Table renders normally with Holidays = 0 for all months
-3. An info note appears below the action bar:
-   "No holidays configured for [year]. Set up holidays in Holiday Management."
-   (the "Holiday Management" text links to the US-003 Holiday Management page)
-
 ### Error Flow
 
 1. Page fails to load data
@@ -108,7 +101,6 @@ The user must hold the `organization.workdays.view` permission to access this pa
 ### Exit Points
 
 - User navigates to another section via sidebar or breadcrumb
-- User follows the "Holiday Management" deep link (info note) to configure holidays for the selected year
 
 ### Not Applicable Flows
 
@@ -140,15 +132,6 @@ This page contains no input form. The only interactive element is the year filte
 | Visible | Only when page data fails to load |
 | Action | Triggers a fresh page data load attempt |
 
-### "Holiday Management" Link (No-Holidays Info Note Only)
-
-| Property | Value |
-|----------|-------|
-| Control type | Inline hyperlink |
-| Label | "Holiday Management" |
-| Visible | Only when the selected year has no holidays configured |
-| Destination | Holiday Management page (US-003) |
-
 ---
 
 ## §4 Data Display
@@ -172,8 +155,8 @@ This page contains no input form. The only interactive element is the year filte
 | 1 | Month | Full month name (January, February, … December) | Label: "Total" |
 | 2 | Total Days | Calendar days in that month for the selected year (accounts for leap year — February shows 28 or 29) | Sum of all 12 months |
 | 3 | Weekends | Count of Saturdays + Sundays within the month | Sum of all 12 months |
-| 4 | Holidays | Count of company holiday calendar days (from US-003) falling within the month for the selected year | Sum of all 12 months |
-| 5 | Workdays | Total Days − Weekends − Holidays for that month | Sum of all 12 months (= annual workdays for selected year) |
+| 4 | Holidays | Count of company holiday calendar days (from US-003) falling within the month for the selected year — **informational reference only, does not affect Workdays** | Sum of all 12 months |
+| 5 | Workdays | Total Days − Weekends for that month | Sum of all 12 months (= annual workdays for selected year) |
 
 All numeric columns (Total Days, Weekends, Holidays, Workdays) display whole numbers. No decimal values.
 
@@ -182,17 +165,8 @@ All numeric columns (Total Days, Weekends, Holidays, Workdays) display whole num
 | State | Condition | What the User Sees |
 |-------|-----------|-------------------|
 | Loading | Page data is being fetched | Skeleton rows: 12 data rows + Total row with placeholder bars; action bar and column headers are visible |
-| Loaded — with holidays | Data loaded; holidays exist for selected year | Full table with all 5 columns populated; no additional notes |
-| Loaded — no holidays | Data loaded; no holidays configured for selected year in US-003 | Full table with Holidays = 0 for all months and Workdays = Total Days − Weekends for all months; info note displayed: "No holidays configured for [year]. Set up holidays in Holiday Management." with a link to the Holiday Management page |
+| Loaded | Data loaded successfully | Full table with all 5 columns populated |
 | Error | System fails to load page data | Error message in place of table; Retry button displayed |
-
-### Info Note (No Holidays State)
-
-Displayed below the action bar, above the table, when the selected year has no holidays in US-003.
-
-> No holidays configured for [year]. Set up holidays in [Holiday Management].
-
-Where `[year]` is the currently selected year and `[Holiday Management]` is a clickable link to the US-003 Holiday Management page.
 
 ---
 
@@ -205,30 +179,29 @@ Where `[year]` is the currently selected year and `[Holiday Management]` is a cl
 | AC-01 | Only users with `organization.workdays.view` permission can access the Monthly Workdays page; unauthorized users cannot reach this page | Permission model |
 | AC-02 | The page defaults to the current calendar year on first load and displays 12 month rows plus a pinned Total row | Default state |
 | AC-03 | Changing the year dropdown reloads the table with computed values for the selected year | Year filter behavior |
-| AC-04 | The Workdays column for each month equals Total Days minus Weekends minus Holidays for that month | Core formula |
-| AC-05 | A holiday falling on a weekend still appears in the Holidays column and reduces Workdays (holidays and weekends are not mutually exclusive) | Holiday-weekend overlap rule |
-| AC-06 | A multi-day holiday that spans two months contributes only the days within each month to that month's Holidays count | Cross-month holiday split |
+| AC-04 | The Workdays column for each month equals Total Days minus Weekends (Saturdays + Sundays) for that month; holidays do not reduce the Workdays count | Core formula |
+| AC-05 | The Holidays column displays the count of company holiday days (from US-003) falling within the month for reference; this value is independent of the Workdays calculation | Holidays column (informational) |
+| AC-06 | A multi-day holiday that spans two months contributes only the days within each month to that month's Holidays display count | Cross-month holiday split (display) |
 | AC-07 | February shows 29 Total Days in a leap year and 28 in a non-leap year without any manual configuration | Leap year handling |
 | AC-08 | The Total row sums all numeric columns across the 12 months; the Workdays total equals annual workdays for the selected year | Total row calculation |
-| AC-09 | When no holidays are configured for the selected year in US-003, all Holidays values show 0 and the info note with a link to Holiday Management is displayed | No-holidays state |
-| AC-10 | A change to the holiday calendar (US-003) — adding, editing, or deleting a holiday — is reflected in the Monthly Workdays table on the next page load without any additional user action | Live recalculation dependency |
-| AC-11 | During data loading, a skeleton of 12 rows + Total row is displayed; no layout shift occurs when data arrives | Loading state |
-| AC-12 | When page data fails to load, an error message and a Retry button are displayed; clicking Retry re-attempts the load | Error state |
+| AC-09 | A change to the holiday calendar (US-003) — adding, editing, or deleting a holiday — is reflected in the Holidays display column on the next page load without any additional user action | Holiday display refresh |
+| AC-10 | During data loading, a skeleton of 12 rows + Total row is displayed; no layout shift occurs when data arrives | Loading state |
+| AC-11 | When page data fails to load, an error message and a Retry button are displayed; clicking Retry re-attempts the load | Error state |
 
 ### Testing Scenarios
 
 | # | Scenario | Input | Expected Result |
 |---|----------|-------|----------------|
-| TS-01 | Standard month — no holidays | Year: 2026, Month: March (31 days, 4 Saturdays, 4 Sundays = 8 weekends, 0 holidays) | Total Days = 31, Weekends = 8, Holidays = 0, Workdays = 23 |
-| TS-02 | Month with holidays on weekdays | Year: 2026, Month: January (31 days, 4 Sat + 4 Sun = 8 weekends, 1 holiday on Monday Jan 1) | Total Days = 31, Weekends = 8, Holidays = 1, Workdays = 22 |
-| TS-03 | Holiday-weekend overlap (from design spec) | Year: any, Month: January (31 days, 8 weekends, 1 holiday on a Saturday) | Weekends = 8, Holidays = 1, Workdays = 31 − 8 − 1 = 22; holiday is NOT excluded from Holidays because it falls on a weekend |
-| TS-04 | Leap year | Year: 2024, Month: February | Total Days = 29 |
+| TS-01 | Standard month — workdays formula | Year: 2026, Month: March (31 days, 4 Saturdays, 4 Sundays = 8 weekends) | Total Days = 31, Weekends = 8, Workdays = 23 (regardless of holidays) |
+| TS-02 | Month with holidays on weekdays — holidays do not reduce Workdays | Year: 2026, Month: January (31 days, 8 weekends, 1 holiday on Monday Jan 1) | Total Days = 31, Weekends = 8, Holidays = 1, Workdays = 23 (holiday only shown in Holidays column; does NOT reduce Workdays) |
+| TS-03 | Holiday on weekend — does not reduce Workdays | Year: any, Month: January (31 days, 8 weekends, 1 holiday on a Saturday) | Weekends = 8, Holidays = 1, Workdays = 31 − 8 = 23; holiday appears in Holidays column for reference only |
+| TS-04 | Leap year | Year: 2024, Month: February | Total Days = 29, Weekends = counted automatically, Workdays = 29 − Weekends |
 | TS-05 | Non-leap year | Year: 2025, Month: February | Total Days = 28 |
-| TS-06 | Cross-month holiday split | Holiday: Jan 30 – Feb 2 (4 days total; 2 in January, 2 in February) | January Holidays += 2, February Holidays += 2; no other months affected |
-| TS-07 | No holidays configured | Year: 2030 (no holidays in US-003 for this year) | All months: Holidays = 0, Workdays = Total Days − Weekends; info note with Holiday Management link shown |
+| TS-06 | Cross-month holiday split (display only) | Holiday: Jan 30 – Feb 2 (4 days total; 2 in January, 2 in February) | January Holidays += 2, February Holidays += 2 (display only); Workdays for each month unchanged |
+| TS-07 | No holidays configured | Year: 2030 (no holidays in US-003 for this year) | All months: Holidays = 0, Workdays = Total Days − Weekends; no info note required |
 | TS-08 | Total row correctness | Any year | Total row sums all numeric columns across 12 months; Workdays total = sum of 12 monthly Workdays values |
 | TS-09 | Year change | User changes dropdown from 2026 to 2025 | Table reloads; all values update for 2025; no page refresh required |
-| TS-10 | Holiday deletion reflects on next load | User deletes a holiday in US-003, then returns to Monthly Workdays | Deleted holiday no longer counted in Holidays column; Workdays increases accordingly |
+| TS-10 | Holiday edit reflects in Holidays column on next load | User edits a holiday in US-003, then returns to Monthly Workdays | Holidays column reflects updated count; Workdays value is unaffected |
 
 ---
 
@@ -249,10 +222,10 @@ Open question: Whether users lacking `organization.workdays.view` see the sideba
 #### Core Formula
 
 ```
-Workdays (per month) = Total Days − Weekends − Holidays
+Workdays (per month) = Total Days − Weekends
 ```
 
-Applied independently to each of the 12 months. Applied to the Total row as a sum of all monthly Workdays values.
+Applied independently to each of the 12 months. Applied to the Total row as a sum of all monthly Workdays values. Holidays do NOT affect the Workdays calculation.
 
 #### Total Days
 
@@ -262,20 +235,19 @@ Calendar days in the month for the selected year. February = 28 in non-leap year
 
 Count of Saturdays and Sundays within the month. Fixed by calendar — cannot be configured.
 
-#### Holidays
+#### Holidays (Informational Display Column)
 
-Count of individual calendar days covered by active holiday records in US-003 (EP-009 Holiday Management) that fall within the month for the selected year.
+Count of individual calendar days covered by active holiday records in US-003 (EP-009 Holiday Management) that fall within the month for the selected year. Displayed for reference only — this value does not affect the Workdays column.
 
 Rules:
-- Multi-day holidays contribute each calendar day individually to its month
-- A holiday spanning two months is split — only the days within each month count for that month
-- A holiday falling on a weekend is NOT excluded; it counts in Holidays and reduces Workdays
-- Soft-deleted holidays (removed from US-003) are excluded from the Holidays count
-- Holidays from other years do not affect the current year's count
+- Multi-day holidays contribute each calendar day individually to its month's Holidays display count
+- A holiday spanning two months is split — only the days within each month count toward that month's Holidays display
+- Soft-deleted holidays (removed from US-003) are excluded from the Holidays display count
+- Holidays from other years do not appear in the current year's count
 
 #### Recalculation Trigger
 
-The page computes all values live on every page load. There are no stored or cached workday values. Any change to the holiday calendar (US-003) is automatically reflected on the next visit to this page — no manual refresh or synchronization step is required.
+The page computes all values live on every page load. There are no stored or cached values. Any change to the holiday calendar (US-003) is automatically reflected in the Holidays display column on the next visit to this page — no manual refresh or synchronization step is required.
 
 ### State Transitions
 
@@ -284,16 +256,15 @@ This is a read-only computed view. There are no entity state transitions. The pa
 | Page State | Trigger | Next State |
 |-----------|---------|-----------|
 | Initial / Year changed | User loads page or selects a new year | Loading |
-| Loading | Data fetch completes successfully | Loaded (with or without holidays) |
+| Loading | Data fetch completes successfully | Loaded |
 | Loading | Data fetch fails | Error |
 | Error | User clicks Retry | Loading |
-| Loaded — no holidays | User navigates to Holiday Management and adds holidays, then returns | Loaded — with holidays |
 
 ### Dependencies
 
 | Dependency | Story | Impact |
 |-----------|-------|--------|
-| Holiday Management | EP-009 US-003 | Provides the holiday calendar data used in the Holidays column. If US-003 has no holidays for the selected year, Holidays = 0 for all months. Monthly Workdays page is fully functional without holidays — it simply shows 0 for all Holidays cells. |
+| Holiday Management | EP-009 US-003 | Provides holiday calendar data displayed in the Holidays column (reference only). If US-003 has no holidays for the selected year, Holidays = 0 for all months. Workdays calculation is unaffected either way. Monthly Workdays page is fully functional without US-003 being built first. |
 | Role & Permission Management | EP-001 US-004 | Provides the `organization.workdays.view` permission assignment. Without this permission, users cannot access the page. |
 
 ---
@@ -320,13 +291,6 @@ This intentionally deviates from the standard list page pattern (which includes 
 - No confirmation dialog required — selecting a year is a non-destructive, reversible action
 - If no value is selected (edge case), the dropdown retains its current value (cannot be cleared)
 
-### Info Note (No Holidays)
-
-- Displayed below the action bar, above the table
-- Uses a non-intrusive informational style (not an error)
-- Includes a direct link to the Holiday Management page to reduce the steps needed to configure holidays
-- The table still renders normally with Holidays = 0 — the note is supplementary, not a blocker
-
 ### Error State
 
 - Error message replaces the table content
@@ -337,13 +301,12 @@ This intentionally deviates from the standard list page pattern (which includes 
 
 | Viewport | Behavior |
 |----------|---------|
-| Desktop (≥ 1280px) | Full table layout with all 5 columns visible |
+| Desktop (≥ 1280px) | Full table layout with all 5 columns visible (Month, Total Days, Weekends, Holidays, Workdays) |
 | Below desktop | Out of scope for this story — web admin is desktop-only |
 
 ### Accessibility Requirements
 
 - [x] Year dropdown is keyboard-navigable (Tab to focus, Enter/Space to open, arrow keys to navigate options)
-- [x] The info note link ("Holiday Management") is reachable and activatable via keyboard
 - [x] Retry button is keyboard-accessible
 - [x] Table has proper column headers (ARIA `<th>` or equivalent) for screen reader support
 - [x] The pinned Total row is visually distinguishable from data rows (e.g., bold text or background differentiation)
@@ -387,15 +350,15 @@ The following are explicitly excluded from this detail requirement:
 
 | Feature | Relationship |
 |---------|-------------|
-| Holiday Management (EP-009 US-003) | Data source for the Holidays column — holidays added/edited/deleted in US-003 are reflected immediately on next Monthly Workdays load |
+| Holiday Management (EP-009 US-003) | Data source for the Holidays display column — holidays added/edited/deleted in US-003 are reflected in the Holidays column on next Monthly Workdays load; does not affect Workdays calculation |
 | Role & Permission Management (EP-001 US-004) | Source of the `organization.workdays.view` permission assignment |
-| Future Payroll DR | Monthly Workdays provides the authoritative workday count foundation for payroll calculation |
+| Future Payroll DR | Monthly Workdays provides the authoritative workday count foundation for payroll calculation (Workdays = Total Days − Weekends) |
 
 ### Notes
 
 - This is the first Detail Requirement for a pure read-only computed summary table in this project. No stored values exist — all calculations are performed live on each page load.
-- The holiday-weekend overlap rule (a holiday on a weekend still reduces Workdays) is explicitly per the design spec and should not be "corrected" during development — it is the intended business behavior.
-- The cross-month holiday split rule is inherited from the holiday calendar data model in US-003 (DR-009-003-01).
+- Workdays = Total Days − Weekends only. Holidays are intentionally excluded from the Workdays formula; they are shown in the Holidays column for HR reference only.
+- The cross-month holiday split rule (for the Holidays display column) is inherited from the holiday calendar data model in US-003 (DR-009-003-01).
 
 ---
 
@@ -414,3 +377,4 @@ The following are explicitly excluded from this detail requirement:
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
 | 1.0 | 2026-06-16 | Initial draft | BA Agent (DR-009-004-01) |
+| 1.1 | 2026-06-16 | Changed Workdays formula: holidays no longer reduce Workdays. New formula: Workdays = Total Days − Weekends. Holidays column retained as informational reference only. Removed "no holidays" info note and US-003 as hard dependency. | BA Agent |
