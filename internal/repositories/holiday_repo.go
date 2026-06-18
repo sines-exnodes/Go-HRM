@@ -36,6 +36,10 @@ type HolidayRepository interface {
 	// ExistsByNameAndYear checks for a duplicate name in the same year.
 	// excludeID, if non-nil, skips that row (used during Update).
 	ExistsByNameAndYear(ctx context.Context, name string, year int, excludeID *uuid.UUID) (bool, error)
+
+	// FindByYear returns all non-deleted holidays for the given year, ordered by from_date ASC.
+	// Used by WorkdayService to compute monthly workday counts.
+	FindByYear(ctx context.Context, year int) ([]models.Holiday, error)
 }
 
 type holidayRepo struct{ db *gorm.DB }
@@ -141,4 +145,10 @@ func (r *holidayRepo) ExistsByNameAndYear(ctx context.Context, name string, year
 	var count int64
 	err := qb.Count(&count).Error
 	return count > 0, err
+}
+
+func (r *holidayRepo) FindByYear(ctx context.Context, year int) ([]models.Holiday, error) {
+	var rows []models.Holiday
+	err := r.base(ctx).Where("year = ?", year).Order("from_date ASC").Find(&rows).Error
+	return rows, err
 }

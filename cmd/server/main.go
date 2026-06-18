@@ -128,6 +128,7 @@ func main() {
 	userContractRepo := repositories.NewUserContractRepository(db)
 	userContractSvc := services.NewUserContractService(userContractRepo, employeeRepo, uploadSvc)
 	holidaySvc := services.NewHolidayService(holidayRepo, holidayTemplateRepo, leaveRepo)
+	workdaySvc := services.NewWorkdayService(holidayRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -153,6 +154,7 @@ func main() {
 	notifH := handlers.NewNotificationHandler(pushSvc)
 	userContractH := handlers.NewUserContractHandler(userContractSvc)
 	holidayH := handlers.NewHolidayHandler(holidaySvc)
+	workdayH := handlers.NewWorkdayHandler(workdaySvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -248,6 +250,9 @@ func main() {
 		holidays.POST("", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Create)
 		holidays.PATCH("/:id", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Update)
 		holidays.DELETE("/:id", middleware.RequirePerms(authSvc, permissions.PermOrgHolidaysManage), holidayH.Delete)
+
+		// ---- /workdays ----
+		authed.GET("/workdays", middleware.RequirePerms(authSvc, permissions.PermOrgWorkdaysView), workdayH.GetYear)
 
 		// ---- /employees/me* self-service (auth only) ----
 		authed.GET("/employees/me", empH.GetMe)
