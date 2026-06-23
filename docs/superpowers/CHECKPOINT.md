@@ -1,13 +1,14 @@
-# Resume Checkpoint — Monthly Workdays API MERGED to main (PR #18, no migration)
+# Resume Checkpoint — Forgot-Password API on feat/forgot-password (PR #20, migration 000024)
 
-**Last updated:** 2026-06-22
-**Stopped at:** Monthly Workdays API **merged to `main` via PR #18** (merge commit `9a1b511`). 1 endpoint live at `GET /api/v1/workdays?year=<year>`. Post-merge revision **DR-009-004-01 v1.1 (AC-04)**: holidays are informational only — **Workdays = TotalDays − Weekends** (was `−holidays`). `main` is in sync with `origin/main`. Next: Request Tickets module (EP-003/US-003) or Attendance G7 (holiday "H" cells, now unblocked by the holidays calendar).
-**Branch:** `feat/monthly-workdays` — **merged to `main` (PR #18); no longer in flight.**
+**Last updated:** 2026-06-23
+**Stopped at:** Forgot-password / reset-password feature implemented on `feat/forgot-password`, **PR #20 open** (not yet merged). Migration 000024 applied to dev DB. Also: employee-profile-enrichment **merged to `main` (PR #19, commit `bfa3b35`)** — manager brief enriched with email/phone/avatar, `users:banking_view` seeded to Employee role, `/me` handler uses `unmask=true`.
+**Branch:** `feat/forgot-password` — **in flight, PR #20 open.**
 
-> **2026-06-22 session (docs/infra only — no migration, no business logic change):**
-> - **Scalar replaces Stoplight Elements** at `/docs` (`internal/handlers/router.go`, constant `scalarDocsHTML`). Stoplight Elements `@8.0.1` injected literal `\n` bytes into the Try It request body causing `"invalid character '\n' in string literal"` 400s. Scalar reads the same `/swagger/doc.json` spec; BearerAuth is auto-wired via `data-configuration`. Token entered once per session, persists across all endpoints.
-> - **Serena memories updated**: `resume_protocol` step 0 now reads `CLAUDE.md` + `AGENTS.md` first; `core` has a new "Authoritative behavior files" section at the top of the memory graph.
-**DB migration version:** **23** (applied). Next free: **000024**.
+> **2026-06-23 session:**
+> - **PR #19 merged** (`feat/employee-profile-enrichment`): `ManagerBrief` enriched with `Email`, `Phone`, `AvatarURL`; Employee role seeded with `users:banking_view`; `GetMe` changed to `unmask=true` (self-read).
+> - **Scalar replaces Stoplight Elements** at `/docs` (still on main from 2026-06-22 session).
+> - **Forgot-password API (migration 000024)**: `password_reset_tokens` table + `PasswordResetTokenRepository` + `PasswordResetService` + `SendPasswordReset()` + `reset_password.{html,txt}` templates + `POST /auth/forgot-password` + `POST /auth/reset-password`. Enumerate guard (always 200). Token expiry 1h (`PASSWORD_RESET_TOKEN_EXPIRE_HOURS`). Email best-effort: errors stored on token row. Verified end-to-end: token creation, SMTP-disabled error capture, successful reset + login, replay rejection. PR #20 open.
+**DB migration version:** **24** (applied to dev). Next free: **000025**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) and [User Contracts](#user-contracts-module--done-migration-000022) below.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
@@ -123,15 +124,16 @@ Merged via **PR #18** (`9a1b511`); `main` in sync with `origin/main`. No further
 
 ### IMMEDIATE next & subsequent priorities (in descending value):
 
-1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000024**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
-2. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
-3. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
-4. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
-5. **Bundled code review** — Phases 4-9 have not been formally reviewed.
-6. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
-7. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
+1. **Merge PR #20** (`feat/forgot-password`) — reviewed + verified; ready to merge. After merge, update CHECKPOINT and Serena memories.
+2. **Request Tickets module (EP-003/US-003) — biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000025**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
+3. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
+4. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
+5. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
+6. **Bundled code review** — Phases 4-9 have not been formally reviewed.
+7. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
+8. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
 
-Latest taken migration = **000023** (holidays); next is **000024**.
+Latest taken migration = **000024** (password_reset_tokens); next is **000025**.
 
 ### Resume entry points
 
@@ -383,6 +385,6 @@ Phases 4–9: **review not yet requested.** Recommendation — one final bundled
 - Phase 7 `target_audience='custom'` deferred (no backing table).
 - Phase 7 scheduled-publish cron deferred.
 - Phase 8 logo upload deferred.
-- Phase 9 password-reset email flow deferred (needs BA confirmation).
+- ~~Phase 9 password-reset email flow deferred~~ — **DONE** (`feat/forgot-password`, PR #20, migration 000024).
 - Phase 9 `/invites/accept` rate-limiting (consider IP-based at the reverse proxy).
 - Phase 9 FCM topic-based fanout deferred (per-device only at present).
