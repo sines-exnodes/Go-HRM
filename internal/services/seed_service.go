@@ -159,6 +159,12 @@ func defaultRoles() []roleSeed {
 			Permissions: []permissions.Permission{
 				permissions.PermAuthLogin,
 				permissions.PermUsersContractsView,
+				// banking_view lets the employee see their own bank fields via
+				// /me; the GetMe handler passes unmask=true so the account
+				// number is returned in full. Employees cannot read other
+				// employees' profiles (no PermEmployeesRead), so this perm
+				// cannot leak cross-employee banking data.
+				permissions.PermUsersBankingView,
 				// Self-service on own leave requests: Read+Create were already
 				// here; Update/Cancel/Delete are the load-bearing fix surfaced
 				// by Phase 5 live verification (REVISION NOTES #4 had claimed

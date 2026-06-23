@@ -286,7 +286,7 @@ Attendance, Thông báo / Announcement, Phân quyền / Permission (RBAC).
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Go-HRM** (10770 symbols, 27024 relationships, 272 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Go-HRM** (10821 symbols, 27075 relationships, 272 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 

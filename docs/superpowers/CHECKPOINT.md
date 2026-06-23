@@ -1,8 +1,12 @@
-# Resume Checkpoint — Monthly Workdays API done (no migration)
+# Resume Checkpoint — Monthly Workdays API MERGED to main (PR #18, no migration)
 
-**Last updated:** 2026-06-16
-**Stopped at:** Monthly Workdays API fully implemented and verified on `feat/monthly-workdays`. 1 endpoint live at `GET /api/v1/workdays?year=<year>`. All 5 tasks complete, spec + quality reviews pass, end-to-end curl verified (12 months, correct error codes). Branch ready to push and open PR. Next: push branch, open PR, then continue with Request Tickets module (EP-003/US-003) or Attendance G7 (holiday cells).
-**Branch:** `feat/monthly-workdays` — all changes committed, ready to push.
+**Last updated:** 2026-06-22
+**Stopped at:** Monthly Workdays API **merged to `main` via PR #18** (merge commit `9a1b511`). 1 endpoint live at `GET /api/v1/workdays?year=<year>`. Post-merge revision **DR-009-004-01 v1.1 (AC-04)**: holidays are informational only — **Workdays = TotalDays − Weekends** (was `−holidays`). `main` is in sync with `origin/main`. Next: Request Tickets module (EP-003/US-003) or Attendance G7 (holiday "H" cells, now unblocked by the holidays calendar).
+**Branch:** `feat/monthly-workdays` — **merged to `main` (PR #18); no longer in flight.**
+
+> **2026-06-22 session (docs/infra only — no migration, no business logic change):**
+> - **Scalar replaces Stoplight Elements** at `/docs` (`internal/handlers/router.go`, constant `scalarDocsHTML`). Stoplight Elements `@8.0.1` injected literal `\n` bytes into the Try It request body causing `"invalid character '\n' in string literal"` 400s. Scalar reads the same `/swagger/doc.json` spec; BearerAuth is auto-wired via `data-configuration`. Token entered once per session, persists across all endpoints.
+> - **Serena memories updated**: `resume_protocol` step 0 now reads `CLAUDE.md` + `AGENTS.md` first; `core` has a new "Authoritative behavior files" section at the top of the memory graph.
 **DB migration version:** **23** (applied). Next free: **000024**.
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) and [User Contracts](#user-contracts-module--done-migration-000022) below.
 
@@ -12,7 +16,7 @@
 
 ## Monthly Workdays API — DONE (no migration, `feat/monthly-workdays`)
 
-Computed endpoint that returns workday counts for each month of a given year. No new DB table — reads from existing `holidays` table (migration 000023). All computation is pure Go: `workdays = total_days − weekends − holidays` (holiday-weekend overlap intentionally not deduplicated per AC-05).
+Computed endpoint that returns workday counts for each month of a given year. No new DB table — reads from existing `holidays` table (migration 000023). All computation is pure Go. **Formula (DR-009-004-01 v1.1 AC-04, revised post-merge): `workdays = total_days − weekends`** — holidays are still counted and returned per month (range-clamped, cross-month split) but are **informational only**, NOT subtracted from workdays. (The original v1.0 formula `− holidays` was changed in commit `01f1ac6`.)
 
 - **No migration** — reads from existing `holidays` table.
 - **DTOs** (`internal/dto/workday.go`): `WorkdayQuery`, `MonthWorkdaysRead`, `WorkdayTotalRead`, `WorkdayYearRead`.
@@ -23,9 +27,9 @@ Computed endpoint that returns workday counts for each month of a given year. No
 - **Route**: `authed.GET("/workdays", middleware.RequirePerms(authSvc, permissions.PermOrgWorkdaysView), workdayH.GetYear)` in `cmd/server/main.go`.
 - **Tests** (`internal/services/workday_service_test.go`): 7 integration tests — no holidays, holiday on weekday, holiday on weekend (AC-05), cross-month holiday (AC-06), leap year, non-leap year, total row.
 - **Swagger**: regenerated after handler completion.
-- **Key commits**: `3256b6e` (DTOs), `445408d` (FindByYear), `ee6a219` (perms+seed), `9bc7dad` (service+7 tests), `e344f18` (handler+route+swag), `0463790` (verification log).
+- **Key commits**: `3256b6e` (DTOs), `445408d` (FindByYear), `ee6a219` (perms+seed), `9bc7dad` (service+7 tests), `e344f18` (handler+route+swag), `0463790` (verification log), `01f1ac6` (**v1.1 fix — holidays informational only**), `9a1b511` (**merge PR #18 → `main`**), `55ecf6f` (v1.1 DR doc), `809b2ef` (GitNexus reindex).
 
-**Verified:** `go build ./...` clean, 7 tests skip cleanly without DB, Docker container rebuilt with new image, curl smoke: 12 months correct shape + `workdays=total−weekends−holidays` per month + 400/401 error cases. Verification log: [`docs/superpowers/verification/phase-workdays.md`](verification/phase-workdays.md).
+**Verified (at merge):** `go build ./...` clean, 7 tests skip cleanly without DB, Docker container rebuilt, curl smoke: 12 months correct shape + 400/401 error cases. ⚠️ **The committed verification log [`docs/superpowers/verification/phase-workdays.md`](verification/phase-workdays.md) is STALE** — it still shows the pre-v1.1 formula (`workdays = total_days − weekends − holidays`) and example numbers computed with `−holidays` (e.g. Feb workdays=13 instead of the v1.1 value 28−8=20). The merged code is v1.1 (`− weekends` only). Re-run the live curl and refresh the log before treating it as proof.
 
 ---
 
@@ -113,14 +117,11 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 
 ## How to resume next session
 
-### IMMEDIATE: push `feat/monthly-workdays` and open PR
+### ✅ DONE: Monthly Workdays merged to `main`
 
-```bash
-git push -u origin feat/monthly-workdays
-# Then open a PR: feat/monthly-workdays → main
-```
+Merged via **PR #18** (`9a1b511`); `main` in sync with `origin/main`. No further action — `feat/monthly-workdays` is no longer in flight. (Follow-up: the stale verification log noted above.)
 
-### Subsequent priorities (in descending value):
+### IMMEDIATE next & subsequent priorities (in descending value):
 
 1. **Request Tickets module (EP-003/US-003) — NEW, biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000024**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
 2. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
