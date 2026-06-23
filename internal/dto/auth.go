@@ -60,3 +60,14 @@ type LoginResponse struct {
 type LogoutResponse struct {
 	Message string `json:"message" example:"Logged out"`
 }
+
+// ForgotPasswordRequest is the body for POST /api/v1/auth/forgot-password.
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email" example:"john@exnodes.vn"`
+}
+
+// ResetPasswordRequest is the body for POST /api/v1/auth/reset-password.
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required" example:"abc123xyz"`
+	NewPassword string `json:"new_password" binding:"required,min=8" example:"NewPass!2026"`
+}
