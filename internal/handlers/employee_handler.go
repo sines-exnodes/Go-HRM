@@ -434,7 +434,7 @@ func (h *EmployeeHandler) GetMe(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), false) // read: masked
+	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), true) // self-read: never mask own data
 	ok(c, http.StatusOK, view, "")
 }
 

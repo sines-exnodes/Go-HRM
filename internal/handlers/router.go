@@ -21,8 +21,8 @@ func NewHandlers() *Handlers {
 }
 
 // RegisterRoutes wires every route onto r. If swaggerEnabled is true, the
-// Swagger UI is mounted at /swagger/*any and Stoplight Elements (modern
-// three-panel reference UI over the same OpenAPI spec) at /docs.
+// Swagger UI is mounted at /swagger/*any and Scalar (modern API reference UI
+// over the same OpenAPI spec) at /docs.
 func RegisterRoutes(r *gin.Engine, h *Handlers, swaggerEnabled bool) {
 	// Liveness probe — un-namespaced so load balancers can hit it without
 	// knowing about /api/v1.
@@ -31,7 +31,7 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, swaggerEnabled bool) {
 	if swaggerEnabled {
 		r.GET("/swagger/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
 		r.GET("/docs", func(c *gin.Context) {
-			c.Data(200, "text/html; charset=utf-8", []byte(stoplightDocsHTML))
+			c.Data(200, "text/html; charset=utf-8", []byte(scalarDocsHTML))
 		})
 	}
 
@@ -40,20 +40,23 @@ func RegisterRoutes(r *gin.Engine, h *Handlers, swaggerEnabled bool) {
 	_ = r.Group("/api/v1")
 }
 
-// stoplightDocsHTML is the page served at /docs. It loads Stoplight Elements
-// from unpkg (pinned) and points it at gin-swagger's /swagger/doc.json so the
-// same OpenAPI spec drives both UIs. CDN dependency is acceptable here because
-// /docs is gated by swaggerEnabled — i.e. dev/non-prod only.
-const stoplightDocsHTML = `<!doctype html>
+// scalarDocsHTML is the page served at /docs. It loads Scalar from jsDelivr
+// and points it at gin-swagger's /swagger/doc.json. CDN dependency is
+// acceptable here because /docs is gated by swaggerEnabled — dev/non-prod only.
+const scalarDocsHTML = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Exnodes HRM API — Reference</title>
-  <link rel="stylesheet" href="https://unpkg.com/@stoplight/elements@8.0.1/styles.min.css">
 </head>
-<body style="margin:0">
-  <elements-api apiDescriptionUrl="/swagger/doc.json" router="hash" layout="sidebar"></elements-api>
-  <script src="https://unpkg.com/@stoplight/elements@8.0.1/web-components.min.js"></script>
+<body>
+  <script
+    id="api-reference"
+    data-url="/swagger/doc.json"
+    data-configuration='{"authentication":{"preferredSecurityScheme":"BearerAuth"}}'
+  ></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 </body>
 </html>
 `

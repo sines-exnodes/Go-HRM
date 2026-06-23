@@ -260,10 +260,13 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 		mgr = &dto.ManagerBrief{
 			ID:         e.Manager.ID,
 			FullName:   e.Manager.FullName(),
+			Phone:      e.Manager.Phone,
+			AvatarURL:  e.Manager.AvatarURL,
 			Position:   positionName(e.Manager),
 			Department: departmentName(e.Manager),
 		}
 		if e.Manager.User != nil {
+			mgr.Email    = e.Manager.User.Email
 			mgr.IsActive = e.Manager.User.IsActive
 		}
 	}

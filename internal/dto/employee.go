@@ -47,11 +47,14 @@ type EmergencyContactInput struct {
 // ---- Line manager (employees parity #10) ----
 
 // ManagerBrief is the resolved line-manager embedded on an employee read:
-// name + position/department names + activity flag (mirrors Python's
-// LineManagerRead). Position/Department are nil when unset.
+// name + email + contact + position/department names + activity flag (mirrors
+// Python's LineManagerRead). Position/Department/Phone/AvatarURL are nil when unset.
 type ManagerBrief struct {
 	ID         uuid.UUID `json:"id"`
 	FullName   string    `json:"full_name"`
+	Email      string    `json:"email"`
+	Phone      *string   `json:"phone,omitempty"`
+	AvatarURL  *string   `json:"avatar_url,omitempty"`
 	Position   *string   `json:"position,omitempty"`
 	Department *string   `json:"department,omitempty"`
 	IsActive   bool      `json:"is_active"`
