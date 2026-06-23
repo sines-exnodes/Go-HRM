@@ -140,7 +140,7 @@ func main() {
 	// ---- handlers ----
 	authH := handlers.NewAuthHandler(authSvc, passwordResetSvc)
 	roleH := handlers.NewRoleHandler(roleSvc)
-	empH := handlers.NewEmployeeHandler(empSvc)
+	empH := handlers.NewEmployeeHandler(empSvc, passwordResetSvc)
 	depH := handlers.NewDependentHandler(depSvc)
 	userH := handlers.NewUserHandler(userSvc)
 	departmentH := handlers.NewDepartmentHandler(departmentSvc)
