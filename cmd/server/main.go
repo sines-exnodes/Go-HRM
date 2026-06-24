@@ -67,6 +67,7 @@ func main() {
 	inviteRepo := repositories.NewInviteRepository(db)
 	holidayRepo := repositories.NewHolidayRepository(db)
 	holidayTemplateRepo := repositories.NewHolidayTemplateRepository(db)
+	passwordResetTokenRepo := repositories.NewPasswordResetTokenRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -129,6 +130,7 @@ func main() {
 	userContractSvc := services.NewUserContractService(userContractRepo, employeeRepo, uploadSvc)
 	holidaySvc := services.NewHolidayService(holidayRepo, holidayTemplateRepo, leaveRepo)
 	workdaySvc := services.NewWorkdayService(holidayRepo)
+	passwordResetSvc := services.NewPasswordResetService(userRepo, passwordResetTokenRepo, emailSvc, cfg)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -136,11 +138,11 @@ func main() {
 	}
 
 	// ---- handlers ----
-	authH := handlers.NewAuthHandler(authSvc)
+	authH := handlers.NewAuthHandler(authSvc, passwordResetSvc)
 	roleH := handlers.NewRoleHandler(roleSvc)
-	empH := handlers.NewEmployeeHandler(empSvc)
+	empH := handlers.NewEmployeeHandler(empSvc, passwordResetSvc)
 	depH := handlers.NewDependentHandler(depSvc)
-	userH := handlers.NewUserHandler(userSvc)
+	userH := handlers.NewUserHandler(userSvc, passwordResetSvc)
 	departmentH := handlers.NewDepartmentHandler(departmentSvc)
 	positionH := handlers.NewPositionHandler(positionSvc)
 	skillH := handlers.NewSkillHandler(skillSvc)
@@ -187,6 +189,10 @@ func main() {
 		auth := v1.Group("/auth")
 		auth.POST("/login", authH.Login)
 		auth.POST("/refresh", authH.Refresh)
+		auth.POST("/forgot-password", authH.ForgotPassword)
+		auth.GET("/verify-token", authH.VerifyResetToken)
+		auth.POST("/reset-password", authH.ResetPassword)
+		auth.POST("/set-password", authH.ResetPassword) // Python parity alias
 
 		// ---- /invites/accept (Phase 9 — PUBLIC) ----
 		// The token in the body is the credential. Lives outside the
@@ -225,6 +231,8 @@ func main() {
 		adminUsers.PATCH(":id/change-password", middleware.RequirePerms(authSvc, permissions.PermUsersChangePwd), userH.AdminChangePassword)
 		adminUsers.POST(":id/change-email", middleware.RequirePerms(authSvc, permissions.PermUsersUpdate), userH.AdminChangeEmail)
 		adminUsers.PUT(":id/roles", middleware.RequirePerms(authSvc, permissions.PermUsersManageRoles), userH.AssignRoles)
+		adminUsers.POST(":id/reset-password", middleware.RequirePerms(authSvc, permissions.PermUsersChangePwd), userH.AdminSendResetLink)
+		adminUsers.POST(":id/send-invite", middleware.RequirePerms(authSvc, permissions.PermUsersCreate), userH.AdminSendInvite)
 
 		// ---- /users/:id/contracts ----
 		// IMPORTANT: :id must match the existing adminUsers wildcard name.

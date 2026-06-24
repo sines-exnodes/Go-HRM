@@ -65,75 +65,11 @@ Don't fork silently.
 "Tests pass" is wrong if any were skipped.
 Default to surfacing uncertainty, not hiding it.
 
-<!-- BEGIN:go-agent-rules -->
-# This is a Go / Gin / GORM service — stack-specific hard rules
-
-This repo is **Go 1.25 + Gin + GORM + PostgreSQL** (`github.com/exnodes/hrm-api`).
-APIs and conventions may differ from your training data — verify against
-`go.mod`, the `Makefile`, and existing code before writing. Heed these
-non-negotiable rules:
-
-- **Migrations are versioned SQL only.** Create up/down pairs in `migrations/`
-  via `make migrate-new name=<snake>`. `db.AutoMigrate()` is **prohibited** —
-  the server asserts the applied migration version on boot and refuses to
-  start if behind or dirty (`internal/config`).
-- **Every entity** carries the four audit columns `created_at`,
-  `updated_at`, `is_deleted BOOLEAN`, `deleted_at TIMESTAMPTZ`, plus a
-  per-table `BEFORE UPDATE` trigger calling `set_updated_at()`. PKs are
-  UUIDs via `gen_random_uuid()` (pgcrypto).
-- **Soft delete** uses the custom `NotDeleted` GORM scope — **never**
-  GORM's built-in `gorm.DeletedAt`.
-- **Layering is one-directional:** `handler → service → repository → GORM`.
-  Handlers never touch the DB directly; services never import `gin`;
-  repositories expose interfaces.
-- **Error model:** services return `*errors.AppError`; the `ErrorHandler`
-  middleware renders the JSON response envelope. Don't write ad-hoc
-  `c.JSON(...)` error bodies.
-- **Before claiming done:** run `make fmt && make vet && make test`.
-  When handler/Swagger annotations change, regenerate docs with
-  `make swag` — never hand-edit `docs/swagger/`.
-<!-- END:go-agent-rules -->
-
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
-
-This project is indexed by GitNexus as **Go-HRM** (10824 symbols, 27090 relationships, 272 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
-
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
-
-## Always Do
-
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
-
-## Never Do
-
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
-
-## Resources
-
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/Go-HRM/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/Go-HRM/clusters` | All functional areas |
-| `gitnexus://repo/Go-HRM/processes` | All execution flows |
-| `gitnexus://repo/Go-HRM/process/{name}` | Step-by-step execution trace |
-
-## CLI
-
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
-
-<!-- gitnexus:end -->
+## Rule 13 — Trust code over LLM regurgitation
+When code hands an LLM a list of facts (filenames, IDs, exact strings)
+and expects them back in output, do NOT trust the LLM's reproduction.
+Claude normalizes, prefixes, abbreviates, and reorders. Either override
+the LLM's output with code-derived ground-truth before persisting, or
+have the LLM reference items by index (doc1/doc2) that the code maps
+back. Tests must mock the LLM returning altered strings — a mock that
+echoes inputs faithfully cannot catch this class.

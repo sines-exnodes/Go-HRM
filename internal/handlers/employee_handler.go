@@ -18,11 +18,12 @@ import (
 )
 
 type EmployeeHandler struct {
-	svc *services.EmployeeService
+	svc   *services.EmployeeService
+	reset *services.PasswordResetService
 }
 
-func NewEmployeeHandler(svc *services.EmployeeService) *EmployeeHandler {
-	return &EmployeeHandler{svc: svc}
+func NewEmployeeHandler(svc *services.EmployeeService, reset *services.PasswordResetService) *EmployeeHandler {
+	return &EmployeeHandler{svc: svc, reset: reset}
 }
 
 // ---- Shared response helpers ----
@@ -201,6 +202,12 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 	if err != nil {
 		_ = c.Error(err)
 		return
+	}
+	// If the caller requested it, fire a "set your password" email via the
+	// forgot-password flow. Best-effort: never fail the create response on
+	// email errors (SMTP may be unconfigured in dev).
+	if in.SendInvite {
+		_ = h.reset.RequestReset(c.Request.Context(), in.Email)
 	}
 	services.ApplyEmployeeFieldVisibility(view, perms, true) // write echo: unmasked
 	ok(c, http.StatusCreated, view, "Employee created")

@@ -194,7 +194,7 @@ func (r *employeeRepository) List(ctx context.Context, q dto.EmployeeListQuery) 
 		Preload("EmployeeSkills.Skill", "is_deleted = ?", false).
 		Preload("LeaveQuota", "is_deleted = ?", false).
 		Joins("JOIN users ON users.id = employees.user_id").
-		Where("employees.is_deleted = ?", false)
+		Where("employees.is_deleted = ? AND users.is_deleted = ?", false, false)
 
 	if q.Search != "" {
 		p := utils.BuildILIKEPattern(q.Search)

@@ -12,11 +12,12 @@ import (
 )
 
 type UserHandler struct {
-	svc *services.UserService
+	svc   *services.UserService
+	reset *services.PasswordResetService
 }
 
-func NewUserHandler(svc *services.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUserHandler(svc *services.UserService, reset *services.PasswordResetService) *UserHandler {
+	return &UserHandler{svc: svc, reset: reset}
 }
 
 // GetMe godoc
@@ -375,4 +376,54 @@ func (h *UserHandler) AssignRoles(c *gin.Context) {
 		return
 	}
 	okEmpty(c, "Roles assigned")
+}
+
+// AdminSendResetLink godoc
+// @Summary      Admin — send password-reset link to a user
+// @Description  Triggers a "reset your password" email for the given user. Same token flow as forgot-password.
+// @Description  Requires users:change_password permission.
+// @Tags         users
+// @Security     BearerAuth
+// @Param        id   path      string  true  "User UUID"
+// @Success      200  {object}  dto.Response[any]
+// @Failure      404  {object}  dto.Response[any]
+// @Router       /api/v1/users/{id}/reset-password [post]
+func (h *UserHandler) AdminSendResetLink(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	user, err := h.svc.Get(c.Request.Context(), id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	_ = h.reset.RequestReset(c.Request.Context(), user.Email)
+	okEmpty(c, "Password reset link sent to "+user.Email)
+}
+
+// AdminSendInvite godoc
+// @Summary      Admin — send (or resend) set-password invite to a user
+// @Description  Sends a "set your password" invite email. Useful for resending the initial invite.
+// @Description  Requires users:create permission.
+// @Tags         users
+// @Security     BearerAuth
+// @Param        id   path      string  true  "User UUID"
+// @Success      200  {object}  dto.Response[any]
+// @Failure      404  {object}  dto.Response[any]
+// @Router       /api/v1/users/{id}/send-invite [post]
+func (h *UserHandler) AdminSendInvite(c *gin.Context) {
+	id, err := parseIDParam(c, "id")
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	user, err := h.svc.Get(c.Request.Context(), id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	_ = h.reset.RequestReset(c.Request.Context(), user.Email)
+	okEmpty(c, "Invite sent to "+user.Email)
 }

@@ -28,15 +28,25 @@ type InviteEmailData struct {
 	ExpiresAt string
 }
 
+// PasswordResetEmailData is the template render context for the reset password email.
+type PasswordResetEmailData struct {
+	AppName   string
+	FullName  string
+	ResetURL  string
+	ExpiresAt string
+}
+
 // EmailService renders + ships HTML/plain-text emails via SMTP. When
 // SMTP_HOST is empty in the environment the service is in "disabled"
 // mode: every Send returns a clear error so the caller can store it on
 // the invite row's last_email_error column WITHOUT blowing up the
 // outer transaction (REVISION NOTES #11).
 type EmailService struct {
-	cfg          *config.Config
-	htmlTemplate *template.Template
-	textTemplate *texttemplate.Template
+	cfg               *config.Config
+	htmlTemplate      *template.Template
+	textTemplate      *texttemplate.Template
+	resetHTMLTemplate *template.Template
+	resetTextTemplate *texttemplate.Template
 }
 
 // ErrEmailDisabled is returned when SMTP is not configured. Callers
@@ -56,7 +66,21 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("email: parse invite.txt: %w", err)
 	}
-	return &EmailService{cfg: cfg, htmlTemplate: htmlT, textTemplate: textT}, nil
+	resetHTMLT, err := template.ParseFS(emailTemplateFS, "emailtemplates/reset_password.html")
+	if err != nil {
+		return nil, fmt.Errorf("email: parse reset_password.html: %w", err)
+	}
+	resetTextT, err := texttemplate.ParseFS(emailTemplateFS, "emailtemplates/reset_password.txt")
+	if err != nil {
+		return nil, fmt.Errorf("email: parse reset_password.txt: %w", err)
+	}
+	return &EmailService{
+		cfg:               cfg,
+		htmlTemplate:      htmlT,
+		textTemplate:      textT,
+		resetHTMLTemplate: resetHTMLT,
+		resetTextTemplate: resetTextT,
+	}, nil
 }
 
 // IsConfigured reports whether SMTP is reachable. Callers can short-
@@ -137,6 +161,41 @@ func (s *EmailService) SendAnnouncementNotification(ctx context.Context, toEmail
 
 	if err := s.sendMessage(ctx, m); err != nil {
 		return fmt.Errorf("send announcement notification: %w", err)
+	}
+	return nil
+}
+
+// SendPasswordReset renders the reset_password template and ships it.
+// Returns ErrEmailDisabled when SMTP is not configured — the caller is
+// expected to record the error on the token row.
+func (s *EmailService) SendPasswordReset(ctx context.Context, toEmail string, data PasswordResetEmailData) error {
+	if !s.IsConfigured() {
+		log.Printf("email: skipped password reset to %s — SMTP not configured (would-be URL: %s)", toEmail, data.ResetURL)
+		return ErrEmailDisabled
+	}
+
+	if data.AppName == "" {
+		data.AppName = s.cfg.AppName
+	}
+
+	var htmlBuf bytes.Buffer
+	if err := s.resetHTMLTemplate.Execute(&htmlBuf, data); err != nil {
+		return fmt.Errorf("render reset_password.html: %w", err)
+	}
+	var textBuf bytes.Buffer
+	if err := s.resetTextTemplate.Execute(&textBuf, data); err != nil {
+		return fmt.Errorf("render reset_password.txt: %w", err)
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", s.fromAddress())
+	m.SetHeader("To", toEmail)
+	m.SetHeader("Subject", fmt.Sprintf("Reset your %s password", data.AppName))
+	m.SetBody("text/plain", textBuf.String())
+	m.AddAlternative("text/html", htmlBuf.String())
+
+	if err := s.sendMessage(ctx, m); err != nil {
+		return fmt.Errorf("send password reset: %w", err)
 	}
 	return nil
 }

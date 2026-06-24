@@ -161,10 +161,19 @@ type EmployeeRead struct {
 // ---- Employee Create (admin) — accepts both user creds and HR fields ----
 
 type EmployeeCreate struct {
-	// User credentials (created in tx)
+	// User credentials (created in tx).
+	// Password is intentionally not accepted from the HTTP payload (json:"-") —
+	// it must be set via the forgot-password / invite-accept flow after creation,
+	// matching Python's passwordless admin-create behaviour.
+	// InviteService.Accept populates this field in Go code before calling
+	// empSvc.Create, so invite-based accounts still get a password on first use.
 	Email    string `json:"email"    binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"-"`
 	IsActive *bool  `json:"is_active,omitempty"`
+
+	// When true, a "set your password" email is sent to the new employee using
+	// the same forgot-password token mechanism (PasswordResetService.RequestReset).
+	SendInvite bool `json:"send_invite,omitempty"`
 
 	// HR personal info
 	FirstName        string     `json:"first_name" binding:"required,min=1,max=100"`

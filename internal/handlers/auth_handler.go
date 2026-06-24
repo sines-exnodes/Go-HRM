@@ -14,12 +14,13 @@ import (
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	auth *services.AuthService
+	auth  *services.AuthService
+	reset *services.PasswordResetService
 }
 
 // NewAuthHandler constructs an AuthHandler.
-func NewAuthHandler(auth *services.AuthService) *AuthHandler {
-	return &AuthHandler{auth: auth}
+func NewAuthHandler(auth *services.AuthService, reset *services.PasswordResetService) *AuthHandler {
+	return &AuthHandler{auth: auth, reset: reset}
 }
 
 // toUserSummary projects an auth-loaded User (with Roles + Employee preloaded)
@@ -163,5 +164,93 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		Success: true,
 		Message: "Logged out",
 		Data:    dto.LogoutResponse{Message: "Logged out"},
+	})
+}
+
+// ForgotPassword godoc
+// @Summary      Request a password reset email
+// @Description  Sends a password reset link to the given email address.
+// @Description  Always returns 200 regardless of whether the email is registered
+// @Description  (enumerate guard — never reveal which accounts exist).
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.ForgotPasswordRequest  true  "Email address"
+// @Success      200   {object}  dto.Response[any]
+// @Failure      400   {object}  dto.Response[any]  "Malformed body"
+// @Router       /api/v1/auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req dto.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperr.ErrBadRequest(err.Error()))
+		return
+	}
+	// RequestReset is always nil — enumerate guard.
+	_ = h.reset.RequestReset(c.Request.Context(), req.Email)
+	c.JSON(http.StatusOK, dto.Response[any]{
+		Success: true,
+		Message: "If that email address is registered, a reset link has been sent.",
+	})
+}
+
+// VerifyResetToken godoc
+// @Summary      Verify a password-reset token
+// @Description  Checks whether the token is valid (exists, not used, not expired). Does not consume the token.
+// @Description  Call this when the user lands on the reset-password page to show an error before they fill in the form.
+// @Tags         Authentication
+// @Produce      json
+// @Param        token  query     string  true  "Reset token from the email link"
+// @Success      200    {object}  dto.Response[any]
+// @Failure      400    {object}  dto.Response[any]  "Invalid, expired, or already-used token"
+// @Router       /api/v1/auth/verify-token [get]
+func (h *AuthHandler) VerifyResetToken(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		_ = c.Error(apperr.ErrBadRequest("token query parameter is required"))
+		return
+	}
+	user, err := h.reset.VerifyToken(c.Request.Context(), token)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	firstName := ""
+	if user.Employee != nil {
+		firstName = user.Employee.FirstName
+	}
+	c.JSON(http.StatusOK, dto.Response[dto.TokenVerifyResponse]{
+		Success: true,
+		Message: "Token is valid.",
+		Data: dto.TokenVerifyResponse{
+			Email:     user.Email,
+			FirstName: firstName,
+		},
+	})
+}
+
+// ResetPassword godoc
+// @Summary      Reset password using a token
+// @Description  Validates the one-time token and sets a new password.
+// @Description  Returns 400 if the token is missing, expired, or already used.
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.ResetPasswordRequest  true  "Reset token and new password"
+// @Success      200   {object}  dto.Response[any]
+// @Failure      400   {object}  dto.Response[any]  "Invalid/expired token or bad request"
+// @Router       /api/v1/auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req dto.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperr.ErrBadRequest(err.Error()))
+		return
+	}
+	if err := h.reset.ResetWithToken(c.Request.Context(), req.Token, req.NewPassword); err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[any]{
+		Success: true,
+		Message: "Password has been reset successfully.",
 	})
 }

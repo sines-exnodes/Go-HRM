@@ -413,9 +413,16 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 			return nil, err
 		}
 	}
-	hash, err := utils.HashPassword(in.Password)
-	if err != nil {
-		return nil, apperrors.ErrBadRequest("failed to hash password")
+	// Hash the password when provided (invite-accept path); leave blank for
+	// passwordless admin-create (Python parity — user sets password via the
+	// forgot-password / invite email flow).
+	hash := ""
+	if in.Password != "" {
+		var err error
+		hash, err = utils.HashPassword(in.Password)
+		if err != nil {
+			return nil, apperrors.ErrBadRequest("failed to hash password")
+		}
 	}
 	active := true
 	if in.IsActive != nil {
