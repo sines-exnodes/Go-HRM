@@ -104,6 +104,30 @@ func (s *PasswordResetService) RequestReset(ctx context.Context, email string) e
 	return nil
 }
 
+// VerifyToken checks whether a reset token is valid (exists, not used, not expired).
+// Returns the associated User so the caller can show their name/email on the set-password page.
+// Does NOT consume the token.
+func (s *PasswordResetService) VerifyToken(ctx context.Context, token string) (*models.User, error) {
+	prt, err := s.tokens.FindByToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperr.ErrBadRequest("Invalid or expired reset token")
+		}
+		return nil, apperr.ErrInternal(err.Error())
+	}
+	if prt.UsedAt != nil {
+		return nil, apperr.ErrBadRequest("Reset token has already been used")
+	}
+	if time.Now().UTC().After(prt.ExpiresAt) {
+		return nil, apperr.ErrBadRequest("Reset token has expired")
+	}
+	user, err := s.users.FindByIDWithRolesAndEmployee(ctx, prt.UserID)
+	if err != nil {
+		return nil, apperr.ErrInternal(err.Error())
+	}
+	return user, nil
+}
+
 // ResetWithToken validates the token and applies the new hashed password.
 // Returns a 400 AppError for invalid/expired/used tokens.
 func (s *PasswordResetService) ResetWithToken(ctx context.Context, token, newPassword string) error {

@@ -193,6 +193,41 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	})
 }
 
+// VerifyResetToken godoc
+// @Summary      Verify a password-reset token
+// @Description  Checks whether the token is valid (exists, not used, not expired). Does not consume the token.
+// @Description  Call this when the user lands on the reset-password page to show an error before they fill in the form.
+// @Tags         Authentication
+// @Produce      json
+// @Param        token  query     string  true  "Reset token from the email link"
+// @Success      200    {object}  dto.Response[any]
+// @Failure      400    {object}  dto.Response[any]  "Invalid, expired, or already-used token"
+// @Router       /api/v1/auth/verify-token [get]
+func (h *AuthHandler) VerifyResetToken(c *gin.Context) {
+	token := c.Query("token")
+	if token == "" {
+		_ = c.Error(apperr.ErrBadRequest("token query parameter is required"))
+		return
+	}
+	user, err := h.reset.VerifyToken(c.Request.Context(), token)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	firstName := ""
+	if user.Employee != nil {
+		firstName = user.Employee.FirstName
+	}
+	c.JSON(http.StatusOK, dto.Response[dto.TokenVerifyResponse]{
+		Success: true,
+		Message: "Token is valid.",
+		Data: dto.TokenVerifyResponse{
+			Email:     user.Email,
+			FirstName: firstName,
+		},
+	})
+}
+
 // ResetPassword godoc
 // @Summary      Reset password using a token
 // @Description  Validates the one-time token and sets a new password.

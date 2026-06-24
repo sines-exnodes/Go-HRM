@@ -66,8 +66,15 @@ type ForgotPasswordRequest struct {
 	Email string `json:"email" binding:"required,email" example:"john@exnodes.vn"`
 }
 
-// ResetPasswordRequest is the body for POST /api/v1/auth/reset-password.
+// ResetPasswordRequest is the body for POST /api/v1/auth/reset-password (and alias /set-password).
 type ResetPasswordRequest struct {
 	Token       string `json:"token" binding:"required" example:"abc123xyz"`
 	NewPassword string `json:"new_password" binding:"required,min=8" example:"NewPass!2026"`
+}
+
+// TokenVerifyResponse is the data payload for GET /api/v1/auth/verify-token.
+// Returns the user's display info so the FE can show it on the set-password page.
+type TokenVerifyResponse struct {
+	Email     string `json:"email" example:"henry@exnodes.vn"`
+	FirstName string `json:"first_name" example:"Henry"`
 }
