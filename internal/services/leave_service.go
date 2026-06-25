@@ -272,10 +272,10 @@ func (s *LeaveService) computeBalance(ctx context.Context, employeeID uuid.UUID,
 	if err != nil {
 		return dto.LeaveBalanceSummary{}, err
 	}
-	var (
-		annualQuota float64
-		sickQuota   float64
-	)
+	// Default to the DB column defaults (12 / 6) so the dashboard matches
+	// the employee profile view when no explicit quota row has been created yet.
+	annualQuota := 12.0
+	sickQuota := 6.0
 	q, err := s.quota.GetByEmployee(ctx, employeeID)
 	if err != nil {
 		return dto.LeaveBalanceSummary{}, err

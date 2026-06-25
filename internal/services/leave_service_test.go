@@ -31,9 +31,8 @@ func newLeaveSvc(t *testing.T, up services.Uploader) (*services.LeaveService, re
 	return services.NewLeaveService(lr, emps, depts, pos, quotaRepo, up, holidayRepo), lr, quotaRepo
 }
 
-// makeLeaveQuota seeds a quota row for an employee. The leave service falls
-// back to (0, 0) when no row exists; tests that need a specific budget use
-// this helper to set the figures explicitly.
+// makeLeaveQuota seeds a quota row for an employee. Tests that need a budget
+// different from the 12/6 default use this helper to set the figures explicitly.
 func makeLeaveQuota(t *testing.T, employeeID uuid.UUID, annual, sick float64) {
 	t.Helper()
 	repo := repositories.NewLeaveQuotaRepository(testDB)
@@ -518,7 +517,7 @@ func TestLeaveService_Get_OwnerOrAdminOnly(t *testing.T) {
 
 // ---- Balance corner case ----
 
-func TestLeaveService_GetBalance_NoQuotaRow_ZeroQuotas(t *testing.T) {
+func TestLeaveService_GetBalance_NoQuotaRow_DefaultsTo12And6(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
@@ -528,9 +527,11 @@ func TestLeaveService_GetBalance_NoQuotaRow_ZeroQuotas(t *testing.T) {
 
 	bal, err := svc.GetBalance(ctx, emp.ID, 2026)
 	require.NoError(t, err)
-	require.Equal(t, 0.0, bal.AnnualQuota)
-	require.Equal(t, 0.0, bal.SickQuota)
-	require.Equal(t, 0.0, bal.AnnualRemaining)
+	// No explicit quota row → falls back to DB column defaults (12 annual / 6 sick)
+	// to match the employee profile view.
+	require.Equal(t, 12.0, bal.AnnualQuota)
+	require.Equal(t, 6.0, bal.SickQuota)
+	require.Equal(t, 12.0, bal.AnnualRemaining)
 	require.Equal(t, 0, bal.LeavesThisYear)
 }
 
