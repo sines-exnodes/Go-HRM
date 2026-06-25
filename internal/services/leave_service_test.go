@@ -518,7 +518,7 @@ func TestLeaveService_Get_OwnerOrAdminOnly(t *testing.T) {
 
 // ---- Balance corner case ----
 
-func TestLeaveService_GetBalance_NoQuotaRow_ZeroQuotas(t *testing.T) {
+func TestLeaveService_GetBalance_NoQuotaRow_DefaultsTo12And6(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
@@ -528,9 +528,11 @@ func TestLeaveService_GetBalance_NoQuotaRow_ZeroQuotas(t *testing.T) {
 
 	bal, err := svc.GetBalance(ctx, emp.ID, 2026)
 	require.NoError(t, err)
-	require.Equal(t, 0.0, bal.AnnualQuota)
-	require.Equal(t, 0.0, bal.SickQuota)
-	require.Equal(t, 0.0, bal.AnnualRemaining)
+	// No explicit quota row → falls back to DB column defaults (12 annual / 6 sick)
+	// to match the employee profile view.
+	require.Equal(t, 12.0, bal.AnnualQuota)
+	require.Equal(t, 6.0, bal.SickQuota)
+	require.Equal(t, 12.0, bal.AnnualRemaining)
 	require.Equal(t, 0, bal.LeavesThisYear)
 }
 
