@@ -31,9 +31,8 @@ func newLeaveSvc(t *testing.T, up services.Uploader) (*services.LeaveService, re
 	return services.NewLeaveService(lr, emps, depts, pos, quotaRepo, up, holidayRepo), lr, quotaRepo
 }
 
-// makeLeaveQuota seeds a quota row for an employee. The leave service falls
-// back to (0, 0) when no row exists; tests that need a specific budget use
-// this helper to set the figures explicitly.
+// makeLeaveQuota seeds a quota row for an employee. Tests that need a budget
+// different from the 12/6 default use this helper to set the figures explicitly.
 func makeLeaveQuota(t *testing.T, employeeID uuid.UUID, annual, sick float64) {
 	t.Helper()
 	repo := repositories.NewLeaveQuotaRepository(testDB)
