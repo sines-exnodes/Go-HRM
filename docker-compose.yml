@@ -39,6 +39,8 @@ services:
       # regardless of what the user has in .env (which often points at localhost).
       DB_HOST: postgres
       APP_ENV: ${APP_ENV:-production}
+    volumes:
+      - ./secret:/secret:ro
     ports:
       - "${PORT:-8080}:8080"
     depends_on:

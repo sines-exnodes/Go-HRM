@@ -19,6 +19,16 @@ func NewDeviceTokenRepository(db *gorm.DB) *DeviceTokenRepository {
 }
 
 func (r *DeviceTokenRepository) Upsert(ctx context.Context, t *models.DeviceToken) error {
+	// Evict this FCM token from any other user who previously held it.
+	// A device that logs in with a new account should not keep delivering
+	// notifications to the old account.
+	if err := r.db.WithContext(ctx).
+		Model(&models.DeviceToken{}).
+		Where("token = ? AND user_id != ? AND is_deleted = ?", t.Token, t.UserID, false).
+		Updates(map[string]any{"is_deleted": true, "deleted_at": gorm.Expr("NOW()")}).Error; err != nil {
+		return err
+	}
+
 	// The DB has a plain UNIQUE (user_id, device_id) constraint (it is NOT a
 	// partial index on is_deleted), so a soft-deleted row still occupies the
 	// slot. Update the existing row in place (re-activating it if it had been

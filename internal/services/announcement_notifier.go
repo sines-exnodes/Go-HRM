@@ -28,8 +28,11 @@ func (n *announcementNotifier) NotifyAnnouncement(ctx context.Context, userIDs [
 	for _, uid := range userIDs {
 		if n.push != nil {
 			req := dto.NotificationTestRequest{Title: title, Body: description}
-			if _, err := n.push.SendToUser(ctx, uid, req); err != nil {
+			result, err := n.push.SendToUser(ctx, uid, req)
+			if err != nil {
 				log.Printf("announcements: push to user %s: %v", uid, err)
+			} else {
+				log.Printf("announcements: push user=%s sent=%d skipped=%d errors=%v", uid, result.Sent, result.Skipped, result.Errors)
 			}
 		}
 		if n.email != nil {
