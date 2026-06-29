@@ -22,13 +22,15 @@ type Employee struct {
 	CurrentAddress   *string    `gorm:"type:text" json:"current_address,omitempty"`
 	DOB              *time.Time `gorm:"type:date" json:"dob,omitempty"`
 	Nationality      *string    `gorm:"type:text" json:"nationality,omitempty"`
-	IDNumber         *string    `gorm:"type:text" json:"id_number,omitempty"`
-	IDIssueDate      *time.Time `gorm:"type:date" json:"id_issue_date,omitempty"`
-	IDFrontImage     *string    `gorm:"type:text" json:"id_front_image,omitempty"`
-	IDBackImage      *string    `gorm:"type:text" json:"id_back_image,omitempty"`
-	AvatarURL        *string    `gorm:"type:text" json:"avatar_url,omitempty"`
-	Education        *string    `gorm:"type:text" json:"education,omitempty"`
-	MaritalStatus    *string    `gorm:"type:text" json:"marital_status,omitempty"`
+	IDNumber                *string    `gorm:"type:text" json:"id_number,omitempty"`
+	IDIssueDate             *time.Time `gorm:"type:date" json:"id_issue_date,omitempty"`
+	IDFrontImage            *string    `gorm:"type:text" json:"id_front_image,omitempty"`
+	IDBackImage             *string    `gorm:"type:text" json:"id_back_image,omitempty"`
+	AvatarURL               *string    `gorm:"type:text" json:"avatar_url,omitempty"`
+	Education               *string    `gorm:"type:text" json:"education,omitempty"`
+	MaritalStatus           *string    `gorm:"type:text" json:"marital_status,omitempty"`
+	SocialInsuranceNumber   *string    `gorm:"type:text" json:"social_insurance_number,omitempty"`
+	TaxIdentificationNumber *string    `gorm:"type:text" json:"tax_identification_number,omitempty"`
 	ExperienceYear   *int       `gorm:"type:int" json:"experience_year,omitempty"`
 	CVURL            *string    `gorm:"type:text" json:"cv_url,omitempty"`
 

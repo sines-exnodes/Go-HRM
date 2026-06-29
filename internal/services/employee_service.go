@@ -336,10 +336,12 @@ func (s *EmployeeService) toRead(e *models.Employee) *dto.EmployeeRead {
 		IDIssueDate:       e.IDIssueDate,
 		IDFrontImage:      e.IDFrontImage,
 		IDBackImage:       e.IDBackImage,
-		PermanentAddress:  e.PermanentAddress,
-		CurrentAddress:    e.CurrentAddress,
-		Education:         e.Education,
-		MaritalStatus:     e.MaritalStatus,
+		PermanentAddress:        e.PermanentAddress,
+		CurrentAddress:          e.CurrentAddress,
+		Education:               e.Education,
+		MaritalStatus:           e.MaritalStatus,
+		SocialInsuranceNumber:   e.SocialInsuranceNumber,
+		TaxIdentificationNumber: e.TaxIdentificationNumber,
 		ExperienceYear:    e.ExperienceYear,
 		CVURL:             e.CVURL,
 		AvatarURL:         e.AvatarURL,
@@ -467,10 +469,12 @@ func (s *EmployeeService) Create(ctx context.Context, in dto.EmployeeCreate) (*d
 			IDIssueDate:      in.IDIssueDate,
 			IDFrontImage:     in.IDFrontImage,
 			IDBackImage:      in.IDBackImage,
-			PermanentAddress: in.PermanentAddress,
-			CurrentAddress:   in.CurrentAddress,
-			Education:        in.Education,
-			MaritalStatus:    in.MaritalStatus,
+			PermanentAddress:        in.PermanentAddress,
+			CurrentAddress:          in.CurrentAddress,
+			Education:               in.Education,
+			MaritalStatus:           in.MaritalStatus,
+			SocialInsuranceNumber:   in.SocialInsuranceNumber,
+			TaxIdentificationNumber: in.TaxIdentificationNumber,
 			ExperienceYear:   in.ExperienceYear,
 			CVURL:            in.CVURL,
 			DepartmentID:     in.DepartmentID,
@@ -610,6 +614,8 @@ func (s *EmployeeService) Update(ctx context.Context, id uuid.UUID, in dto.Emplo
 	setIfNotNilStr("current_address", in.CurrentAddress)
 	setIfNotNilStr("education", in.Education)
 	setIfNotNilStr("marital_status", in.MaritalStatus)
+	setIfNotNilStr("social_insurance_number", in.SocialInsuranceNumber)
+	setIfNotNilStr("tax_identification_number", in.TaxIdentificationNumber)
 	setIfNotNilStr("contract_type", in.ContractType)
 	setIfNotNilStr("bank_account", in.BankAccount)
 	setIfNotNilStr("bank_name", in.BankName)
@@ -753,6 +759,12 @@ func (s *EmployeeService) SelfUpdate(ctx context.Context, userID uuid.UUID, in d
 	}
 	if in.MaritalStatus != nil {
 		allowed["marital_status"] = *in.MaritalStatus
+	}
+	if in.SocialInsuranceNumber != nil {
+		allowed["social_insurance_number"] = strings.TrimSpace(*in.SocialInsuranceNumber)
+	}
+	if in.TaxIdentificationNumber != nil {
+		allowed["tax_identification_number"] = strings.TrimSpace(*in.TaxIdentificationNumber)
 	}
 	if err := s.emps.UpdateFields(ctx, e.ID, allowed); err != nil {
 		return nil, err

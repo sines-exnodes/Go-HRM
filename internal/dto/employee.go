@@ -105,13 +105,15 @@ type EmployeeRead struct {
 	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
 	IDFrontImage     *string    `json:"id_front_image,omitempty"`
 	IDBackImage      *string    `json:"id_back_image,omitempty"`
-	PermanentAddress *string    `json:"permanent_address,omitempty"`
-	CurrentAddress   *string    `json:"current_address,omitempty"`
-	Education        *string    `json:"education,omitempty"`
-	MaritalStatus    *string    `json:"marital_status,omitempty"`
-	ExperienceYear   *int       `json:"experience_year,omitempty"`
-	CVURL            *string    `json:"cv_url,omitempty"`
-	AvatarURL        *string    `json:"avatar_url,omitempty"`
+	PermanentAddress        *string    `json:"permanent_address,omitempty"`
+	CurrentAddress          *string    `json:"current_address,omitempty"`
+	Education               *string    `json:"education,omitempty"`
+	MaritalStatus           *string    `json:"marital_status,omitempty"`
+	ExperienceYear          *int       `json:"experience_year,omitempty"`
+	CVURL                   *string    `json:"cv_url,omitempty"`
+	AvatarURL               *string    `json:"avatar_url,omitempty"`
+	SocialInsuranceNumber   *string    `json:"social_insurance_number,omitempty"`
+	TaxIdentificationNumber *string    `json:"tax_identification_number,omitempty"`
 
 	// Emergency contacts — 1-N list (employees parity #4). Always present
 	// (empty array when none) so the FE can render the section unconditionally.
@@ -187,12 +189,14 @@ type EmployeeCreate struct {
 	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
 	IDFrontImage     *string    `json:"id_front_image,omitempty"`
 	IDBackImage      *string    `json:"id_back_image,omitempty"`
-	PermanentAddress *string    `json:"permanent_address,omitempty"`
-	CurrentAddress   *string    `json:"current_address,omitempty"`
-	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
-	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
-	ExperienceYear   *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
-	CVURL            *string    `json:"cv_url,omitempty"`
+	PermanentAddress        *string    `json:"permanent_address,omitempty"`
+	CurrentAddress          *string    `json:"current_address,omitempty"`
+	Education               *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
+	MaritalStatus           *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
+	ExperienceYear          *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
+	CVURL                   *string    `json:"cv_url,omitempty"`
+	SocialInsuranceNumber   *string    `json:"social_insurance_number,omitempty"   binding:"omitempty,max=50"`
+	TaxIdentificationNumber *string    `json:"tax_identification_number,omitempty" binding:"omitempty,max=50"`
 
 	// Emergency contacts — full replacement list at create (employees parity #4).
 	EmergencyContacts []EmergencyContactInput `json:"emergency_contacts,omitempty" binding:"omitempty,dive"`
@@ -236,12 +240,14 @@ type EmployeeUpdate struct {
 	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
 	IDFrontImage     *string    `json:"id_front_image,omitempty"`
 	IDBackImage      *string    `json:"id_back_image,omitempty"`
-	PermanentAddress *string    `json:"permanent_address,omitempty"`
-	CurrentAddress   *string    `json:"current_address,omitempty"`
-	Education        *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
-	MaritalStatus    *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
-	ExperienceYear   *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
-	CVURL            *string    `json:"cv_url,omitempty"`
+	PermanentAddress        *string    `json:"permanent_address,omitempty"`
+	CurrentAddress          *string    `json:"current_address,omitempty"`
+	Education               *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
+	MaritalStatus           *string    `json:"marital_status,omitempty"  binding:"omitempty,oneof=single married other"`
+	ExperienceYear          *int       `json:"experience_year,omitempty"` // career-start year; range validated in the service (validateExperienceYear)
+	CVURL                   *string    `json:"cv_url,omitempty"`
+	SocialInsuranceNumber   *string    `json:"social_insurance_number,omitempty"   binding:"omitempty,max=50"`
+	TaxIdentificationNumber *string    `json:"tax_identification_number,omitempty" binding:"omitempty,max=50"`
 
 	// Emergency contacts — pointer-to-slice partial-PATCH semantics:
 	// nil/absent = leave unchanged, [] = clear all, non-empty = replace the set.
@@ -289,9 +295,11 @@ type EmployeeSelfUpdate struct {
 	DOB              *time.Time `json:"dob,omitempty"`
 	Phone            *string    `json:"phone,omitempty"`
 	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
-	PermanentAddress *string    `json:"permanent_address,omitempty"`
-	CurrentAddress   *string    `json:"current_address,omitempty"`
-	MaritalStatus    *string    `json:"marital_status,omitempty" binding:"omitempty,oneof=single married other"`
+	PermanentAddress        *string    `json:"permanent_address,omitempty"`
+	CurrentAddress          *string    `json:"current_address,omitempty"`
+	MaritalStatus           *string    `json:"marital_status,omitempty" binding:"omitempty,oneof=single married other"`
+	SocialInsuranceNumber   *string    `json:"social_insurance_number,omitempty"   binding:"omitempty,max=50"`
+	TaxIdentificationNumber *string    `json:"tax_identification_number,omitempty" binding:"omitempty,max=50"`
 
 	// Emergency contacts — self may manage their own list (pointer-to-slice:
 	// nil = leave unchanged, [] = clear all, non-empty = replace the set).
