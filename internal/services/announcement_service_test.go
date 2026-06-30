@@ -73,14 +73,15 @@ type captureNotifier struct {
 
 type notifyCall struct {
 	UserIDs     []uuid.UUID
+	ID          uuid.UUID
 	Title       string
 	Description string
 }
 
-func (n *captureNotifier) NotifyAnnouncement(_ context.Context, userIDs []uuid.UUID, title, description string) {
+func (n *captureNotifier) NotifyAnnouncement(_ context.Context, userIDs []uuid.UUID, id uuid.UUID, title, description string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	n.calls = append(n.calls, notifyCall{UserIDs: userIDs, Title: title, Description: description})
+	n.calls = append(n.calls, notifyCall{UserIDs: userIDs, ID: id, Title: title, Description: description})
 }
 
 func (n *captureNotifier) callCount() int {
