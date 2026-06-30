@@ -44,10 +44,14 @@ func NewAnnouncementNotifier(
 	return &announcementNotifier{push: push, email: email, users: users}
 }
 
-func (n *announcementNotifier) NotifyAnnouncement(ctx context.Context, userIDs []uuid.UUID, title, description string) {
+func (n *announcementNotifier) NotifyAnnouncement(ctx context.Context, userIDs []uuid.UUID, id uuid.UUID, title, description string) {
 	for _, uid := range userIDs {
 		if n.push != nil {
-			req := dto.NotificationTestRequest{Title: title, Body: pushBody(description)}
+			req := dto.NotificationTestRequest{
+				Title: title,
+				Body:  pushBody(description),
+				Data:  map[string]any{"type": "announcement", "id": id.String()},
+			}
 			result, err := n.push.SendToUser(ctx, uid, req)
 			if err != nil {
 				log.Printf("announcements: push to user %s: %v", uid, err)
