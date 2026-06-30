@@ -27,7 +27,7 @@ type HubBroadcaster interface {
 // AnnouncementNotifier dispatches push + email notifications when an
 // announcement is published. Nil disables notifications (tests, dev).
 type AnnouncementNotifier interface {
-	NotifyAnnouncement(ctx context.Context, userIDs []uuid.UUID, title, description string)
+	NotifyAnnouncement(ctx context.Context, userIDs []uuid.UUID, id uuid.UUID, title, description string)
 }
 
 // AnnouncementService owns the announcement aggregate. Permission gating
@@ -251,7 +251,7 @@ func (s *AnnouncementService) dispatchNotifications(ann *models.Announcement) {
 	if len(userIDs) == 0 {
 		return
 	}
-	s.notifier.NotifyAnnouncement(ctx, userIDs, ann.Title, ann.Description)
+	s.notifier.NotifyAnnouncement(ctx, userIDs, ann.ID, ann.Title, ann.Description)
 }
 
 func (s *AnnouncementService) resolveRecipientUserIDs(ctx context.Context, ann *models.Announcement) ([]uuid.UUID, error) {
