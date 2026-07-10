@@ -91,6 +91,7 @@ const (
 	PermOrgWorkdaysView Permission = "organization:workdays_view"
 
 	// Announcements
+	PermAnnounceRead   Permission = "announcements:read"
 	PermAnnounceManage Permission = "announcements:manage"
 
 	// Invites (Phase 9)
@@ -118,7 +119,7 @@ func AllPermissions() []Permission {
 		PermOrgSettings,
 		PermOrgHolidaysView, PermOrgHolidaysManage,
 		PermOrgWorkdaysView,
-		PermAnnounceManage,
+		PermAnnounceRead, PermAnnounceManage,
 		PermInviteManage,
 	}
 }
@@ -275,6 +276,7 @@ var PermissionGroups = []PermissionGroup{
 	{
 		Resource: "announcements", Label: "Announcements",
 		Permissions: []PermissionItem{
+			{PermAnnounceRead, "View Announcements", "View announcements visible to the user"},
 			{PermAnnounceManage, "Manage Announcements", "Create, edit, send, and delete announcements"},
 		},
 	},

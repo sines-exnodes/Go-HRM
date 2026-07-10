@@ -950,6 +950,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/forgot-password": {
+            "post": {
+                "description": "Sends a password reset link to the given email address.\nAlways returns 200 regardless of whether the email is registered\n(enumerate guard — never reveal which accounts exist).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Request a password reset email",
+                "parameters": [
+                    {
+                        "description": "Email address",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.ForgotPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed body",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/login": {
             "post": {
                 "description": "Exchanges an email + password for a token pair. Required permission: ` + "`" + `auth:login` + "`" + `.\n\n**Brute-force protection.** After ` + "`" + `MAX_FAILED_LOGIN_ATTEMPTS` + "`" + ` (default 5)\nconsecutive bad passwords the account is locked for ` + "`" + `ACCOUNT_LOCKOUT_MINUTES` + "`" + `\n(default 15). During the lockout window, every login attempt — including the\ncorrect one — returns 401 with ` + "`" + `\"Account temporarily locked. Try again in N minutes.\"` + "`" + `.\nA successful login resets the failed-attempt counter.\n\n**` + "`" + `remember_me` + "`" + `.** When ` + "`" + `true` + "`" + `, the refresh token is issued with the long-lived\nTTL (` + "`" + `REMEMBER_ME_REFRESH_TOKEN_EXPIRE_DAYS` + "`" + `, default 30 days) instead of the\ndefault refresh-token TTL. The access token TTL is unaffected.\n\n**` + "`" + `is_active` + "`" + `.** A deactivated account is rejected with 401 *after* password\nverification so the response cannot be used to enumerate which accounts exist.",
@@ -1073,6 +1113,106 @@ const docTemplate = `{
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/reset-password": {
+            "post": {
+                "description": "Validates the one-time token and sets a new password.\nReturns 400 if the token is missing, expired, or already used.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Reset password using a token",
+                "parameters": [
+                    {
+                        "description": "Reset token and new password",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid/expired token or bad request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/verify-token": {
+            "get": {
+                "description": "Checks whether the token is valid (exists, not used, not expired). Does not consume the token.\nCall this when the user lands on the reset-password page to show an error before they fill in the form.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify a password-reset token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Reset token from the email link",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid, expired, or already-used token",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dashboard": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns fixed-order widgets visible to the authenticated user based on source module permissions.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Get the common dashboard",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_DashboardRead"
                         }
                     }
                 }
@@ -4244,6 +4384,43 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/users/{id}/reset-password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Triggers a \"reset your password\" email for the given user. Same token flow as forgot-password.\nRequires users:change_password permission.",
+                "tags": [
+                    "users"
+                ],
+                "summary": "Admin — send password-reset link to a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/{id}/roles": {
             "put": {
                 "security": [
@@ -4285,6 +4462,43 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/{id}/send-invite": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends a \"set your password\" invite email. Useful for resending the initial invite.\nRequires users:create permission.",
+                "tags": [
+                    "users"
+                ],
+                "summary": "Admin — send (or resend) set-password invite to a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
                         }
                     }
                 }
@@ -5386,6 +5600,121 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.DashboardActionRead": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DashboardGreetingRead": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DashboardItemRead": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DashboardMetricRead": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "value": {}
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DashboardRead": {
+            "type": "object",
+            "properties": {
+                "empty": {
+                    "type": "boolean"
+                },
+                "empty_message": {
+                    "type": "string"
+                },
+                "greeting": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardGreetingRead"
+                },
+                "widgets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardWidgetRead"
+                    }
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.DashboardWidgetRead": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardActionRead"
+                    }
+                },
+                "empty_message": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardItemRead"
+                    }
+                },
+                "metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardMetricRead"
+                    }
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.DeleteUserRequest": {
             "type": "object",
             "required": [
@@ -5528,8 +5857,7 @@ const docTemplate = `{
             "required": [
                 "email",
                 "first_name",
-                "last_name",
-                "password"
+                "last_name"
             ],
             "properties": {
                 "bank_account": {
@@ -5582,7 +5910,7 @@ const docTemplate = `{
                     ]
                 },
                 "email": {
-                    "description": "User credentials (created in tx)",
+                    "description": "User credentials (created in tx).\nPassword is intentionally not accepted from the HTTP payload (json:\"-\") —\nit must be set via the forgot-password / invite-accept flow after creation,\nmatching Python's passwordless admin-create behaviour.\nInviteService.Accept populates this field in Go code before calling\nempSvc.Create, so invite-based accounts still get a password on first use.",
                     "type": "string"
                 },
                 "emergency_contacts": {
@@ -5651,10 +5979,6 @@ const docTemplate = `{
                 "nationality": {
                     "type": "string"
                 },
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                },
                 "payment_method": {
                     "type": "string"
                 },
@@ -5677,12 +6001,24 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "send_invite": {
+                    "description": "When true, a \"set your password\" email is sent to the new employee using\nthe same forgot-password token mechanism (PasswordResetService.RequestReset).",
+                    "type": "boolean"
+                },
                 "skill_ids": {
                     "description": "Skills assigned at creation (inline — Python parity). Empty/absent = none.",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
+                },
+                "social_insurance_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "tax_identification_number": {
+                    "type": "string",
+                    "maxLength": 50
                 }
             }
         },
@@ -5736,6 +6072,14 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string"
+                },
+                "social_insurance_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "tax_identification_number": {
+                    "type": "string",
+                    "maxLength": 50
                 }
             }
         },
@@ -5925,6 +6269,14 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "social_insurance_number": {
+                    "type": "string",
+                    "maxLength": 50
+                },
+                "tax_identification_number": {
+                    "type": "string",
+                    "maxLength": 50
                 }
             }
         },
@@ -5949,6 +6301,18 @@ const docTemplate = `{
                 },
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.ForgotPasswordRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@exnodes.vn"
                 }
             }
         },
@@ -6339,6 +6703,24 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password",
+                "token"
+            ],
+            "properties": {
+                "new_password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "NewPass!2026"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "abc123xyz"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-any": {
             "type": "object",
             "properties": {
@@ -6393,6 +6775,20 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_DashboardRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardRead"
                 },
                 "message": {
                     "type": "string"
@@ -6896,6 +7292,7 @@ const docTemplate = `{
                 "organization:holidays_view",
                 "organization:holidays_manage",
                 "organization:workdays_view",
+                "announcements:read",
                 "announcements:manage",
                 "invites:manage"
             ],
@@ -6947,6 +7344,7 @@ const docTemplate = `{
                 "kept for backward compat; prefer ApproveTeam/ApproveAll",
                 "approve own subordinate chain only (BFS)",
                 "approve any employee's request",
+                "",
                 "",
                 "",
                 "",
@@ -7011,6 +7409,7 @@ const docTemplate = `{
                 "PermOrgHolidaysView",
                 "PermOrgHolidaysManage",
                 "PermOrgWorkdaysView",
+                "PermAnnounceRead",
                 "PermAnnounceManage",
                 "PermInviteManage"
             ]

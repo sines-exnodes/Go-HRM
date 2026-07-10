@@ -131,6 +131,7 @@ func main() {
 	holidaySvc := services.NewHolidayService(holidayRepo, holidayTemplateRepo, leaveRepo)
 	workdaySvc := services.NewWorkdayService(holidayRepo)
 	passwordResetSvc := services.NewPasswordResetService(userRepo, passwordResetTokenRepo, emailSvc, cfg)
+	dashboardSvc := services.NewDashboardService(cfg, employeeRepo, leaveRepo, quotaRepo, attendanceRepo, announcementRepo, holidayRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -157,6 +158,7 @@ func main() {
 	userContractH := handlers.NewUserContractHandler(userContractSvc)
 	holidayH := handlers.NewHolidayHandler(holidaySvc)
 	workdayH := handlers.NewWorkdayHandler(workdaySvc)
+	dashboardH := handlers.NewDashboardHandler(dashboardSvc)
 
 	// ---- CORS origin allow-list ----
 	var corsOrigins []string
@@ -204,6 +206,7 @@ func main() {
 		authed.Use(middleware.JWT(userRepo, cfg.JWTSecret))
 
 		authed.POST("/auth/logout", authH.Logout)
+		authed.GET("/dashboard", dashboardH.Get)
 
 		// ---- /roles ----
 		roles := authed.Group("/roles")
@@ -351,28 +354,28 @@ func main() {
 		leaves.POST(":id/delete", middleware.RequirePerms(authSvc, permissions.PermLeaveDelete), leaveH.Delete)
 
 		// ---- /announcements (Phase 7 — web) ----
-		// JWT-only reads (visibility filtered server-side); PermAnnounceManage
-		// gates writes. Mark-viewed is a self-service action, no perm.
+		// Read routes require the source module view permission and remain
+		// visibility-filtered server-side; PermAnnounceManage gates writes.
 		announce := authed.Group("/announcements")
-		announce.GET("", announcementH.List)
-		announce.GET(":id", announcementH.Get)
-		announce.POST(":id/view", announcementH.MarkViewed)
+		announce.GET("", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.List)
+		announce.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.Get)
+		announce.POST(":id/view", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MarkViewed)
 		announce.POST("", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), announcementH.Create)
 		announce.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), announcementH.Update)
 		announce.DELETE(":id", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), announcementH.Delete)
 		announce.POST(":id/publish", middleware.RequirePerms(authSvc, permissions.PermAnnounceManage), announcementH.Publish)
 
 		// ---- /mobile/announcements (Phase 7 — mobile) ----
-		// JWT-only; service forces visibility filtering. Description
+		// Read permission required; service forces visibility filtering. Description
 		// omitted from list items; detail fetch via :id.
 		// `` → top-5 unpaginated brief (home widget — matches Python's
 		// GET /mobile/announcements/).
 		// `/list` → paginated brief.
 		mobileAnnounce := authed.Group("/mobile/announcements")
-		mobileAnnounce.GET("", announcementH.MobileBrief)
-		mobileAnnounce.GET("/list", announcementH.MobileList)
-		mobileAnnounce.GET(":id", announcementH.MobileGet)
-		mobileAnnounce.POST(":id/read", announcementH.MarkViewed)
+		mobileAnnounce.GET("", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MobileBrief)
+		mobileAnnounce.GET("/list", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MobileList)
+		mobileAnnounce.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MobileGet)
+		mobileAnnounce.POST(":id/read", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MarkViewed)
 
 		// ---- /attendance (Phase 6) ----
 		// Gin route precedence: literal segments (today/me/matrix) must be
