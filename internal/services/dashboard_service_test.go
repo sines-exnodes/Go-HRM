@@ -59,6 +59,15 @@ func dashboardMetric(t *testing.T, w dto.DashboardWidgetRead, key string) dto.Da
 	return dto.DashboardMetricRead{}
 }
 
+func dashboardHasMetric(w dto.DashboardWidgetRead, key string) bool {
+	for _, m := range w.Metrics {
+		if m.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
 func TestDashboardService_Get_FiltersWidgetsAndKeepsStableOrder(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
@@ -178,6 +187,47 @@ func TestDashboardService_Get_PendingApprovalsAreTeamScoped(t *testing.T) {
 	require.Equal(t, float64(1), dashboardMetric(t, widget, "pending_leave").Value)
 	require.Len(t, widget.Items, 1)
 	require.Contains(t, widget.Items[0].Title, "Dashboard Report")
+}
+
+func TestDashboardService_Get_LeaveSummaryUsesOrganizationScopeForManagers(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	role := makeRole(t, "Dashboard HR", []permissions.Permission{
+		permissions.PermAuthLogin,
+		permissions.PermLeaveRead,
+		permissions.PermLeaveManage,
+	}, false)
+	hrUser := makeUser(t, "dashboard-hr@example.com", "pw-Aa123456", role)
+	hrUser.Roles = []models.Role{*role}
+	makeEmployee(t, hrUser, "Dashboard HR")
+	targetUser := makeUser(t, "dashboard-leave-target@example.com", "pw-Aa123456")
+	target := makeEmployee(t, targetUser, "Dashboard Leave Target")
+
+	start := time.Date(2099, 1, 3, 0, 0, 0, 0, time.UTC)
+	require.NoError(t, testDB.Create(&models.LeaveRequest{
+		EmployeeID:  target.ID,
+		CreatedBy:   target.ID,
+		FromDate:    start,
+		ToDate:      start,
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		TotalDays:   1,
+		Reason:      "approved away day",
+		Status:      models.LeaveStatusApproved,
+	}).Error)
+
+	dash, err := newDashboardSvc(t).Get(ctx, hrUser)
+	require.NoError(t, err)
+
+	widget := dashboardWidget(t, dash, "leave_summary")
+	require.Equal(t, "organization", widget.Scope)
+	require.Equal(t, float64(1), dashboardMetric(t, widget, "upcoming_leave").Value)
+	require.False(t, dashboardHasMetric(widget, "annual_remaining"), "organization leave summary should not show the viewer's personal balance")
+	require.Empty(t, widget.Actions, "organization leave summary should not show personal create-leave action")
+	require.Len(t, widget.Items, 1)
+	require.Contains(t, widget.Items[0].Title, "Dashboard Leave Target")
 }
 
 func TestDashboardService_Get_AuthOnlyUserGetsNeutralEmptyDashboard(t *testing.T) {
