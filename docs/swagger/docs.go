@@ -2961,7 +2961,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the latest 5 published announcements visible to the\ncurrent user, as ` + "`" + `MobileAnnouncementBrief` + "`" + ` items (description\nomitted; fetch full detail via MobileGet). Unpaginated.\nMirrors Python's ` + "`" + `GET /mobile/announcements/` + "`" + ` contract.",
+                "description": "Returns the latest 5 published announcements visible to the\ncurrent user. Each item includes a plain-text description preview\nlimited to 100 Unicode characters. Unpaginated.\nMirrors Python's ` + "`" + `GET /mobile/announcements/` + "`" + ` contract.",
                 "produces": [
                     "application/json"
                 ],
@@ -2987,7 +2987,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Always visibility-filtered to published + audience match.\nDescription field omitted from each item; fetch detail via MobileGet.",
+                "description": "Always visibility-filtered to published + audience match.\nEach item includes a plain-text description preview limited to\n100 Unicode characters; fetch full content via MobileGet.",
                 "produces": [
                     "application/json"
                 ],
@@ -4518,7 +4518,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData"
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData"
                         }
                     }
                 }
@@ -6938,11 +6938,11 @@ const docTemplate = `{
                 }
             }
         },
-        "github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData": {
+        "github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/internal_handlers.HealthData"
+                    "$ref": "#/definitions/handlers.HealthData"
                 },
                 "message": {
                     "type": "string"
@@ -7445,7 +7445,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.HealthData": {
+        "handlers.HealthData": {
             "type": "object",
             "properties": {
                 "service": {
