@@ -41,8 +41,13 @@ type LeaveRequestRepository interface {
 	ListByEmployee(ctx context.Context, employeeID uuid.UUID, filter ListByEmployeeFilter) ([]models.LeaveRequest, int64, error)
 
 	// Upcoming returns pending/approved requests with from_date on or after
-	// `today`, capped to `limit`. Used by the dashboard endpoint.
+	// `today`, capped to `limit`. Used by the employee leave dashboard.
 	Upcoming(ctx context.Context, employeeID uuid.UUID, today time.Time, limit int) ([]models.LeaveRequest, error)
+
+	// UpcomingScoped returns pending/approved requests whose to_date is on or after
+	// `today`, capped to `limit`. employeeIDs nil means organization-wide;
+	// an empty slice means no matches.
+	UpcomingScoped(ctx context.Context, employeeIDs []uuid.UUID, today time.Time, limit int) ([]models.LeaveRequest, int64, error)
 
 	// History returns requests whose to_date is strictly before `today`,
 	// capped to `limit`. Used by the dashboard endpoint.
@@ -214,6 +219,35 @@ func (r *leaveRequestRepo) Upcoming(ctx context.Context, employeeID uuid.UUID, t
 		Limit(limit).
 		Find(&items).Error
 	return items, err
+}
+
+func (r *leaveRequestRepo) UpcomingScoped(ctx context.Context, employeeIDs []uuid.UUID, today time.Time, limit int) ([]models.LeaveRequest, int64, error) {
+	if employeeIDs != nil && len(employeeIDs) == 0 {
+		return []models.LeaveRequest{}, 0, nil
+	}
+	if limit < 1 {
+		limit = 5
+	}
+
+	query := r.base(ctx).
+		Model(&models.LeaveRequest{}).
+		Where("status IN ?", []string{string(models.LeaveStatusPending), string(models.LeaveStatusApproved)}).
+		Where("to_date >= ?", today)
+	if employeeIDs != nil {
+		query = query.Where("employee_id IN ?", employeeIDs)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var items []models.LeaveRequest
+	err := query.
+		Order("from_date ASC, created_at DESC").
+		Limit(limit).
+		Find(&items).Error
+	return items, total, err
 }
 
 func (r *leaveRequestRepo) History(ctx context.Context, employeeID uuid.UUID, today time.Time, limit int) ([]models.LeaveRequest, error) {

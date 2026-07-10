@@ -273,7 +273,7 @@ func (s *DashboardService) pendingApprovalsWidget(ctx context.Context, user *mod
 }
 
 func (s *DashboardService) leaveSummaryWidget(ctx context.Context, user *models.User, currentEmp *models.Employee, today time.Time) (dto.DashboardWidgetRead, bool, error) {
-	if currentEmp == nil || !dashboardHasAny(
+	if !dashboardHasAny(
 		user,
 		permissions.PermLeaveRead,
 		permissions.PermLeaveCreate,
@@ -287,15 +287,39 @@ func (s *DashboardService) leaveSummaryWidget(ctx context.Context, user *models.
 	) {
 		return dto.DashboardWidgetRead{}, false, nil
 	}
-	balance, err := s.leaveBalance(ctx, currentEmp.ID, today.Year())
+
+	hasOrgScope := dashboardHasAny(user, permissions.PermLeaveApproveAll, permissions.PermLeaveApprove, permissions.PermLeaveManage)
+	hasTeamScope := dashboardHas(user, permissions.PermLeaveApproveTeam) && !hasOrgScope
+
+	scope := "own"
+	var employeeIDs []uuid.UUID
+	if hasOrgScope {
+		scope = "organization"
+	} else if hasTeamScope {
+		if currentEmp == nil {
+			return dto.DashboardWidgetRead{}, false, nil
+		}
+		subordinateSet, err := s.emps.SubordinateIDs(ctx, currentEmp.ID)
+		if err != nil {
+			return dto.DashboardWidgetRead{}, false, err
+		}
+		employeeIDs = make([]uuid.UUID, 0, len(subordinateSet))
+		for id := range subordinateSet {
+			employeeIDs = append(employeeIDs, id)
+		}
+		scope = "team"
+	} else {
+		if currentEmp == nil {
+			return dto.DashboardWidgetRead{}, false, nil
+		}
+		employeeIDs = []uuid.UUID{currentEmp.ID}
+	}
+
+	_, pending, err := s.leaves.List(ctx, employeeIDs, []string{string(models.LeaveStatusPending)}, 1, 1)
 	if err != nil {
 		return dto.DashboardWidgetRead{}, false, err
 	}
-	_, pending, err := s.leaves.List(ctx, []uuid.UUID{currentEmp.ID}, []string{string(models.LeaveStatusPending)}, 1, 1)
-	if err != nil {
-		return dto.DashboardWidgetRead{}, false, err
-	}
-	upcoming, err := s.leaves.Upcoming(ctx, currentEmp.ID, today, 5)
+	upcoming, upcomingTotal, err := s.leaves.UpcomingScoped(ctx, employeeIDs, today, 5)
 	if err != nil {
 		return dto.DashboardWidgetRead{}, false, err
 	}
@@ -303,24 +327,35 @@ func (s *DashboardService) leaveSummaryWidget(ctx context.Context, user *models.
 	for i := range upcoming {
 		items = append(items, s.leaveItem(ctx, &upcoming[i]))
 	}
-	actions := []dto.DashboardActionRead{}
-	if dashboardHas(user, permissions.PermLeaveCreate) {
-		actions = append(actions, dto.DashboardActionRead{
-			Key:   "create_leave_request",
-			Label: "Create Leave Request",
-			URL:   "/leave-requests/new",
-		})
+
+	metrics := []dto.DashboardMetricRead{
+		{Key: "pending_requests", Label: "Pending Requests", Value: float64(pending)},
+		{Key: "upcoming_leave", Label: "Upcoming Leave", Value: float64(upcomingTotal)},
 	}
-	return dto.DashboardWidgetRead{
-		ID:    "leave_summary",
-		Title: "Leave Summary",
-		Scope: "own",
-		Metrics: []dto.DashboardMetricRead{
+	actions := []dto.DashboardActionRead{}
+	if scope == "own" {
+		balance, err := s.leaveBalance(ctx, currentEmp.ID, today.Year())
+		if err != nil {
+			return dto.DashboardWidgetRead{}, false, err
+		}
+		metrics = append([]dto.DashboardMetricRead{
 			{Key: "annual_remaining", Label: "Annual Remaining", Value: balance.AnnualRemaining},
 			{Key: "sick_remaining", Label: "Sick Remaining", Value: balance.SickRemaining},
-			{Key: "pending_requests", Label: "Pending Requests", Value: float64(pending)},
-			{Key: "upcoming_leave", Label: "Upcoming Leave", Value: float64(len(upcoming))},
-		},
+		}, metrics...)
+		if dashboardHas(user, permissions.PermLeaveCreate) {
+			actions = append(actions, dto.DashboardActionRead{
+				Key:   "create_leave_request",
+				Label: "Create Leave Request",
+				URL:   "/leave-requests/new",
+			})
+		}
+	}
+
+	return dto.DashboardWidgetRead{
+		ID:           "leave_summary",
+		Title:        "Leave Summary",
+		Scope:        scope,
+		Metrics:      metrics,
 		Items:        items,
 		Actions:      actions,
 		EmptyMessage: "No upcoming leave.",

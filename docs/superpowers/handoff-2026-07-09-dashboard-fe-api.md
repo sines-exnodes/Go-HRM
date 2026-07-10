@@ -213,7 +213,15 @@ Team scope uses the current employee's transitive reporting chain. If the approv
 
 ### 3. Leave Summary - `leave_summary`
 
-Appears when the caller has an employee profile and any leave permission, including self-service permissions such as `leave_requests:read` or `leave_requests:create`.
+Appears when the caller has any leave permission, including self-service permissions such as `leave_requests:read` or manager/HR permissions such as `leave_requests:manage`.
+
+Scope rules:
+- `leave_requests:approve_all`, legacy `leave_requests:approve`, `leave_requests:manage`, or `*` -> `scope: "organization"` and the widget is not limited to the logged-in employee.
+- `leave_requests:approve_team` only -> `scope: "team"` and the widget uses the caller's subordinate employees.
+- Self-service leave permissions only -> `scope: "own"` and the widget uses the caller's own employee profile.
+- If the caller only has self-service or team scope but has no employee profile, the widget is omitted.
+
+For `scope: "own"`, balance metrics and the create quick action are included:
 
 ```json
 {
@@ -246,6 +254,33 @@ Appears when the caller has an employee profile and any leave permission, includ
 The `create_leave_request` quick action appears only when the caller has `leave_requests:create`.
 
 Balance defaults match the leave module: annual quota defaults to 12 and sick quota defaults to 6 when no explicit quota row exists.
+
+For `scope: "team"` or `scope: "organization"`, the widget is operational rather than personal:
+
+```json
+{
+  "id": "leave_summary",
+  "title": "Leave Summary",
+  "scope": "organization",
+  "metrics": [
+    { "key": "pending_requests", "label": "Pending Requests", "value": 2 },
+    { "key": "upcoming_leave", "label": "Upcoming Leave", "value": 4 }
+  ],
+  "items": [
+    {
+      "id": "leave_uuid",
+      "title": "Jane Smith - annual leave",
+      "description": "approved away day",
+      "status": "approved",
+      "date": "2026-07-10T00:00:00Z",
+      "url": "/leave-requests/leave_uuid"
+    }
+  ],
+  "empty_message": "No upcoming leave."
+}
+```
+
+Manager/HR scope does not include `annual_remaining`, `sick_remaining`, or `create_leave_request`, because those are personal leave actions/balances. `items` contains up to 5 pending/approved leave requests whose `to_date` is today or later, ordered by soonest `from_date`; `upcoming_leave` is the total count in scope, not just the number of returned items.
 
 ---
 
