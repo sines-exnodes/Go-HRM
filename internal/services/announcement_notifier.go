@@ -2,33 +2,13 @@ package services
 
 import (
 	"context"
-	"html"
 	"log"
-	"regexp"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 
 	"github.com/exnodes/hrm-api/internal/dto"
 	"github.com/exnodes/hrm-api/internal/repositories"
 )
-
-var reHTMLTag = regexp.MustCompile(`<[^>]+>`)
-var reWhitespace = regexp.MustCompile(`\s+`)
-
-// pushBody strips HTML tags, decodes entities, collapses whitespace, and
-// truncates to the recommended FCM body length (~128 visible characters).
-func pushBody(htmlContent string) string {
-	s := reHTMLTag.ReplaceAllString(htmlContent, " ")
-	s = html.UnescapeString(s)
-	s = strings.TrimSpace(reWhitespace.ReplaceAllString(s, " "))
-	if utf8.RuneCountInString(s) > 128 {
-		runes := []rune(s)
-		s = string(runes[:127]) + "…"
-	}
-	return s
-}
 
 type announcementNotifier struct {
 	push  *PushNotificationService
@@ -49,7 +29,7 @@ func (n *announcementNotifier) NotifyAnnouncement(ctx context.Context, userIDs [
 		if n.push != nil {
 			req := dto.NotificationTestRequest{
 				Title: title,
-				Body:  pushBody(description),
+				Body:  plainTextPreview(description, 128),
 				Data:  map[string]any{"type": "announcement", "id": id.String()},
 			}
 			result, err := n.push.SendToUser(ctx, uid, req)
