@@ -1183,10 +1183,10 @@ definitions:
       success:
         type: boolean
     type: object
-  github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData:
+  github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData:
     properties:
       data:
-        $ref: '#/definitions/internal_handlers.HealthData'
+        $ref: '#/definitions/handlers.HealthData'
       message:
         type: string
       success:
@@ -1577,7 +1577,7 @@ definitions:
       label:
         type: string
     type: object
-  internal_handlers.HealthData:
+  handlers.HealthData:
     properties:
       service:
         example: exnodes-hrm-api
@@ -3521,8 +3521,8 @@ paths:
     get:
       description: |-
         Returns the latest 5 published announcements visible to the
-        current user, as `MobileAnnouncementBrief` items (description
-        omitted; fetch full detail via MobileGet). Unpaginated.
+        current user. Each item includes a plain-text description preview
+        limited to 100 Unicode characters. Unpaginated.
         Mirrors Python's `GET /mobile/announcements/` contract.
       produces:
       - application/json
@@ -3562,7 +3562,8 @@ paths:
     get:
       description: |-
         Always visibility-filtered to published + audience match.
-        Description field omitted from each item; fetch detail via MobileGet.
+        Each item includes a plain-text description preview limited to
+        100 Unicode characters; fetch full content via MobileGet.
       parameters:
       - description: page
         in: query
@@ -4534,7 +4535,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData'
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData'
       summary: Liveness probe
       tags:
       - system

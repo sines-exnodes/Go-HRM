@@ -260,8 +260,8 @@ func (h *AnnouncementHandler) MarkViewed(c *gin.Context) {
 // MobileBrief godoc
 // @Summary      Top-5 announcements (mobile home widget)
 // @Description  Returns the latest 5 published announcements visible to the
-// @Description  current user, as `MobileAnnouncementBrief` items (description
-// @Description  omitted; fetch full detail via MobileGet). Unpaginated.
+// @Description  current user. Each item includes a plain-text description preview
+// @Description  limited to 100 Unicode characters. Unpaginated.
 // @Description  Mirrors Python's `GET /mobile/announcements/` contract.
 // @Tags         announcements
 // @Security     BearerAuth
@@ -284,7 +284,8 @@ func (h *AnnouncementHandler) MobileBrief(c *gin.Context) {
 // MobileList godoc
 // @Summary      List announcements (mobile, paginated)
 // @Description  Always visibility-filtered to published + audience match.
-// @Description  Description field omitted from each item; fetch detail via MobileGet.
+// @Description  Each item includes a plain-text description preview limited to
+// @Description  100 Unicode characters; fetch full content via MobileGet.
 // @Tags         announcements
 // @Security     BearerAuth
 // @Produce      json

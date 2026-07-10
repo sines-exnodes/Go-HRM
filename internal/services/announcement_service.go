@@ -734,6 +734,8 @@ func (s *AnnouncementService) List(ctx context.Context, currentUserID uuid.UUID,
 
 // ---- Mobile-specific ----
 
+const mobileDescriptionPreviewLimit = 100
+
 // MobileList returns the mobile-shaped projection. Always
 // visibility-filtered (mobile never sees drafts/scheduled rows).
 func (s *AnnouncementService) MobileList(ctx context.Context, currentUserID uuid.UUID, q dto.MobileAnnouncementListQuery) (dto.PaginatedData[dto.MobileAnnouncementBrief], error) {
@@ -806,6 +808,7 @@ func (s *AnnouncementService) toMobileBrief(a *models.Announcement, viewed bool)
 	out := dto.MobileAnnouncementBrief{
 		ID:            a.ID,
 		Title:         a.Title,
+		Description:   plainTextPreview(a.Description, mobileDescriptionPreviewLimit),
 		Summary:       a.Summary,
 		CoverImageURL: a.CoverImageURL,
 		Status:        a.Status,
