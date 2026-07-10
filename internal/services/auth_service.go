@@ -231,6 +231,9 @@ func (s *AuthService) resolvePermsFromUser(roles []models.Role) (map[permissions
 			out[permissions.Permission(p)] = true
 		}
 	}
+	if out[permissions.PermAnnounceManage] {
+		out[permissions.PermAnnounceRead] = true
+	}
 	return out, nil
 }
 

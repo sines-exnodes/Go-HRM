@@ -1,8 +1,17 @@
-# Resume Checkpoint — Forgot-Password API on feat/forgot-password (PR #20, migration 000024)
+# Resume Checkpoint — Dashboard API implemented
 
-**Last updated:** 2026-06-23
-**Stopped at:** Forgot-password / reset-password feature implemented on `feat/forgot-password`, **PR #20 open** (not yet merged). Migration 000024 applied to dev DB. Also: employee-profile-enrichment **merged to `main` (PR #19, commit `bfa3b35`)** — manager brief enriched with email/phone/avatar, `users:banking_view` seeded to Employee role, `/me` handler uses `unmask=true`.
-**Branch:** `feat/forgot-password` — **in flight, PR #20 open.**
+**Last updated:** 2026-07-09
+**Stopped at:** Dashboard API implemented from `DR-001-002-01-dashboard-page.md`. No migration. Request Tickets widget intentionally omitted until the Request Tickets module exists.
+**Branch:** `fix/push-announcement-data-payload`.
+
+> **2026-07-09 session:**
+> - Added `GET /api/v1/dashboard` (JWT only) with fixed-order widgets: attendance overview, pending approvals, leave summary, announcements, holidays/workdays, and workforce summary. Widgets are omitted when the caller lacks the source module permission or source scope.
+> - Added `announcements:read`, seeded it to Admin/HR Manager/Manager/Employee, and made `announcements:manage` imply read in effective permission resolution so existing manage-only roles keep read access.
+> - Added dashboard DTO/service/handler/tests plus `AuthService` permission implication test. Regenerated Swagger docs.
+> - FE handoff doc added: `docs/superpowers/handoff-2026-07-09-dashboard-fe-api.md`.
+> - Verified: `go test ./internal/services`, `go test ./...`, and `go vet ./...`.
+
+Previous checkpoint: Forgot-password / reset-password feature implemented on `feat/forgot-password`, **PR #20 open** (not yet merged). Migration 000024 applied to dev DB. Also: employee-profile-enrichment **merged to `main` (PR #19, commit `bfa3b35`)** — manager brief enriched with email/phone/avatar, `users:banking_view` seeded to Employee role, `/me` handler uses `unmask=true`.
 
 > **2026-06-23 session:**
 > - **PR #19 merged** (`feat/employee-profile-enrichment`): `ManagerBrief` enriched with `Email`, `Phone`, `AvatarURL`; Employee role seeded with `users:banking_view`; `GetMe` changed to `unmask=true` (self-read).

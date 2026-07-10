@@ -94,7 +94,7 @@ func defaultRoles() []roleSeed {
 				// PermAnnounceManage. Without this line, only Super Admin's
 				// wildcard would reach the labels API — labels are admin-
 				// managed, so Admin must hold the perm directly.
-				permissions.PermAnnounceManage,
+				permissions.PermAnnounceRead, permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
 				permissions.PermOrgHolidaysView, permissions.PermOrgHolidaysManage,
 				permissions.PermOrgWorkdaysView,
@@ -128,7 +128,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
 				// Phase 4: HR managers publish announcements in the Python
 				// system and therefore also manage announcement labels.
-				permissions.PermAnnounceManage,
+				permissions.PermAnnounceRead, permissions.PermAnnounceManage,
 				permissions.PermOrgSettings,
 				permissions.PermOrgHolidaysView, permissions.PermOrgHolidaysManage,
 				permissions.PermOrgWorkdaysView,
@@ -148,6 +148,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveRead, permissions.PermLeaveCreate, permissions.PermLeaveUpdate, permissions.PermLeaveDelete,
 				permissions.PermLeaveApproveTeam, permissions.PermLeaveCancel, permissions.PermLeaveManage,
 				permissions.PermAttendanceRead, permissions.PermAttendanceManage,
+				permissions.PermAnnounceRead,
 				permissions.PermOrgHolidaysView,
 				permissions.PermOrgWorkdaysView,
 			},
@@ -176,6 +177,7 @@ func defaultRoles() []roleSeed {
 				permissions.PermLeaveUpdate, permissions.PermLeaveCancel,
 				permissions.PermLeaveDelete,
 				permissions.PermAttendanceRead,
+				permissions.PermAnnounceRead,
 				permissions.PermOrgHolidaysView,
 				permissions.PermOrgWorkdaysView,
 			},
