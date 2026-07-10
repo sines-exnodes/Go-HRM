@@ -137,12 +137,12 @@ type AnnouncementListQuery struct {
 
 // ---- Mobile shapes ----
 
-// MobileAnnouncementBrief is the home-screen widget projection: minimal
-// fields needed to render the top-N cards. Excludes Body (rendered only
-// on detail) to keep the payload small.
+// MobileAnnouncementBrief is the compact projection used by mobile lists and
+// the home-screen widget. Description is a plain-text, 100-character preview.
 type MobileAnnouncementBrief struct {
 	ID            uuid.UUID                 `json:"id"`
 	Title         string                    `json:"title"`
+	Description   string                    `json:"description"`
 	Summary       *string                   `json:"summary,omitempty"`
 	CoverImageURL *string                   `json:"cover_image_url,omitempty"`
 	Status        models.AnnouncementStatus `json:"status"`

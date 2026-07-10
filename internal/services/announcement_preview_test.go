@@ -1,10 +1,14 @@
 package services
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/exnodes/hrm-api/internal/models"
 )
 
 func TestPlainTextPreview(t *testing.T) {
@@ -48,4 +52,17 @@ func TestPlainTextPreview(t *testing.T) {
 			assert.Equal(t, tt.expected, plainTextPreview(tt.input, tt.limit))
 		})
 	}
+}
+
+func TestToMobileBriefIncludesPlainTextDescriptionPreview(t *testing.T) {
+	description := "<p>Hello&nbsp;<strong>team</strong></p><p>" + strings.Repeat("界", 100) + "</p>"
+	item := (&AnnouncementService{}).toMobileBrief(&models.Announcement{
+		Description: description,
+	}, false)
+
+	raw, err := json.Marshal(item)
+	require.NoError(t, err)
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(raw, &payload))
+	assert.Equal(t, "Hello team "+strings.Repeat("界", 88)+"…", payload["description"])
 }
