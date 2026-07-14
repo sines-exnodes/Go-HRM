@@ -8,13 +8,14 @@ status: approved
 approved_by: "BA Team"
 priority: critical
 created_date: "2026-02-25"
-last_updated: "2026-02-26"
+last_updated: "2026-07-09"
 business_owner: TBD
 related_documents:
   - docs/PROJECT_OVERVIEW.md
   - docs/PLATFORMS/WEB-APP/README.md
 user_stories:
   - US-001-authentication
+  - US-002-dashboard
   - US-004-role-permission-management
   - US-005-user-management
 add_on_sections: []
@@ -47,7 +48,7 @@ The Foundation epic establishes the core platform for Exnodes HRM, enabling user
 | Criteria | Measurement |
 |----------|-------------|
 | Users can authenticate securely | Login/logout/password reset working for all roles |
-| Dashboard displays relevant information | Role-specific metrics and quick actions visible |
+| Dashboard displays relevant information | Permission-appropriate metrics and quick actions visible |
 | Navigation provides access to all modules | Menu structure supports all planned modules |
 | Roles and permissions enforced | Users only see and access their authorized features |
 | Organization settings configurable | Basic settings saved and applied correctly |
@@ -60,7 +61,7 @@ The Foundation epic establishes the core platform for Exnodes HRM, enabling user
 
 - User authentication (login, logout, password reset, session management)
 - Role-based access control (HR Admin, Manager, Employee)
-- Dashboard with role-specific metrics and activity feed
+- Dashboard with common layout, permission-scoped metrics, and activity feed
 - Main navigation structure and responsive layout
 - Organization profile and settings
 - User management (invite, deactivate, role assignment)
@@ -82,7 +83,7 @@ The Foundation epic establishes the core platform for Exnodes HRM, enabling user
 | Story ID | Name | Priority | Status |
 |----------|------|----------|--------|
 | US-001 | User Authentication | Critical | In Progress |
-| US-002 | Dashboard | High | Planned |
+| US-002 | Dashboard | High | In Progress |
 | US-003 | Navigation & Layout | High | Planned |
 | US-004 | Role & Permission Management | High | Planned |
 | US-005 | Organization Settings | Medium | Planned |
@@ -94,8 +95,8 @@ The Foundation epic establishes the core platform for Exnodes HRM, enabling user
 - Includes: Login, logout, password reset, session management, remember me
 
 **US-002: Dashboard**
-- As a user, I want to see a role-specific dashboard so that I can quickly understand key metrics and pending actions
-- Includes: HR Admin dashboard (workforce overview), Manager dashboard (team summary), Employee dashboard (personal summary)
+- As a user, I want to see a permission-appropriate dashboard so that I can quickly understand key metrics and pending actions
+- Includes: common dashboard layout, permission-hidden widgets/actions, workforce overview, team summary, and personal summary where permitted
 
 **US-003: Navigation & Layout**
 - As a user, I want consistent navigation so that I can easily access different modules
@@ -153,7 +154,7 @@ All other Exnodes HRM epics depend on EP-001:
 
 - [ ] All user stories (US-001 through US-005) completed
 - [ ] Authentication working for all three user roles
-- [ ] Dashboard displaying role-specific content
+- [ ] Dashboard displaying permission-scoped content
 - [ ] Navigation accessible from all pages
 - [ ] Role-based access control enforced
 - [ ] Organization settings saved and applied
@@ -198,9 +199,10 @@ All other Exnodes HRM epics depend on EP-001:
 |---------|------|---------|--------|
 | 1.0 | 2026-02-25 | Initial EPIC created for Exnodes HRM | BA Team |
 | 1.1 | 2026-02-26 | EPIC approved, US-001 story creation started | BA Team |
+| 1.2 | 2026-07-09 | Added US-002 Dashboard story folder and initial detail requirement | BA Agent |
 
 ---
 
 **Document Status:** Approved
 **Approval Required:** No - EPIC approved, stories can be created
-**Last Updated:** 2026-02-26
+**Last Updated:** 2026-07-09

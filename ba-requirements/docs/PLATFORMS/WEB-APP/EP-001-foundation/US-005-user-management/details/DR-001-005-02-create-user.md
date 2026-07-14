@@ -9,9 +9,9 @@ detail_id: DR-001-005-02
 detail_name: "Create User"
 parent_requirement: FR-US-005-10
 status: draft
-version: "1.3"
+version: "1.4"
 created_date: "2026-03-24"
-last_updated: "2026-05-20"
+last_updated: "2026-06-29"
 related_documents:
   - path: "../REQUIREMENTS.md"
     relationship: parent
@@ -37,7 +37,7 @@ input_sources:
 **Story:** US-005-user-management
 **Epic:** EP-001 (Foundation)
 **Status:** Draft
-**Version:** 1.3
+**Version:** 1.4
 
 ---
 
@@ -50,7 +50,7 @@ As a **user with user management permission**, I want to **create a new user acc
 **Target Users:** Any user with user management permission (configured via US-004). Users with view-only permission cannot access this feature.
 
 **Key Functionality:**
-- Multi-section form: Personal Information (extended with Marital status, Nationality, Permanent address, Temporary address), User Account (role + status toggle + send login URL toggle), Employee Profile (dept/position/experience/education level + optional Line Manager + CV + skills), ID Cards (front/back images + ID number + issue date), Emergency Contact (repeatable rows), Salary (permission-gated), Banking (permission-gated)
+- Multi-section form: Personal Information (extended with Marital status, Nationality, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number), User Account (role + status toggle + send login URL toggle), Employee Profile (dept/position/experience/education level + optional Line Manager + CV + skills), ID Cards (front/back images + ID number + issue date), Emergency Contact (repeatable rows), Salary (permission-gated), Banking (permission-gated)
 - 14 mandatory fields, plus optional fields across all sections (including optional Line Manager assignment for reporting hierarchy)
 - Two-column layout extended into 4 rows — Personal Info + User Account, Personal Info cont. + Employee Profile, ID Cards + Emergency Contact, Salary + Banking (permission-gated)
 - Email uniqueness validation (server-side on submit — both inline error and error toast)
@@ -76,7 +76,7 @@ As a **user with user management permission**, I want to **create a new user acc
 3. System loads dropdown data from APIs: roles (US-004), departments (EP-008 US-001), positions (EP-008 US-002), gender options, marital status options, nationality (ISO country list), education levels, skills (EP-008 US-003), bank list (hardcoded VN banks)
 4. System evaluates current user's permissions: `user.salary.view`/`user.salary.manage` and `user.banking.view`/`user.banking.manage` — Salary and Banking cards are hidden if their `view` permission is absent
 5. Form displays with cards laid out in 4 rows: Row 1 (Personal Info top + User Account), Row 2 (Personal Info cont. + Employee Profile), Row 3 (ID Cards + Emergency Contact), Row 4 (Salary + Banking, if permission allows). Nationality defaults to "Vietnam"; Account status toggle ON by default
-6. User fills **Personal Information**: enters first name, last name, email, phone number, date of birth, selects gender, confirms or changes Nationality (mandatory); optionally selects Marital status, uploads avatar, enters Permanent address and Temporary address
+6. User fills **Personal Information**: enters first name, last name, email, phone number, date of birth, selects gender, confirms or changes Nationality (mandatory); optionally selects Marital status, uploads avatar, enters Permanent address, Temporary address, Social Insurance Number, and Tax Identification Number
 7. User fills **User Account**: selects a user role from dropdown (with search), sets account status toggle (default: Active), confirms "Send login URL" toggle (default: ON; disabled if Account status is Inactive)
 8. User fills **Employee Profile**: selects department, position, and Education level (mandatory) from dropdowns, enters experience year; optionally selects a Line Manager from the searchable user dropdown (or leaves as "No line manager"); optionally uploads CV/Resumé and adds skills
 9. User optionally fills **ID Cards**: uploads front/back images, enters ID number, picks issue date
@@ -136,6 +136,8 @@ As a **user with user management permission**, I want to **create a new user acc
 | Nationality | Searchable dropdown | Not empty; must select a value | Yes (*) | "Vietnam" | N/A | Options: full ISO country list. Includes search field. Placeholder: "Select nationality". (278px, right half) |
 | Permanent address | Text input | Trimmed; no other validation | No | Empty | 500 chars | Placeholder: "Enter permanent address" (576px, full width). Previously named "Address". |
 | Temporary address | Text input | Trimmed; no other validation | No | Empty | 500 chars | Placeholder: "Enter temporary address" (576px, full width) |
+| Social Insurance Number | Text input | Trimmed; no other validation | No | Empty | 50 chars | Placeholder: "Enter social insurance number" (576px, full width). Optional free-text field; no format validation. |
+| Tax Identification Number | Text input | Trimmed; no other validation | No | Empty | 50 chars | Placeholder: "Enter tax identification number" (576px, full width). Optional free-text field; no format validation. |
 
 ### Input Fields — User Account
 
@@ -258,6 +260,8 @@ As a **user with user management permission**, I want to **create a new user acc
 | Nationality | Searchable dropdown | Default: "Vietnam" | 278px, right half | Country of citizenship (mandatory) |
 | Permanent address | Text input | Placeholder: "Enter permanent address" | 576px, full width | Permanent residence address (optional) |
 | Temporary address | Text input | Placeholder: "Enter temporary address" | 576px, full width | Current temporary address (optional) |
+| Social Insurance Number | Text input | Placeholder: "Enter social insurance number" | 576px, full width | Employee's social insurance number (optional) |
+| Tax Identification Number | Text input | Placeholder: "Enter tax identification number" | 576px, full width | Employee's tax identification number (optional) |
 
 **User Account card (right column top, 600×200px):**
 
@@ -479,6 +483,8 @@ section spans full width. If both are hidden, Row 4 is omitted entirely.
 - **AC-49:** Marital status dropdown is optional and displays options: Single, Married, Other. No dropdown search.
 - **AC-50:** Nationality dropdown is mandatory, defaults to "Vietnam", includes a search field, and accepts the full ISO country list.
 - **AC-51:** Permanent address (renamed from "Address") and Temporary address are independent optional fields, each accepting up to 500 trimmed characters.
+- **AC-84:** Social Insurance Number is an optional free-text field in the Personal Information card, accepts up to 50 trimmed characters. No format validation is applied.
+- **AC-85:** Tax Identification Number is an optional free-text field in the Personal Information card, accepts up to 50 trimmed characters. No format validation is applied.
 
 **Employee Profile — Education Level:**
 - **AC-52:** Education level dropdown is mandatory and displays options: High school, College, Bachelor's degree, Master's degree, Doctorate. Inline error "Education level is required" if empty on save.
@@ -514,7 +520,7 @@ section spans full width. If both are hidden, Row 4 is omitted entirely.
 
 **Layout Behavior:**
 - **AC-74:** If both Salary and Banking sections are hidden (user has neither `view` permission), Row 4 is omitted entirely from the page.
-- **AC-75:** Form-dirty detection includes all new fields (Marital status, Nationality, Permanent address, Temporary address, Education level, all ID Cards fields, all Emergency Contact rows, all Salary fields, all Banking fields). Any change triggers the discard confirmation on Cancel.
+- **AC-75:** Form-dirty detection includes all new fields (Marital status, Nationality, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number, Education level, all ID Cards fields, all Emergency Contact rows, all Salary fields, all Banking fields). Any change triggers the discard confirmation on Cancel.
 
 **Line Manager (Employee Profile):**
 - **AC-76:** Line Manager field appears in the Employee Profile section as a full-width (576px) row positioned after Education level and before CV/Resumé.
@@ -595,7 +601,7 @@ section spans full width. If both are hidden, Row 4 is omitted entirely.
 - **SR-01:** Only users with user management permission can access the Create User page
 - **SR-02:** Permissions are configured via US-004 (Role & Permission Management). No role names are hardcoded.
 - **SR-03:** Email must be unique organization-wide — checked **server-side on form submission only**. If duplicate, both inline error and error toast displayed.
-- **SR-04:** All text fields (first name, last name, email, phone, permanent address, temporary address, ID number, emergency contact full name/relationship/phone, banking account name) are trimmed of leading/trailing whitespace before saving
+- **SR-04:** All text fields (first name, last name, email, phone, permanent address, temporary address, social insurance number, tax identification number, ID number, emergency contact full name/relationship/phone, banking account name) are trimmed of leading/trailing whitespace before saving
 - **SR-05:** Account status defaults to Active (toggle ON) when creating a new user. Administrator can switch to Inactive before saving if needed.
 - **SR-06:** A newly created user with Active status can log in immediately — no additional activation step required
 - **SR-07:** A newly created user with Inactive status cannot log in until activated by an administrator
@@ -612,7 +618,7 @@ section spans full width. If both are hidden, Row 4 is omitted entirely.
 - **SR-18:** If "Send login URL" is OFF at save time, the user account is created but no invitation email is sent. The administrator must manually share login information with the user.
 - **SR-19:** Dropdown search fields (User Role, Department, Position) filter options client-side — no server round-trip for dropdown filtering. Consistent with User List filter dropdown pattern.
 - **SR-20:** When Account status is set to Inactive, the "Send login URL" toggle is automatically disabled and forced to OFF — since an inactive user cannot log in, sending a login URL would be misleading. When Account status is toggled back to Active, the "Send login URL" toggle is re-enabled and defaults back to ON.
-- **SR-21:** "Form dirty" detection compares all fields against their initial values — including all new fields (Marital status, Nationality, Permanent address, Temporary address, Education level, all ID Cards fields, all Emergency Contact rows, all Salary fields, all Banking fields). Any change triggers the discard confirmation on Cancel.
+- **SR-21:** "Form dirty" detection compares all fields against their initial values — including all new fields (Marital status, Nationality, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number, Education level, all ID Cards fields, all Emergency Contact rows, all Salary fields, all Banking fields). Any change triggers the discard confirmation on Cancel.
 - **SR-22:** "Address" field is renamed to "Permanent address" everywhere in the form, validation messages, and saved data. A new "Temporary address" field is added with the same validation rules (optional, trimmed, max 500 chars).
 - **SR-23:** Nationality is a mandatory field, defaults to "Vietnam", and is sourced from the full ISO country list. The dropdown includes a search field.
 - **SR-24:** Marital status is an optional field with options: Single, Married, Other. No dropdown search (only 3 options).
@@ -635,6 +641,7 @@ section spans full width. If both are hidden, Row 4 is omitted entirely.
 - **SR-41:** Server-side, on save, the system re-validates that the selected Line Manager is still active. If not (the user was deactivated between dropdown load and save submission), the save is rejected with both inline error "Selected line manager is no longer active" below the Line Manager field and an error toast.
 - **SR-42:** Line Manager interacts with downstream permissions via the `.team` / `.all` scope split documented in the design spec (`docs/superpowers/specs/2026-05-20-user-management-line-manager-design.md`). When downstream stories add `<action>.team` permissions (e.g., `leave.approve.team`), holders can only act on requests from users in their subordinate chain (resolved via Line Manager). Holders of `<action>.all` can act on anyone. This DR does NOT introduce new permissions itself.
 - **SR-43:** Edit access for the Line Manager field is gated by the existing `user.edit` permission — no new permission is introduced for Line Manager management.
+- **SR-44:** Social Insurance Number and Tax Identification Number are optional free-text fields. No format validation is applied. Both are trimmed of leading/trailing whitespace before saving (consistent with SR-04). Saving without these fields is fully allowed.
 
 **State Transitions:**
 ```
@@ -794,3 +801,4 @@ section spans full width. If both are hidden, Row 4 is omitted entirely.
 | 1.1 | 2026-03-24 | BA Agent | Added "Send login URL" toggle field (AC-44 through AC-48, SR-17/18/20); resolved login credentials open question |
 | 1.2 | 2026-05-18 | BA Agent | Added ID Cards, Emergency Contact, Salary (permission-gated), Banking (permission-gated) sections; added Nationality (mandatory) + Marital status + Temporary address + Education level (mandatory) fields; renamed Address → Permanent address |
 | 1.3 | 2026-05-20 | BA Agent | Added optional Line Manager field to Employee Profile (searchable user dropdown showing "Name — Position, Department"); excludes inactive users; field is optional for top-of-hierarchy users; documented two-variant `.team`/`.all` permission pattern for downstream approval stories (see design spec 2026-05-20-user-management-line-manager-design.md); no new permissions added in this DR |
+| 1.4 | 2026-06-29 | BA Agent | Added Social Insurance Number and Tax Identification Number as optional free-text fields (max 50 chars, no format validation) to Personal Information card; updated SR-04 (trimming), SR-21 (dirty detection), AC-75, AC-84, AC-85, SR-44 |

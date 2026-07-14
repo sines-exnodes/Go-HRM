@@ -9,9 +9,9 @@ detail_id: DR-001-005-03
 detail_name: "User Details"
 parent_requirement: FR-US-005-03
 status: draft
-version: "1.2"
+version: "1.3"
 created_date: 2026-03-26
-last_updated: 2026-05-20
+last_updated: 2026-06-29
 related_documents:
   - path: "../REQUIREMENTS.md"
     relationship: parent
@@ -32,7 +32,7 @@ related_documents:
 **Story:** US-005-user-management
 **Epic:** EP-001 (Foundation)
 **Status:** Draft
-**Version:** 1.2
+**Version:** 1.3
 
 ---
 
@@ -51,7 +51,7 @@ As a **user with user management permission**, I want to **view a user's extende
 **Key Functionality:**
 - Read-only display of all user data (no inline editing)
 - Static cover image + user avatar + name + status badge + role display
-- Seven info cards: Personal Information (9 fields), Work Profile (7 fields including Line Manager), Direct Reports (list of subordinates), ID Cards (4 fields), Emergency Contact (list), Salary (permission-gated, 2 fields), Banking (permission-gated, 4 fields with masked account number)
+- Seven info cards: Personal Information (11 fields), Work Profile (7 fields including Line Manager), Direct Reports (list of subordinates), ID Cards (4 fields), Emergency Contact (list), Salary (permission-gated, 2 fields), Banking (permission-gated, 4 fields with masked account number)
 - Line Manager displayed as clickable name (with `(Inactive)` suffix if deactivated) — navigates to manager's User Details
 - Direct Reports card lists all users whose Line Manager = current user, computed live from inverse relationship
 - Left action panel with 7 navigation buttons for management actions
@@ -138,6 +138,8 @@ No input fields — this page is entirely read-only.
 | Nationality | Globe icon | Label + value | — (always populated — mandatory) | User's nationality (ISO country) |
 | Permanent address | Location icon | Label + value (spans wider column) | "—" | Permanent address text |
 | Temporary address | Location icon | Label + value (spans wider column) | "—" | Temporary/current address text |
+| Social Insurance Number | Shield icon | Label + value | "—" | Employee's social insurance number |
+| Tax Identification Number | File icon | Label + value | "—" | Employee's tax identification number |
 
 ### Work Profile Card
 
@@ -210,7 +212,7 @@ No input fields — this page is entirely read-only.
 |-------|-----------|----------------|
 | Loading | Page first opens, API fetching | Skeleton placeholders for avatar, name, cards |
 | Populated | User data loaded successfully | Full profile with all visible cards displayed |
-| Partial data | Some optional fields empty | "—" shown for empty optional fields; layout unchanged; new fields (Marital status, Permanent address, Temporary address, ID number, Issue date, salary fields, banking fields) render with "—" when empty |
+| Partial data | Some optional fields empty | "—" shown for empty optional fields; layout unchanged; new fields (Marital status, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number, ID number, Issue date, salary fields, banking fields) render with "—" when empty |
 | Error | API fails to load user data | Error message with retry button; left panel still visible |
 | User not found | User deleted since list was loaded | "User not found" message with link to return to User List |
 | View-only mode | User has view permission only | Overview button visible; 6 management action buttons hidden |
@@ -300,11 +302,11 @@ No input fields — this page is entirely read-only.
 - **AC-09:** User's system role displays below the name with an icon prefix (e.g., "Super Admin")
 
 **Personal Information Card:**
-- **AC-10:** Personal Information card displays 9 fields: Full name, Email, Phone number, Date of birth, Gender, Marital status, Nationality, Permanent address, Temporary address
+- **AC-10:** Personal Information card displays 11 fields: Full name, Email, Phone number, Date of birth, Gender, Marital status, Nationality, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number
 - **AC-11:** Each field displays with an icon prefix, label (muted text), and value (body text)
 - **AC-12:** Permanent address and Temporary address each span a wider column for full address text
 - **AC-13:** Nationality is always displayed with a value (mandatory field — never shows "—")
-- **AC-14:** Empty optional fields (Phone number, Date of birth, Gender, Marital status, Permanent address, Temporary address) display "—" as placeholder value
+- **AC-14:** Empty optional fields (Phone number, Date of birth, Gender, Marital status, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number) display "—" as placeholder value
 
 **Work Profile Card:**
 - **AC-15:** Work Profile card displays 7 fields: Department, Position, Experience from, Line Manager, Education level, Skills, CV/Resumé
@@ -432,7 +434,7 @@ No input fields — this page is entirely read-only.
 - **SR-08:** The Activate/Deactivate button label is context-sensitive — shows "Deactivate" for active users and "Activate" for inactive users (consistent with gear icon behavior on User List)
 - **SR-09:** CV/Resumé is displayed as a clickable link that triggers a file download or opens in a new tab — the file is served from the stored upload location
 - **SR-10:** Skills are displayed as comma-separated plain text (not interactive chips — read-only on this page)
-- **SR-11:** Empty optional fields (Phone number, Permanent address, Temporary address, Marital status, Skills, CV/Resumé, ID number, Issue date, salary fields, banking fields) display "—" — they are never hidden, only show placeholder value
+- **SR-11:** Empty optional fields (Phone number, Permanent address, Temporary address, Marital status, Social Insurance Number, Tax Identification Number, Skills, CV/Resumé, ID number, Issue date, salary fields, banking fields) display "—" — they are never hidden, only show placeholder value
 - **SR-12:** The back arrow navigation preserves User List state (active search query, filter selections, current page, rows per page) — the list does not reload from scratch
 - **SR-13:** The "Address" field has been renamed to "Permanent address"; a separate "Temporary address" field is displayed alongside it
 - **SR-14:** Nationality is a mandatory field and is always displayed with a value (never "—")
@@ -597,3 +599,4 @@ No input fields — this page is entirely read-only.
 | 1.0 | 2026-03-26 | BA Agent | Initial draft — Figma design context from node 3120:5348 |
 | 1.1 | 2026-05-18 | BA Agent | Added 4 new read-only cards (ID Cards, Emergency Contact, Salary, Banking); added Nationality + Marital status + Temporary address + Education level fields; renamed Address → Permanent address; permission-gated visibility for Salary and Banking via new `user.salary.view` and `user.banking.view` permissions; banking account number always masked to last 4 digits |
 | 1.2 | 2026-05-20 | BA Agent | Added Line Manager row to Work Profile card (clickable link to manager's profile, `(Inactive)` suffix when deactivated); added new "Direct Reports" sub-section listing all users whose Line Manager = current user (computed live from inverse relationship, alphabetical, click-to-navigate); two-variant `.team`/`.all` permission pattern documented in design spec for downstream stories |
+| 1.3 | 2026-06-29 | BA Agent | Added Social Insurance Number and Tax Identification Number as optional read-only display fields in Personal Information card; updated Personal Information field count 9 → 11; updated AC-10, AC-14, SR-11 |

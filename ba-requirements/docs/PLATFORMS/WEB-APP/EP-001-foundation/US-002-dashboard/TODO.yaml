@@ -1,0 +1,146 @@
+---
+document_type: TODO
+platform: WEB-APP
+epic_id: EP-001
+story_id: US-002
+story_name: "Dashboard"
+version: "1.0"
+last_updated: "2026-07-09"
+completion_percentage: 63
+related_documents:
+  - path: "./ANALYSIS.md"
+    relationship: sibling
+  - path: "./REQUIREMENTS.md"
+    relationship: sibling
+  - path: "./FLOWCHART.md"
+    relationship: sibling
+  - path: "../EPIC.md"
+    relationship: parent
+---
+
+# Task Tracking: Dashboard
+
+**Epic:** EP-001 (Foundation)
+**Story:** US-002-dashboard
+**Last Updated:** 2026-07-09
+
+---
+
+## Task Summary
+
+| Status | Count |
+|--------|-------|
+| Completed | 5 |
+| In Progress | 0 |
+| Pending | 3 |
+| **Total** | **8** |
+
+**Completion:** 63%
+
+---
+
+tasks:
+
+  - id: "TK-002-01"
+    title: "Analyze existing DR library"
+    description: "Review all existing DRs and the Project Knowledge Base for dashboard-relevant patterns"
+    status: "completed"
+    category: "analysis"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: []
+    notes: "Completed 2026-07-09. 60 DRs inventoried."
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-02"
+    title: "Create Dashboard analysis"
+    description: "Document Dashboard business context, scope, requirements analysis, and risks"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-002-01"]
+    notes: "ANALYSIS.md created."
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-03"
+    title: "Create Dashboard requirements"
+    description: "Document functional requirements and business rules for Dashboard"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-002-02"]
+    notes: "REQUIREMENTS.md created."
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-04"
+    title: "Write detail requirement: Dashboard Page"
+    description: "Create DR-001-002-01-dashboard-page.md using dr-agent workflow"
+    status: "completed"
+    category: "documentation"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 3
+    blocker: null
+    dependencies: ["TK-002-03"]
+    notes: "DR created 2026-07-09."
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-05"
+    title: "Obtain Dashboard Figma design"
+    description: "Request web Dashboard frame and extract design context when available"
+    status: "pending"
+    category: "design"
+    priority: "high"
+    assigned_to: "Design Team"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-002-04"]
+    notes: "No Dashboard Figma frame available during initial DR creation."
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-06"
+    title: "Resolve Dashboard open questions"
+    description: "Confirm last updated timestamp, manager first-widget priority, and future personalization"
+    status: "completed"
+    category: "analysis"
+    priority: "medium"
+    assigned_to: "Product Owner"
+    estimated_hours: 1
+    blocker: null
+    dependencies: ["TK-002-04"]
+    notes: "Completed 2026-07-09 via brainstorming: common layout for all users, permission-hidden widgets/actions, counts plus short actionable lists, no Dashboard timestamp required in v1, future personalization out of scope."
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-07"
+    title: "Stakeholder review"
+    description: "Review Dashboard DR with Product Owner, HR/Admin, and manager representatives"
+    status: "pending"
+    category: "review"
+    priority: "high"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: null
+    dependencies: ["TK-002-06"]
+    notes: null
+    updated_at: "2026-07-09T00:00:00Z"
+
+  - id: "TK-002-08"
+    title: "Update from approved design"
+    description: "Revise Dashboard DR after Figma design is finalized"
+    status: "pending"
+    category: "documentation"
+    priority: "medium"
+    assigned_to: "BA Team"
+    estimated_hours: 2
+    blocker: "Dashboard Figma not available"
+    dependencies: ["TK-002-05"]
+    notes: null
+    updated_at: "2026-07-09T00:00:00Z"

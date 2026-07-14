@@ -9,9 +9,9 @@ detail_id: DR-001-005-04
 detail_name: "Update User Information"
 parent_requirement: FR-US-005-11
 status: draft
-version: "1.2"
+version: "1.3"
 created_date: "2026-03-26"
-last_updated: "2026-05-20"
+last_updated: "2026-06-29"
 related_documents:
   - path: "../REQUIREMENTS.md"
     relationship: parent
@@ -39,7 +39,7 @@ input_sources:
 **Story:** US-005-user-management
 **Epic:** EP-001 (Foundation)
 **Status:** Draft
-**Version:** 1.2
+**Version:** 1.3
 
 ---
 
@@ -56,7 +56,7 @@ As a **user with user management permission**, I want to **update a user's exten
 
 **Key Functionality:**
 - Pre-filled edit form with existing user data across all sections
-- Personal Information editing (name, DOB, phone, gender, permanent address, temporary address, marital status, nationality, avatar)
+- Personal Information editing (name, DOB, phone, gender, permanent address, temporary address, marital status, nationality, social insurance number, tax identification number, avatar)
 - Work Profile editing (department, position, experience year, education level, line manager, CV, skills)
 - ID Cards editing (front/back images, ID number, issue date)
 - Emergency Contact editing (repeatable rows — full name, relationship, phone)
@@ -124,6 +124,8 @@ As a **user with user management permission**, I want to **update a user's exten
 | Nationality | Searchable dropdown (576px, full width) | Not empty; must select a value from ISO country list | Yes (*) | Pre-filled with user's existing nationality | "Select nationality" | User's nationality (full ISO country list) |
 | Permanent address | Text input (576px, full width) | Trimmed, max 500 chars | No | Pre-filled or empty | "Enter permanent address" | User's permanent residential address (renamed from "Address") |
 | Temporary address | Text input (576px, full width) | Trimmed, max 500 chars | No | Pre-filled or empty | "Enter temporary address" | User's temporary residential address |
+| Social Insurance Number | Text input (576px, full width) | Trimmed, max 50 chars; no format validation | No | Pre-filled or empty | "Enter social insurance number" | Employee's social insurance number (optional free-text) |
+| Tax Identification Number | Text input (576px, full width) | Trimmed, max 50 chars; no format validation | No | Pre-filled or empty | "Enter tax identification number" | Employee's tax identification number (optional free-text) |
 
 ### Input Fields — Work Profile Card
 
@@ -229,6 +231,8 @@ Section visibility/editability is permission-gated:
 | Nationality | Text | Searchable dropdown with placeholder | Selected option in dropdown | Nationality |
 | Permanent address | Text | Input with placeholder | Geist Regular 14px in input field | Permanent residential address |
 | Temporary address | Text | Input with placeholder | Geist Regular 14px in input field | Temporary residential address |
+| Social Insurance Number | Text | Input with placeholder | Geist Regular 14px in input field | Employee's social insurance number |
+| Tax Identification Number | Text | Input with placeholder | Geist Regular 14px in input field | Employee's tax identification number |
 | Department | Text | Dropdown with placeholder | Selected option in dropdown | Assigned department |
 | Position | Text | Dropdown with placeholder | Selected option in dropdown | Assigned position |
 | Experience from (year) | Text | Input with placeholder | 4-digit year in input field | Career start year |
@@ -417,7 +421,7 @@ Section visibility/editability is permission-gated:
 - **SR-12:** Smart dirty check compares current field values to originally loaded values — reverting to original values makes the form "clean"
 - **SR-13:** Salary card is gated by `user.salary.view` (visibility) and `user.salary.manage` (editability); Banking card is gated by `user.banking.view` (visibility) and `user.banking.manage` (editability) — UI hiding/disabling is enforced both client-side and server-side (UI alone is not security)
 - **SR-14:** "Permanent address" replaces the former "Address" field — same data column, renamed label only
-- **SR-15:** All new fields (Marital status, Nationality, Permanent address, Temporary address, Education level, ID Cards fields, Emergency Contact rows, Salary fields, Banking fields) participate in the smart dirty check — modifying any of them sets the form dirty; reverting to the original loaded value clears their contribution to the dirty state
+- **SR-15:** All new fields (Marital status, Nationality, Permanent address, Temporary address, Social Insurance Number, Tax Identification Number, Education level, ID Cards fields, Emergency Contact rows, Salary fields, Banking fields) participate in the smart dirty check — modifying any of them sets the form dirty; reverting to the original loaded value clears their contribution to the dirty state
 - **SR-16:** Bank account number is shown in full (unmasked) on this Update form — this deliberately differs from DR-001-005-03 (User Details), which masks the account number with only the last 4 digits visible to view-only users. Editors require the complete value to verify and modify the account.
 - **SR-17:** Saving the form when the user lacks `user.salary.manage` preserves existing Salary values unchanged; saving when the user lacks `user.banking.manage` preserves existing Banking values unchanged — the system never writes empty/null values for permission-disabled sections
 - **SR-18:** All new text fields trim whitespace on save (consistent with existing fields)
@@ -565,3 +569,4 @@ Section visibility/editability is permission-gated:
 | 1.0 | 2026-03-26 | BA Agent | Initial draft — full 8-section detail requirement with Figma design context |
 | 1.1 | 2026-05-18 | BA Agent | Added ID Cards, Emergency Contact, Salary (permission-gated), Banking (permission-gated) sections; added Nationality (mandatory) + Marital status + Temporary address + Education level (mandatory) fields; renamed Address → Permanent address; mandatory field count 8 → 10 |
 | 1.2 | 2026-05-20 | BA Agent | Added editable Line Manager field to Work Profile (searchable user dropdown showing "Name — Position, Department"); dropdown excludes self AND subordinate chain to prevent cycles; client-side cycle preview + server enforcement; inactive-manager warning banner (informational, non-blocking); smart dirty check coverage; mandatory field count unchanged at 10; no new permissions added — gated by existing `user.edit`; two-variant `.team`/`.all` permission pattern documented in design spec for downstream approval stories |
+| 1.3 | 2026-06-29 | BA Agent | Added Social Insurance Number and Tax Identification Number as optional free-text fields (max 50 chars, no format validation) to Personal Information card; updated Key Functionality, SR-15 (dirty check coverage); mandatory field count unchanged at 10 |
