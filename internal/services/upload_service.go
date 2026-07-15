@@ -17,8 +17,8 @@ import (
 	"github.com/exnodes/hrm-api/internal/config"
 )
 
-// Uploader is the storage-side abstraction consumed by employee/profile
-// services. UploadService is the Supabase-S3-backed implementation.
+// Uploader is the storage-side abstraction consumed by feature services.
+// UploadService is the AWS-S3-backed implementation.
 type Uploader interface {
 	Upload(ctx context.Context, subdir, ext string, content []byte, contentType string) (string, error)
 	Delete(ctx context.Context, publicURL string) error
@@ -42,11 +42,7 @@ func NewUploadService(ctx context.Context, cfg config.StorageConfig) (*UploadSer
 	if err != nil {
 		return nil, fmt.Errorf("upload: load aws config: %w", err)
 	}
-	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String(cfg.Endpoint)
-		o.UsePathStyle = true
-	})
-	return &UploadService{cfg: cfg, client: client}, nil
+	return &UploadService{cfg: cfg, client: s3.NewFromConfig(awsCfg)}, nil
 }
 
 // Upload stores content at `subdir/<uuid><ext>` and returns the public URL.
@@ -70,7 +66,7 @@ func (s *UploadService) Upload(ctx context.Context, subdir, ext string, content 
 func (s *UploadService) Delete(ctx context.Context, publicURL string) error {
 	key := s.objectPathFromURL(publicURL)
 	if key == "" {
-		return nil // foreign or empty URL — silent no-op
+		return nil
 	}
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(s.cfg.Bucket),
@@ -83,8 +79,12 @@ func (s *UploadService) Delete(ctx context.Context, publicURL string) error {
 }
 
 func (s *UploadService) PublicURL(key string) string {
-	ref := s.cfg.ProjectRef()
-	return fmt.Sprintf("https://%s.supabase.co/storage/v1/object/public/%s/%s", ref, s.cfg.Bucket, key)
+	return fmt.Sprintf(
+		"https://%s.s3.%s.amazonaws.com/%s",
+		s.cfg.Bucket,
+		s.cfg.Region,
+		strings.TrimLeft(key, "/"),
+	)
 }
 
 func (s *UploadService) objectPathFromURL(raw string) string {
@@ -95,10 +95,9 @@ func (s *UploadService) objectPathFromURL(raw string) string {
 	if err != nil {
 		return ""
 	}
-	marker := fmt.Sprintf("/object/public/%s/", s.cfg.Bucket)
-	idx := strings.Index(u.Path, marker)
-	if idx < 0 {
+	expectedHost := fmt.Sprintf("%s.s3.%s.amazonaws.com", s.cfg.Bucket, s.cfg.Region)
+	if !strings.EqualFold(u.Hostname(), expectedHost) {
 		return ""
 	}
-	return u.Path[idx+len(marker):]
+	return strings.TrimPrefix(u.Path, "/")
 }
