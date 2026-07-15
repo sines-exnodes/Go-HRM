@@ -818,7 +818,7 @@ func (s *EmployeeService) SoftDelete(ctx context.Context, id uuid.UUID, callerUs
 
 const (
 	maxAvatarBytes = 5 * 1024 * 1024
-	avatarSubdir   = "avatars"
+	avatarSubdir   = "hrm-app/avatars"
 )
 
 // allowedAvatarMIME is the set of image content types permitted for an
@@ -853,10 +853,11 @@ func (s *EmployeeService) uploadAvatar(ctx context.Context, employeeID uuid.UUID
 		return nil, err
 	}
 	if err := s.emps.UpdateAvatarURL(ctx, employeeID, &url); err != nil {
+		_ = s.uploads.Delete(ctx, url)
 		return nil, err
 	}
 	if prev != nil && *prev != "" {
-		_ = s.uploads.Delete(ctx, *prev) // best-effort cleanup
+		_ = s.uploads.Delete(ctx, *prev)
 	}
 	return s.Get(ctx, employeeID)
 }
