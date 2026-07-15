@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/stretchr/testify/require"
 
 	"github.com/exnodes/hrm-api/internal/config"
@@ -54,5 +55,7 @@ func TestUploadServiceLiveAWS(t *testing.T) {
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(key),
 	})
-	require.Error(t, err, "deleted probe object must no longer exist")
+	var responseErr *smithyhttp.ResponseError
+	require.ErrorAs(t, err, &responseErr, "deleted probe lookup must return an AWS HTTP response error")
+	require.Equal(t, http.StatusNotFound, responseErr.HTTPStatusCode(), "deleted probe object must return HTTP 404")
 }
