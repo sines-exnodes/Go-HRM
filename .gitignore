@@ -49,6 +49,7 @@ coverage.html
 .ennam-scaffold-backup/
 
 # Local runtime, credentials, and large backup artifacts
+/.worktrees/
 /.codex-pr/
 /secret/
 /server.err
