@@ -1899,7 +1899,7 @@ Khi có ANY address field thay đổi → server stamp `company_address_updated_
 | Skill icon | `icon` | 2MB | image/* |
 | Leave attachment | `attachment` | 10MB | image/* + application/pdf |
 
-Server trả URL public sau upload (S3-compatible storage, Supabase-backed trong dev).
+Server trả URL public sau upload từ bucket AWS S3 đã cấu hình.
 
 ---
 
