@@ -21,21 +21,23 @@ import (
 // without touching real object storage.
 type fakeUploader struct {
 	uploadedURL string
+	subdir      string
 	deleted     []string
 }
 
-func (f *fakeUploader) Upload(ctx context.Context, subdir, ext string, content []byte, contentType string) (string, error) {
-	f.uploadedURL = "https://fake.supabase.co/storage/v1/object/public/hrm-uploads/" + subdir + "/" + uuid.NewString() + ext
+func (f *fakeUploader) Upload(_ context.Context, subdir, ext string, _ []byte, _ string) (string, error) {
+	f.subdir = subdir
+	f.uploadedURL = "https://fake-bucket.s3.ap-southeast-1.amazonaws.com/" + subdir + "/" + uuid.NewString() + ext
 	return f.uploadedURL, nil
 }
 
-func (f *fakeUploader) Delete(ctx context.Context, publicURL string) error {
+func (f *fakeUploader) Delete(_ context.Context, publicURL string) error {
 	f.deleted = append(f.deleted, publicURL)
 	return nil
 }
 
 func (f *fakeUploader) PublicURL(key string) string {
-	return "https://fake.supabase.co/storage/v1/object/public/hrm-uploads/" + key
+	return "https://fake-bucket.s3.ap-southeast-1.amazonaws.com/" + key
 }
 
 // empSvcDeps bundles the secondary returns from newEmpSvc. It embeds
@@ -347,6 +349,7 @@ func TestEmployeeService_UpdateAvatar_ChecksImageType(t *testing.T) {
 	require.NoError(t, testDB.Raw("SELECT avatar_url FROM employees WHERE id = ?", view.ID).Scan(&avatar).Error)
 	require.NotNil(t, avatar)
 	assert.Equal(t, up.uploadedURL, *avatar)
+	assert.Equal(t, "hrm-app/avatars", up.subdir)
 }
 
 func TestEmployeeService_UpdateAvatar_RejectsSpoofedContentType(t *testing.T) {

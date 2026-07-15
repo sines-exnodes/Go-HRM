@@ -202,9 +202,7 @@ func TestSkillService_Update_RenameAndDescription(t *testing.T) {
 }
 
 func TestSkillService_Update_NewIcon_ReplacesPrevious(t *testing.T) {
-	// Verifies that when an update supplies a new icon, the PRIOR icon
-	// object is deleted from storage (best-effort cleanup so we don't
-	// leak orphan objects in Supabase).
+	// A failed database write must not leak an orphan object in S3.
 	skipIfNoDB(t)
 	truncateAll(t)
 	ctx := context.Background()
