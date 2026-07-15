@@ -34,7 +34,11 @@ func TestUploadServiceLiveAWS(t *testing.T) {
 
 	publicURL, err := svc.Upload(ctx, "hrm-app/avatars", ".png", png, "image/png")
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = svc.Delete(context.Background(), publicURL) })
+	t.Cleanup(func() {
+		cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelCleanup()
+		_ = svc.Delete(cleanupCtx, publicURL)
+	})
 
 	key := svc.objectPathFromURL(publicURL)
 	require.True(t, strings.HasPrefix(key, "hrm-app/avatars/"))

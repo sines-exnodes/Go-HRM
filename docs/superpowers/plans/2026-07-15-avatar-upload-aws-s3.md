@@ -14,7 +14,7 @@
 - Avatar object keys are exactly `hrm-app/avatars/<uuid>.<lowercase-extension>`.
 - Required variables are `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`, `STORAGE_REGION`, and `STORAGE_BUCKET`.
 - `STORAGE_ENDPOINT`, Supabase URL construction, custom S3 base endpoints, and path-style addressing are removed.
-- Existing avatar routes, multipart field `avatar`, authorization, 5 MB limit, and byte-sniffed PNG/JPEG/GIF/WEBP validation remain unchanged.
+- Existing avatar routes, multipart field `avatar`, authorization, 5 MB limit, and byte-sniffed PNG/JPEG/WEBP validation remain unchanged.
 - Existing skill, leave, and contract prefixes remain unchanged while their shared transport switches to AWS S3.
 - Only URLs belonging to the configured AWS bucket and region are eligible for deletion; foreign and legacy URLs remain silent no-ops.
 - Historical plans, specifications, and verification records remain historical. Remove Supabase references only from active code, examples, tests, and current reference documentation.

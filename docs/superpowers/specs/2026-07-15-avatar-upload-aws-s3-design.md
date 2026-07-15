@@ -60,7 +60,7 @@ objects. Upload credentials remain server-side and are never returned.
 1. Authenticated client sends `PATCH /api/v1/employees/me/avatar`, or an
    authorized administrator sends `PATCH /api/v1/employees/:id/avatar`.
 2. Handler reads multipart field `avatar`, enforces the 5 MB limit, and accepts
-   PNG, JPEG, GIF, or WEBP.
+   PNG, JPEG, or WEBP.
 3. Employee service sniffs actual bytes and rejects spoofed content types.
 4. Storage adapter uploads the bytes to `hrm-app/avatars/<uuid>.<ext>`.
 5. Employee repository stores the returned AWS public URL.
