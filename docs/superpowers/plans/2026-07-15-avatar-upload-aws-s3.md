@@ -359,7 +359,7 @@ git commit -m "refactor(storage): switch uploader to AWS S3"
 - Consumes: unchanged `Uploader.Upload(ctx, subdir, ext, content, contentType)`.
 - Produces: avatar prefix `hrm-app/avatars` and compensation delete when `UpdateAvatarURL` fails.
 
-- [ ] **Step 1: Write deterministic failing avatar test**
+- [ ] **Step 1: Write deterministic failing avatar test for canceled-request cleanup**
 
 Create `internal/services/avatar_upload_test.go`:
 
@@ -384,6 +384,8 @@ type recordingAvatarUploader struct {
 	contentType string
 	uploadedURL string
 	deleted     []string
+	deleteErr   error
+	deleteLimit bool
 }
 
 func (u *recordingAvatarUploader) Upload(_ context.Context, subdir, ext string, _ []byte, contentType string) (string, error) {
@@ -393,7 +395,12 @@ func (u *recordingAvatarUploader) Upload(_ context.Context, subdir, ext string, 
 	return u.uploadedURL, nil
 }
 
-func (u *recordingAvatarUploader) Delete(_ context.Context, publicURL string) error {
+func (u *recordingAvatarUploader) Delete(ctx context.Context, publicURL string) error {
+	u.deleteErr = ctx.Err()
+	_, u.deleteLimit = ctx.Deadline()
+	if u.deleteErr != nil {
+		return u.deleteErr
+	}
 	u.deleted = append(u.deleted, publicURL)
 	return nil
 }
@@ -419,17 +426,21 @@ func TestUploadAvatarUsesAppPrefixAndCleansObjectWhenPersistenceFails(t *testing
 		uploads: uploader,
 	}
 	pngHeader := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 
-	_, err := svc.uploadAvatar(context.Background(), uuid.New(), nil, pngHeader, "text/plain", ".PNG")
+	_, err := svc.uploadAvatar(ctx, uuid.New(), nil, pngHeader, "text/plain", ".PNG")
 
 	require.ErrorIs(t, err, persistErr)
 	assert.Equal(t, "hrm-app/avatars", uploader.subdir, "application namespace prevents cross-app object collisions")
 	assert.Equal(t, "image/png", uploader.contentType, "storage receives the sniffed MIME type")
+	assert.NoError(t, uploader.deleteErr, "request cancellation must not cancel compensation cleanup")
+	assert.True(t, uploader.deleteLimit, "compensation cleanup must have a finite deadline")
 	assert.Equal(t, []string{uploader.uploadedURL}, uploader.deleted, "failed persistence must not leak the uploaded object")
 }
 ```
 
-- [ ] **Step 2: Run test and verify the old prefix and orphan behavior fail**
+- [ ] **Step 2: Run test and verify canceled request context blocks compensation cleanup**
 
 Run:
 
@@ -437,7 +448,9 @@ Run:
 go test ./internal/services -run '^TestUploadAvatarUsesAppPrefixAndCleansObjectWhenPersistenceFails$' -count=1 -v
 ```
 
-Expected: FAIL because subdirectory is `avatars` and `uploader.deleted` is empty.
+Expected: FAIL before the fix because the already-canceled request context reaches
+cleanup unchanged, has no finite deadline, and prevents deletion of the uploaded
+object.
 
 - [ ] **Step 3: Implement prefix and compensation cleanup**
 
@@ -454,7 +467,9 @@ Replace the persistence block inside `uploadAvatar` with:
 
 ```go
 	if err := s.emps.UpdateAvatarURL(ctx, employeeID, &url); err != nil {
-		_ = s.uploads.Delete(ctx, url)
+		cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancelCleanup()
+		_ = s.uploads.Delete(cleanupCtx, url)
 		return nil, err
 	}
 	if prev != nil && *prev != "" {

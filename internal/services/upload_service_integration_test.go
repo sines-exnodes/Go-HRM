@@ -32,7 +32,7 @@ func TestUploadServiceLiveAWS(t *testing.T) {
 	png, err := base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
 	require.NoError(t, err)
 
-	publicURL, err := svc.Upload(ctx, "hrm-app/avatars", ".png", png, "image/png")
+	publicURL, err := svc.Upload(ctx, "hrm-app/avatars", ".PNG", png, "image/png")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		cleanupCtx, cancelCleanup := context.WithTimeout(context.Background(), 10*time.Second)
@@ -42,6 +42,7 @@ func TestUploadServiceLiveAWS(t *testing.T) {
 
 	key := svc.objectPathFromURL(publicURL)
 	require.True(t, strings.HasPrefix(key, "hrm-app/avatars/"))
+	require.True(t, strings.HasSuffix(key, ".png"), "S3 object key must normalize extension to lowercase")
 	_, err = svc.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(cfg.Bucket),
 		Key:    aws.String(key),
