@@ -1,0 +1,37 @@
+[agents]
+max_threads = 6
+max_depth = 1
+
+[mcp_servers.serena]
+command = "uvx"
+args = [
+    "--from",
+    "git+https://github.com/oraios/serena",
+    "serena",
+    "start-mcp-server",
+    "--context",
+    "ide-assistant",
+    "--project",
+    'E:\Work\Go-HRM',
+]
+
+[mcp_servers.context7]
+command = "npx"
+args = [
+    "-y",
+    "@upstash/context7-mcp",
+]
+
+[mcp_servers.jira]
+command = "npx"
+args = [
+    "-y",
+    "@ennamjsc/jira-mcp",
+]
+
+[mcp_servers.jira.env]
+JIRA_URL = "${JIRA_URL}"
+JIRA_TOKEN = "${JIRA_TOKEN}"
+
+[mcp_servers.figma-desktop]
+url = "http://127.0.0.1:3845/mcp"

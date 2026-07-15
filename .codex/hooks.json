@@ -1,0 +1,13 @@
+{
+  "SessionStart": [
+    {
+      "matcher": ".*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": ".codex/hooks/session-start.ps1"
+        }
+      ]
+    }
+  ]
+}
