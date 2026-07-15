@@ -47,5 +47,14 @@ coverage.html
 .serena/.cache/
 # Backup folder from scaffold edit-mode (safe to delete after review)
 .ennam-scaffold-backup/
+
+# Local runtime, credentials, and large backup artifacts
+/.codex-pr/
+/secret/
+/server.err
+/server.log
+/bk.zip
+/Go-HRM.rar
+
 # Checkpoints are committed by default. Uncomment to ignore:
 # .serena/checkpoint/
