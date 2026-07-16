@@ -1895,11 +1895,11 @@ Khi có ANY address field thay đổi → server stamp `company_address_updated_
 
 | Upload | Field | Max size | MIME allowlist |
 |---|---|---|---|
-| Avatar (employee) | `avatar` | 5MB | image/jpeg, image/png, image/gif, image/webp |
+| Avatar (employee) | `avatar` | 5MB | image/jpeg, image/png, image/webp |
 | Skill icon | `icon` | 2MB | image/* |
 | Leave attachment | `attachment` | 10MB | image/* + application/pdf |
 
-Server trả URL public sau upload (S3-compatible storage, Supabase-backed trong dev).
+Server trả URL public sau upload từ bucket AWS S3 đã cấu hình.
 
 ---
 

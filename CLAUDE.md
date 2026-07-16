@@ -39,7 +39,7 @@ schema split below mirrors its patterns.
 | Migrations | `golang-migrate/migrate/v4` — versioned SQL only |
 | Auth | JWT HS256 access + refresh (`golang-jwt/jwt/v5`), bcrypt cost 12 (`golang.org/x/crypto`) |
 | Authorization | In-code permission registry (RBAC), wildcard `*`, AND semantics |
-| File storage | AWS SDK Go v2 S3 (`aws-sdk-go-v2/service/s3`) → Supabase S3-compatible (`STORAGE_*` env) |
+| File storage | AWS SDK Go v2 S3 (`aws-sdk-go-v2/service/s3`) using regional AWS endpoints (`STORAGE_*` env) |
 | API docs | `swaggo/swag` + `gin-swagger` → `docs/swagger/` (generated) |
 | Realtime | Server-Sent Events hub (`internal/sse`, introduced in the announcements phase) |
 | Config | `joho/godotenv` + `.env` (DB_* or DATABASE_URL) |

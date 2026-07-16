@@ -818,7 +818,7 @@ func (s *EmployeeService) SoftDelete(ctx context.Context, id uuid.UUID, callerUs
 
 const (
 	maxAvatarBytes = 5 * 1024 * 1024
-	avatarSubdir   = "avatars"
+	avatarSubdir   = "hrm-app/avatars"
 )
 
 // allowedAvatarMIME is the set of image content types permitted for an
@@ -827,7 +827,6 @@ const (
 var allowedAvatarMIME = map[string]bool{
 	"image/jpeg": true,
 	"image/png":  true,
-	"image/gif":  true,
 	"image/webp": true,
 }
 
@@ -844,7 +843,7 @@ func (s *EmployeeService) uploadAvatar(ctx context.Context, employeeID uuid.UUID
 	}
 	sniffed := http.DetectContentType(content[:sniffLen])
 	if !allowedAvatarMIME[sniffed] {
-		return nil, apperrors.ErrBadRequest("Avatar must be a valid image (PNG, JPEG, GIF, or WEBP)")
+		return nil, apperrors.ErrBadRequest("Avatar must be a valid image (PNG, JPEG, or WEBP)")
 	}
 	// Use the verified type for storage, not the client's header.
 	contentType = sniffed
@@ -853,10 +852,13 @@ func (s *EmployeeService) uploadAvatar(ctx context.Context, employeeID uuid.UUID
 		return nil, err
 	}
 	if err := s.emps.UpdateAvatarURL(ctx, employeeID, &url); err != nil {
+		cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancelCleanup()
+		_ = s.uploads.Delete(cleanupCtx, url)
 		return nil, err
 	}
 	if prev != nil && *prev != "" {
-		_ = s.uploads.Delete(ctx, *prev) // best-effort cleanup
+		_ = s.uploads.Delete(ctx, *prev)
 	}
 	return s.Get(ctx, employeeID)
 }
