@@ -14,13 +14,18 @@ import (
 
 // AuthHandler handles authentication endpoints.
 type AuthHandler struct {
-	auth  *services.AuthService
-	reset *services.PasswordResetService
+	auth     *services.AuthService
+	reset    *services.PasswordResetService
+	resetOTP *services.PasswordResetOTPService
 }
 
 // NewAuthHandler constructs an AuthHandler.
-func NewAuthHandler(auth *services.AuthService, reset *services.PasswordResetService) *AuthHandler {
-	return &AuthHandler{auth: auth, reset: reset}
+func NewAuthHandler(
+	auth *services.AuthService,
+	reset *services.PasswordResetService,
+	resetOTP *services.PasswordResetOTPService,
+) *AuthHandler {
+	return &AuthHandler{auth: auth, reset: reset, resetOTP: resetOTP}
 }
 
 // toUserSummary projects an auth-loaded User (with Roles + Employee preloaded)
@@ -190,6 +195,98 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.Response[any]{
 		Success: true,
 		Message: "If that email address is registered, a reset link has been sent.",
+	})
+}
+
+// MobileForgotPassword godoc
+// @Summary      Request a 6-digit password-reset code (mobile)
+// @Description  Mails a 6-digit OTP to the given address. Backs both "Send Code"
+// @Description  (Screen 1) and "Resend Code" (Screen 2) — the same cooldown and
+// @Description  rate limit apply to each.
+// @Description
+// @Description  **Unlike the web `/auth/forgot-password`, this endpoint is NOT
+// @Description  enumerate-guarded**: an unregistered or deactivated address returns
+// @Description  404 so the app can show the inline "No account found" error (AC-05).
+// @Description
+// @Description  **Limits** (all env-tunable): the code expires in `OTP_EXPIRE_MINUTES`
+// @Description  (default 10). A resend inside `OTP_RESEND_COOLDOWN_SECONDS` (default 60)
+// @Description  returns 429, as does exceeding `OTP_MAX_REQUESTS_PER_WINDOW` (default 3)
+// @Description  requests per `OTP_RATE_LIMIT_WINDOW_MINUTES` (default 15). Both 429s
+// @Description  carry a `retry_after_seconds` detail.
+// @Description
+// @Description  Issuing a code invalidates any previously issued one (SR-03). Email
+// @Description  dispatch is best-effort — an SMTP failure is recorded on the row and
+// @Description  still returns 200.
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.OTPRequestRequest  true  "Email address"
+// @Success      200   {object}  dto.Response[dto.OTPRequestResponse]
+// @Failure      400   {object}  dto.Response[any]  "Malformed body or invalid email format"
+// @Failure      404   {object}  dto.Response[any]  "No account found with this email address"
+// @Failure      429   {object}  dto.Response[any]  "Resend cooldown or rate limit hit"
+// @Router       /api/v1/auth/mobile/forgot-password [post]
+func (h *AuthHandler) MobileForgotPassword(c *gin.Context) {
+	var req dto.OTPRequestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperr.ErrBadRequest(err.Error()))
+		return
+	}
+	result, err := h.resetOTP.RequestOTP(c.Request.Context(), req.Email)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[dto.OTPRequestResponse]{
+		Success: true,
+		Message: "A verification code has been sent to your email.",
+		Data: dto.OTPRequestResponse{
+			ExpiresAt:         result.ExpiresAt,
+			ResendAvailableAt: result.ResendAvailableAt,
+		},
+	})
+}
+
+// MobileVerifyOTP godoc
+// @Summary      Verify a 6-digit password-reset code (mobile)
+// @Description  Validates the code and returns a single-use `reset_token`.
+// @Description  Send that token to `POST /api/v1/auth/reset-password` to set the
+// @Description  new password — there is no separate mobile reset endpoint.
+// @Description
+// @Description  **The code is consumed here** (SR-05), before the token is issued.
+// @Description  Backing out of the new-password screen and re-submitting the same
+// @Description  code returns 400; the app must hold the `reset_token`. The token
+// @Description  expires in `OTP_RESET_TOKEN_EXPIRE_MINUTES` (default 10).
+// @Description
+// @Description  A wrong code returns 400 with a `remaining_attempts` detail. After
+// @Description  `OTP_MAX_VERIFY_ATTEMPTS` (default 5) wrong submissions the code is
+// @Description  burned and a new one must be requested.
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.OTPVerifyRequest  true  "Email and 6-digit code"
+// @Success      200   {object}  dto.Response[dto.OTPVerifyResponse]
+// @Failure      400   {object}  dto.Response[any]  "Incorrect, expired, or already-used code"
+// @Failure      404   {object}  dto.Response[any]  "No account found with this email address"
+// @Router       /api/v1/auth/mobile/verify-otp [post]
+func (h *AuthHandler) MobileVerifyOTP(c *gin.Context) {
+	var req dto.OTPVerifyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperr.ErrBadRequest(err.Error()))
+		return
+	}
+	result, err := h.resetOTP.VerifyOTP(c.Request.Context(), req.Email, req.OTP)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	c.JSON(http.StatusOK, dto.Response[dto.OTPVerifyResponse]{
+		Success: true,
+		Message: "Code verified.",
+		Data: dto.OTPVerifyResponse{
+			ResetToken: result.ResetToken,
+			ExpiresAt:  result.ExpiresAt,
+		},
 	})
 }
 

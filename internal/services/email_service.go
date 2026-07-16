@@ -36,6 +36,17 @@ type PasswordResetEmailData struct {
 	ExpiresAt string
 }
 
+// PasswordResetOTPEmailData is the template render context for the mobile
+// forgot-password code email (DR-001-001-02). Code is the plaintext 6-digit
+// OTP — the only place it ever exists outside the request that generated it.
+type PasswordResetOTPEmailData struct {
+	AppName          string
+	FullName         string
+	Code             string
+	ExpiresAt        string
+	ExpiresInMinutes int
+}
+
 // EmailService renders + ships HTML/plain-text emails via SMTP. When
 // SMTP_HOST is empty in the environment the service is in "disabled"
 // mode: every Send returns a clear error so the caller can store it on
@@ -47,6 +58,8 @@ type EmailService struct {
 	textTemplate      *texttemplate.Template
 	resetHTMLTemplate *template.Template
 	resetTextTemplate *texttemplate.Template
+	otpHTMLTemplate   *template.Template
+	otpTextTemplate   *texttemplate.Template
 }
 
 // ErrEmailDisabled is returned when SMTP is not configured. Callers
@@ -74,12 +87,22 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("email: parse reset_password.txt: %w", err)
 	}
+	otpHTMLT, err := template.ParseFS(emailTemplateFS, "emailtemplates/reset_password_otp.html")
+	if err != nil {
+		return nil, fmt.Errorf("email: parse reset_password_otp.html: %w", err)
+	}
+	otpTextT, err := texttemplate.ParseFS(emailTemplateFS, "emailtemplates/reset_password_otp.txt")
+	if err != nil {
+		return nil, fmt.Errorf("email: parse reset_password_otp.txt: %w", err)
+	}
 	return &EmailService{
 		cfg:               cfg,
 		htmlTemplate:      htmlT,
 		textTemplate:      textT,
 		resetHTMLTemplate: resetHTMLT,
 		resetTextTemplate: resetTextT,
+		otpHTMLTemplate:   otpHTMLT,
+		otpTextTemplate:   otpTextT,
 	}, nil
 }
 
@@ -196,6 +219,44 @@ func (s *EmailService) SendPasswordReset(ctx context.Context, toEmail string, da
 
 	if err := s.sendMessage(ctx, m); err != nil {
 		return fmt.Errorf("send password reset: %w", err)
+	}
+	return nil
+}
+
+// SendPasswordResetOTP renders the reset_password_otp template and ships the
+// 6-digit code. Returns ErrEmailDisabled when SMTP is not configured — the
+// caller is expected to record the error on the OTP row.
+func (s *EmailService) SendPasswordResetOTP(ctx context.Context, toEmail string, data PasswordResetOTPEmailData) error {
+	if !s.IsConfigured() {
+		// Mirrors SendInvite/SendPasswordReset, which log the would-be reset
+		// URL. SMTP is only unconfigured in dev, where surfacing the code is
+		// the only way to exercise the flow.
+		log.Printf("email: skipped password reset OTP to %s — SMTP not configured (would-be code: %s)", toEmail, data.Code)
+		return ErrEmailDisabled
+	}
+
+	if data.AppName == "" {
+		data.AppName = s.cfg.AppName
+	}
+
+	var htmlBuf bytes.Buffer
+	if err := s.otpHTMLTemplate.Execute(&htmlBuf, data); err != nil {
+		return fmt.Errorf("render reset_password_otp.html: %w", err)
+	}
+	var textBuf bytes.Buffer
+	if err := s.otpTextTemplate.Execute(&textBuf, data); err != nil {
+		return fmt.Errorf("render reset_password_otp.txt: %w", err)
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", s.fromAddress())
+	m.SetHeader("To", toEmail)
+	m.SetHeader("Subject", fmt.Sprintf("%s is your %s verification code", data.Code, data.AppName))
+	m.SetBody("text/plain", textBuf.String())
+	m.AddAlternative("text/html", htmlBuf.String())
+
+	if err := s.sendMessage(ctx, m); err != nil {
+		return fmt.Errorf("send password reset otp: %w", err)
 	}
 	return nil
 }

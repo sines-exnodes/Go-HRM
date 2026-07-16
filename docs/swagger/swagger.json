@@ -1070,6 +1070,104 @@
                 }
             }
         },
+        "/api/v1/auth/mobile/forgot-password": {
+            "post": {
+                "description": "Mails a 6-digit OTP to the given address. Backs both \"Send Code\"\n(Screen 1) and \"Resend Code\" (Screen 2) — the same cooldown and\nrate limit apply to each.\n\n**Unlike the web `/auth/forgot-password`, this endpoint is NOT\nenumerate-guarded**: an unregistered or deactivated address returns\n404 so the app can show the inline \"No account found\" error (AC-05).\n\n**Limits** (all env-tunable): the code expires in `OTP_EXPIRE_MINUTES`\n(default 10). A resend inside `OTP_RESEND_COOLDOWN_SECONDS` (default 60)\nreturns 429, as does exceeding `OTP_MAX_REQUESTS_PER_WINDOW` (default 3)\nrequests per `OTP_RATE_LIMIT_WINDOW_MINUTES` (default 15). Both 429s\ncarry a `retry_after_seconds` detail.\n\nIssuing a code invalidates any previously issued one (SR-03). Email\ndispatch is best-effort — an SMTP failure is recorded on the row and\nstill returns 200.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Request a 6-digit password-reset code (mobile)",
+                "parameters": [
+                    {
+                        "description": "Email address",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPRequestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPRequestResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed body or invalid email format",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "No account found with this email address",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "429": {
+                        "description": "Resend cooldown or rate limit hit",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/mobile/verify-otp": {
+            "post": {
+                "description": "Validates the code and returns a single-use `reset_token`.\nSend that token to `POST /api/v1/auth/reset-password` to set the\nnew password — there is no separate mobile reset endpoint.\n\n**The code is consumed here** (SR-05), before the token is issued.\nBacking out of the new-password screen and re-submitting the same\ncode returns 400; the app must hold the `reset_token`. The token\nexpires in `OTP_RESET_TOKEN_EXPIRE_MINUTES` (default 10).\n\nA wrong code returns 400 with a `remaining_attempts` detail. After\n`OTP_MAX_VERIFY_ATTEMPTS` (default 5) wrong submissions the code is\nburned and a new one must be requested.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify a 6-digit password-reset code (mobile)",
+                "parameters": [
+                    {
+                        "description": "Email and 6-digit code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPVerifyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPVerifyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Incorrect, expired, or already-used code",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "No account found with this email address",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/refresh": {
             "post": {
                 "consumes": [
@@ -4515,7 +4613,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData"
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData"
                         }
                     }
                 }
@@ -6611,6 +6709,57 @@
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.OTPRequestRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@exnodes.vn"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.OTPRequestResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "resend_available_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.OTPVerifyRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "otp"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@exnodes.vn"
+                },
+                "otp": {
+                    "type": "string",
+                    "example": "482913"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.OTPVerifyResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "reset_token": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead": {
             "type": "object",
             "properties": {
@@ -6851,6 +7000,34 @@
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPRequestResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPRequestResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPVerifyResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPVerifyResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead": {
             "type": "object",
             "properties": {
@@ -6935,11 +7112,11 @@
                 }
             }
         },
-        "github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData": {
+        "github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData": {
             "type": "object",
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/handlers.HealthData"
+                    "$ref": "#/definitions/internal_handlers.HealthData"
                 },
                 "message": {
                     "type": "string"
@@ -7442,7 +7619,7 @@
                 }
             }
         },
-        "handlers.HealthData": {
+        "internal_handlers.HealthData": {
             "type": "object",
             "properties": {
                 "service": {

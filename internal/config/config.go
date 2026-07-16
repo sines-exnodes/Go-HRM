@@ -86,6 +86,16 @@ type Config struct {
 	SMTPUseTLS                    bool
 	FirebaseCredentialsPath       string
 	FirebaseProjectID             string
+
+	// Mobile forgot-password OTP flow (DR-001-001-02). The DR's stated
+	// numbers are the defaults; every threshold is env-tunable because the
+	// DR lists them as pending PO / security confirmation.
+	OTPExpireMinutes           int
+	OTPResendCooldownSeconds   int
+	OTPMaxRequestsPerWindow    int
+	OTPRateLimitWindowMinutes  int
+	OTPMaxVerifyAttempts       int
+	OTPResetTokenExpireMinutes int
 }
 
 // Load reads the .env file (if present) and returns the populated Config.
@@ -149,6 +159,13 @@ func Load() *Config {
 		SMTPUseTLS:                    getEnvBool("SMTP_USE_TLS", true),
 		FirebaseCredentialsPath:       getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseProjectID:             getEnv("FIREBASE_PROJECT_ID", ""),
+
+		OTPExpireMinutes:           getEnvInt("OTP_EXPIRE_MINUTES", 10),
+		OTPResendCooldownSeconds:   getEnvInt("OTP_RESEND_COOLDOWN_SECONDS", 60),
+		OTPMaxRequestsPerWindow:    getEnvInt("OTP_MAX_REQUESTS_PER_WINDOW", 3),
+		OTPRateLimitWindowMinutes:  getEnvInt("OTP_RATE_LIMIT_WINDOW_MINUTES", 15),
+		OTPMaxVerifyAttempts:       getEnvInt("OTP_MAX_VERIFY_ATTEMPTS", 5),
+		OTPResetTokenExpireMinutes: getEnvInt("OTP_RESET_TOKEN_EXPIRE_MINUTES", 10),
 	}
 
 	if strings.TrimSpace(cfg.JWTSecret) == "" {

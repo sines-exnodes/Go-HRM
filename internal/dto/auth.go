@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // LoginRequest is the body for POST /api/v1/auth/login.
 type LoginRequest struct {
@@ -70,6 +74,32 @@ type ForgotPasswordRequest struct {
 type ResetPasswordRequest struct {
 	Token       string `json:"token" binding:"required" example:"abc123xyz"`
 	NewPassword string `json:"new_password" binding:"required,min=8" example:"NewPass!2026"`
+}
+
+// OTPRequestRequest is the body for POST /api/v1/auth/mobile/forgot-password.
+// The same endpoint backs both "Send Code" and "Resend Code".
+type OTPRequestRequest struct {
+	Email string `json:"email" binding:"required,email" example:"john@exnodes.vn"`
+}
+
+// OTPRequestResponse tells the app when the code dies and when the Resend
+// link may light up again.
+type OTPRequestResponse struct {
+	ExpiresAt         time.Time `json:"expires_at"`
+	ResendAvailableAt time.Time `json:"resend_available_at"`
+}
+
+// OTPVerifyRequest is the body for POST /api/v1/auth/mobile/verify-otp.
+type OTPVerifyRequest struct {
+	Email string `json:"email" binding:"required,email" example:"john@exnodes.vn"`
+	OTP   string `json:"otp" binding:"required,len=6,numeric" example:"482913"`
+}
+
+// OTPVerifyResponse carries the single-use token the app must send to
+// POST /api/v1/auth/reset-password to complete the reset.
+type OTPVerifyResponse struct {
+	ResetToken string    `json:"reset_token"`
+	ExpiresAt  time.Time `json:"expires_at"`
 }
 
 // TokenVerifyResponse is the data payload for GET /api/v1/auth/verify-token.
