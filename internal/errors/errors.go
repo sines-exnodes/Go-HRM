@@ -14,6 +14,7 @@ const (
 	CodeForbidden    = "forbidden"
 	CodeUnauthorized = "unauthorized"
 	CodeInternal     = "internal_error"
+	CodeTooManyReqs  = "too_many_requests"
 )
 
 // AppError is the canonical error type raised by services. The error
@@ -71,6 +72,17 @@ func ErrNotFound(resource string) *AppError {
 	}
 }
 
+// ErrNotFoundMsg is ErrNotFound with a caller-supplied message, for the cases
+// where the wire text is dictated by a requirement rather than by the
+// "<resource> not found" convention.
+func ErrNotFoundMsg(msg string) *AppError {
+	return &AppError{
+		Code:    CodeNotFound,
+		Message: msg,
+		HTTP:    http.StatusNotFound,
+	}
+}
+
 func ErrBadRequest(msg string) *AppError {
 	return &AppError{
 		Code:    CodeBadRequest,
@@ -100,6 +112,17 @@ func ErrUnauthorized(msg string) *AppError {
 		Code:    CodeUnauthorized,
 		Message: msg,
 		HTTP:    http.StatusUnauthorized,
+	}
+}
+
+// ErrTooManyRequests reports a client-side rate limit. Callers should attach
+// a retry_after_seconds detail via WithDetails when the client can usefully
+// count down to the next allowed attempt.
+func ErrTooManyRequests(msg string) *AppError {
+	return &AppError{
+		Code:    CodeTooManyReqs,
+		Message: msg,
+		HTTP:    http.StatusTooManyRequests,
 	}
 }
 

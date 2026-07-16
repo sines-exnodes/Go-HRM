@@ -1,8 +1,23 @@
-# Resume Checkpoint — Dashboard API implemented
+# Resume Checkpoint — Mobile forgot-password (OTP) implemented
 
-**Last updated:** 2026-07-09
-**Stopped at:** Dashboard API implemented from `DR-001-002-01-dashboard-page.md`. No migration. Request Tickets widget intentionally omitted until the Request Tickets module exists.
-**Branch:** `fix/push-announcement-data-payload`.
+**Last updated:** 2026-07-16
+**Stopped at:** Mobile OTP forgot-password implemented + verified on `feat/mobile-forgot-password-otp` (commit `3433715`). **Not pushed, no PR yet.** Migration **000027** applied to the *test* DB only.
+**Branch:** `feat/mobile-forgot-password-otp` (off `main` @ `eb486ce`).
+
+> **2026-07-16 session — mobile forgot-password OTP (DR-001-001-02):**
+> - New flow **alongside** the untouched web link flow (000024). `POST /auth/mobile/forgot-password` (mails a 6-digit code, also backs Resend) + `POST /auth/mobile/verify-otp` (consumes the code, returns a 10-min single-use `reset_token`). Screen 3 reuses the existing `POST /auth/reset-password` — no third endpoint.
+> - **Migration 000027** `password_reset_otps`. Codes bcrypt-hashed at rest, looked up by `user_id`.
+> - New: `models.PasswordResetOTP`, `PasswordResetOTPRepository`, `PasswordResetOTPService`, `EmailService.SendPasswordResetOTP` + `reset_password_otp.{html,txt}`, `apperr.ErrTooManyRequests` / `ErrNotFoundMsg`, `OTP_*` config keys.
+> - **3 DR conflicts resolved with the project owner** (see the verification log — do NOT silently re-decide these):
+>   1. **SR-05 beats Alt-3** — code consumed at verify; the app must hold the `reset_token`. Re-submitting the code after backing out of Screen 3 fails by design.
+>   2. **AC-05/SR-08 beats the enumerate guard** — unknown/inactive email returns **404**. Deliberate account-existence oracle; **diverges from the web `/auth/forgot-password`, which still always returns 200.** DR wants security to confirm.
+>   3. **SR-09 NOT implemented** — no cross-device session kill. `password_reset_at` is stamped but unenforced; old access tokens live out their TTL. Needs a JWT middleware change.
+> - Added beyond the DR: `OTP_MAX_VERIFY_ATTEMPTS` (default 5) — the DR bounds OTP *requests* but not *verify* attempts, and 10^6 codes is walkable in 10 minutes otherwise.
+> - **Verified:** build/vet clean, swag regenerated, 14/14 integration tests, live 14-step HTTP smoke with a real Mailpit delivery. Log: [`verification/mobile-forgot-password-otp.md`](verification/mobile-forgot-password-otp.md).
+> - ⚠️ **Pre-existing suite breakage, NOT from this work** — 4 leave-request tests fail on a clean `main` too (confirmed by stashing): `TestApprove_TeamScope_{CanApproveSubordinate,RejectsNonSubordinate}`, `TestReject_TeamScope_CanRejectSubordinate`, `TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus` — all `forbidden: Only an admin can edit an approved leave request`. Needs its own fix.
+> - ~~⚠️ Dev DB `exnodes_hrm` is at migration 19~~ — **RESOLVED same session.** Dev migrated 19→27 (000020–000027 in one clean run, dirty=f). Data intact (20 users / 20 employees / 5 roles / 25 leaves / 40 attendance); role levels seeded 100/90/80/50/10. App boots against it and `/auth/mobile/forgot-password` answers. The OTP feature smoke itself had already run against `exnodes_hrm_test`.
+>   - `migrate` CLI is in `$(go env GOPATH)/bin`, **not on PATH**, and `.env`'s `DATABASE_URL` uses the compose hostname `postgres`, which does not resolve from the host. So `make migrate-up` fails from a host shell. What works:
+>     `"$(go env GOPATH)/bin/migrate" -path migrations -database "postgres://postgres:devpassword@localhost:5432/exnodes_hrm?sslmode=disable" up`
 
 > **2026-07-09 session:**
 > - Added `GET /api/v1/dashboard` (JWT only) with fixed-order widgets: attendance overview, pending approvals, leave summary, announcements, holidays/workdays, and workforce summary. Widgets are omitted when the caller lacks the source module permission or source scope.
@@ -17,7 +32,7 @@ Previous checkpoint: Forgot-password / reset-password feature implemented on `fe
 > - **PR #19 merged** (`feat/employee-profile-enrichment`): `ManagerBrief` enriched with `Email`, `Phone`, `AvatarURL`; Employee role seeded with `users:banking_view`; `GetMe` changed to `unmask=true` (self-read).
 > - **Scalar replaces Stoplight Elements** at `/docs` (still on main from 2026-06-22 session).
 > - **Forgot-password API (migration 000024)**: `password_reset_tokens` table + `PasswordResetTokenRepository` + `PasswordResetService` + `SendPasswordReset()` + `reset_password.{html,txt}` templates + `POST /auth/forgot-password` + `POST /auth/reset-password`. Enumerate guard (always 200). Token expiry 1h (`PASSWORD_RESET_TOKEN_EXPIRE_HOURS`). Email best-effort: errors stored on token row. Verified end-to-end: token creation, SMTP-disabled error capture, successful reset + login, replay rejection. PR #20 open.
-**DB migration version:** **24** (applied to dev). Next free: **000025**.
+**DB migration version:** **000027** (`password_reset_otps`) — latest on disk **and applied to dev `exnodes_hrm`** (2026-07-16, 19→27 in one run: 000020–000027). Next free is **000028**. (The "24 / next 25" note below was stale — 000025 `users_email_partial_unique` and 000026 `employees_insurance_tax` had already landed.)
 **See:** [Post-migration parity work](#post-migration-parity-work-python--go-api-parity) and [User Contracts](#user-contracts-module--done-migration-000022) below.
 
 > **Roles & Permissions parity — DONE (PR #14, on `main`).** Full role CRUD at `/api/v1/roles` (was catalog/seed-only); role `level` (1–100) + assignment authority (`user_service.AssignRoles` → 403 if granting above your max level); soft-delete frees the name (partial-unique on `LOWER(name)`); `is_system` guards; `GET /roles/permissions` gated `roles:read`. Brief role embed renamed `dto.RoleRead`→`dto.RoleRef`. Seed levels: Super Admin 100 / Admin 90 / HR Manager 80 / Manager 50 / Employee 10. Migrations 000020 + 000021.
@@ -133,7 +148,9 @@ Merged via **PR #18** (`9a1b511`); `main` in sync with `origin/main`. No further
 
 ### IMMEDIATE next & subsequent priorities (in descending value):
 
-1. **Merge PR #20** (`feat/forgot-password`) — reviewed + verified; ready to merge. After merge, update CHECKPOINT and Serena memories.
+0. **Push `feat/mobile-forgot-password-otp` + open a PR** (commit `3433715`, migration 000027). Verified but unreviewed and unpushed. **Flag for the reviewer:** the deliberate 404-on-unknown-email enumeration divergence (decision 2) wants a security sign-off, and the deferred SR-09 session-kill.
+0b. **Fix the 4 pre-existing leave-request test failures** — the services suite is red on `main` right now, which masks future regressions.
+1. ~~**Merge PR #20** (`feat/forgot-password`)~~ — superseded: the web forgot-password flow is on `main` (migration 000024 is in the tree).
 2. **Request Tickets module (EP-003/US-003) — biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000025**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
 3. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
 4. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.

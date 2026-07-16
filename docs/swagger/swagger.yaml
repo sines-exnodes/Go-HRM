@@ -970,6 +970,40 @@ definitions:
     - body
     - title
     type: object
+  github_com_exnodes_hrm-api_internal_dto.OTPRequestRequest:
+    properties:
+      email:
+        example: john@exnodes.vn
+        type: string
+    required:
+    - email
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.OTPRequestResponse:
+    properties:
+      expires_at:
+        type: string
+      resend_available_at:
+        type: string
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.OTPVerifyRequest:
+    properties:
+      email:
+        example: john@exnodes.vn
+        type: string
+      otp:
+        example: "482913"
+        type: string
+    required:
+    - email
+    - otp
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.OTPVerifyResponse:
+    properties:
+      expires_at:
+        type: string
+      reset_token:
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead:
     properties:
       items:
@@ -1129,6 +1163,24 @@ definitions:
       success:
         type: boolean
     type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPRequestResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPRequestResponse'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPVerifyResponse:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPVerifyResponse'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
   ? github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead
   : properties:
       data:
@@ -1183,10 +1235,10 @@ definitions:
       success:
         type: boolean
     type: object
-  github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData:
+  github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData:
     properties:
       data:
-        $ref: '#/definitions/handlers.HealthData'
+        $ref: '#/definitions/internal_handlers.HealthData'
       message:
         type: string
       success:
@@ -1577,7 +1629,7 @@ definitions:
       label:
         type: string
     type: object
-  handlers.HealthData:
+  internal_handlers.HealthData:
     properties:
       service:
         example: exnodes-hrm-api
@@ -2293,6 +2345,99 @@ paths:
       security:
       - BearerAuth: []
       summary: Acknowledge logout
+      tags:
+      - Authentication
+  /api/v1/auth/mobile/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Mails a 6-digit OTP to the given address. Backs both "Send Code"
+        (Screen 1) and "Resend Code" (Screen 2) — the same cooldown and
+        rate limit apply to each.
+
+        **Unlike the web `/auth/forgot-password`, this endpoint is NOT
+        enumerate-guarded**: an unregistered or deactivated address returns
+        404 so the app can show the inline "No account found" error (AC-05).
+
+        **Limits** (all env-tunable): the code expires in `OTP_EXPIRE_MINUTES`
+        (default 10). A resend inside `OTP_RESEND_COOLDOWN_SECONDS` (default 60)
+        returns 429, as does exceeding `OTP_MAX_REQUESTS_PER_WINDOW` (default 3)
+        requests per `OTP_RATE_LIMIT_WINDOW_MINUTES` (default 15). Both 429s
+        carry a `retry_after_seconds` detail.
+
+        Issuing a code invalidates any previously issued one (SR-03). Email
+        dispatch is best-effort — an SMTP failure is recorded on the row and
+        still returns 200.
+      parameters:
+      - description: Email address
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPRequestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPRequestResponse'
+        "400":
+          description: Malformed body or invalid email format
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "404":
+          description: No account found with this email address
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "429":
+          description: Resend cooldown or rate limit hit
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      summary: Request a 6-digit password-reset code (mobile)
+      tags:
+      - Authentication
+  /api/v1/auth/mobile/verify-otp:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Validates the code and returns a single-use `reset_token`.
+        Send that token to `POST /api/v1/auth/reset-password` to set the
+        new password — there is no separate mobile reset endpoint.
+
+        **The code is consumed here** (SR-05), before the token is issued.
+        Backing out of the new-password screen and re-submitting the same
+        code returns 400; the app must hold the `reset_token`. The token
+        expires in `OTP_RESET_TOKEN_EXPIRE_MINUTES` (default 10).
+
+        A wrong code returns 400 with a `remaining_attempts` detail. After
+        `OTP_MAX_VERIFY_ATTEMPTS` (default 5) wrong submissions the code is
+        burned and a new one must be requested.
+      parameters:
+      - description: Email and 6-digit code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.OTPVerifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPVerifyResponse'
+        "400":
+          description: Incorrect, expired, or already-used code
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+        "404":
+          description: No account found with this email address
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any'
+      summary: Verify a 6-digit password-reset code (mobile)
       tags:
       - Authentication
   /api/v1/auth/refresh:
@@ -4535,7 +4680,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-handlers_HealthData'
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-internal_handlers_HealthData'
       summary: Liveness probe
       tags:
       - system

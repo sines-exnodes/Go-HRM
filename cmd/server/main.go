@@ -68,6 +68,7 @@ func main() {
 	holidayRepo := repositories.NewHolidayRepository(db)
 	holidayTemplateRepo := repositories.NewHolidayTemplateRepository(db)
 	passwordResetTokenRepo := repositories.NewPasswordResetTokenRepository(db)
+	passwordResetOTPRepo := repositories.NewPasswordResetOTPRepository(db)
 
 	// ---- services ----
 	authSvc := services.NewAuthService(userRepo, roleRepo, services.AuthConfig{
@@ -131,6 +132,7 @@ func main() {
 	holidaySvc := services.NewHolidayService(holidayRepo, holidayTemplateRepo, leaveRepo)
 	workdaySvc := services.NewWorkdayService(holidayRepo)
 	passwordResetSvc := services.NewPasswordResetService(userRepo, passwordResetTokenRepo, emailSvc, cfg)
+	passwordResetOTPSvc := services.NewPasswordResetOTPService(userRepo, passwordResetOTPRepo, passwordResetTokenRepo, emailSvc, cfg)
 	dashboardSvc := services.NewDashboardService(cfg, employeeRepo, leaveRepo, quotaRepo, attendanceRepo, announcementRepo, holidayRepo)
 
 	// ---- run idempotent seed on boot ----
@@ -139,7 +141,7 @@ func main() {
 	}
 
 	// ---- handlers ----
-	authH := handlers.NewAuthHandler(authSvc, passwordResetSvc)
+	authH := handlers.NewAuthHandler(authSvc, passwordResetSvc, passwordResetOTPSvc)
 	roleH := handlers.NewRoleHandler(roleSvc)
 	empH := handlers.NewEmployeeHandler(empSvc, passwordResetSvc)
 	depH := handlers.NewDependentHandler(depSvc)
@@ -195,6 +197,14 @@ func main() {
 		auth.GET("/verify-token", authH.VerifyResetToken)
 		auth.POST("/reset-password", authH.ResetPassword)
 		auth.POST("/set-password", authH.ResetPassword) // Python parity alias
+
+		// Mobile forgot-password (DR-001-001-02). OTP-based: the app mails a
+		// 6-digit code instead of the web flow's one-click link. Screen 3
+		// finishes on the shared /auth/reset-password above, using the
+		// reset_token that /mobile/verify-otp returns.
+		authMobile := auth.Group("/mobile")
+		authMobile.POST("/forgot-password", authH.MobileForgotPassword) // also backs "Resend Code"
+		authMobile.POST("/verify-otp", authH.MobileVerifyOTP)
 
 		// ---- /invites/accept (Phase 9 — PUBLIC) ----
 		// The token in the body is the credential. Lives outside the
