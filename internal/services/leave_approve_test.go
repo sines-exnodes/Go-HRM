@@ -14,13 +14,19 @@ import (
 	"github.com/exnodes/hrm-api/internal/services"
 )
 
-// setupApproveChain creates a manager + subordinate linked by line_manager_id.
+// setupApproveChain creates a manager + subordinate linked by manager_id.
+//
+// The column is manager_id (migration 000003), NOT line_manager_id — the
+// latter is the name of the FEATURE (the line-manager suite, PR #10), not of
+// the column. Writing to line_manager_id makes Postgres reject the UPDATE
+// with SQLSTATE 42703 and every caller of this helper fails before it reaches
+// any approval logic.
 func setupApproveChain(t *testing.T) (mgr, sub *models.Employee) {
 	t.Helper()
 	_, mgr = makeEmpUser(t, "mgr-approve@x.com", "Manager A")
 	_, sub = makeEmpUser(t, "sub-approve@x.com", "Subordinate B")
 	require.NoError(t,
-		testDB.Exec("UPDATE employees SET line_manager_id = ? WHERE id = ?", mgr.ID, sub.ID).Error,
+		testDB.Exec("UPDATE employees SET manager_id = ? WHERE id = ?", mgr.ID, sub.ID).Error,
 	)
 	return
 }
