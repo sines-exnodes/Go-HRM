@@ -247,64 +247,172 @@ func TestNotification_UnreadCount_CountsOnlyOwnUnread(t *testing.T) {
 	assert.Equal(t, int64(2), count.UnreadCount)
 }
 
-// DR Rule 12 — notification content is a snapshot. Editing the source after
-// the fact must not rewrite what the employee was already told. This test is
-// the reason the table stores title/body instead of joining to the source.
-func TestNotification_SnapshotSurvivesSourceEdit(t *testing.T) {
+
+
+// ---- Announcement producer ----
+
+// newAnnouncementSvcWithFeed wires a real announcement notifier backed by the
+// notification feed. push/email are nil so only the in-app rows are written.
+func newAnnouncementSvcWithFeed(t *testing.T, notifs *services.NotificationService) *services.AnnouncementService {
+	t.Helper()
+	return svcWithNotifier(t, services.NewAnnouncementNotifier(nil, nil, testUserRepo, notifs))
+}
+
+// AC-10 — a draft announcement generates nothing. The publish gate is what
+// enforces this; this test pins it so a future refactor of broadcastPublished
+// cannot silently start notifying on draft save.
+func TestNotification_Announcement_DraftGeneratesNothing(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
+	ctx := context.Background()
 
-	svc, _ := newNotificationSvc(t)
-	u := makeUser(t, "snapshot@example.com", "pw-Aa123456")
-	sourceID := uuid.New()
+	notifSvc, _ := newNotificationSvc(t)
+	annSvc := newAnnouncementSvcWithFeed(t, notifSvc)
 
-	require.NoError(t, svc.CreateMany(context.Background(), []models.Notification{{
-		UserID:   u.ID,
-		Type:     models.NotificationTypeAnnouncement,
-		Title:    "Original title",
-		Body:     "Original body",
-		SourceID: sourceID,
-	}}))
+	author, _ := makeEmpUser(t, "author-draft@x.com", "Draft Author")
+	recipient, _ := makeEmpUser(t, "recipient-draft@x.com", "Draft Recipient")
 
-	// Simulate the source record changing underneath the notification.
-	require.NoError(t, testDB.Exec(
-		`UPDATE announcements SET title = 'Edited title' WHERE id = ?`, sourceID,
-	).Error)
+	_, err := annSvc.Create(ctx, author.ID, dto.AnnouncementCreate{
+		Title:       "Draft only",
+		Description: "<p>never sent</p>",
+	})
+	require.NoError(t, err)
 
-	out, aerr := svc.List(context.Background(), u.ID, dto.NotificationListQuery{})
+	// Give any stray dispatch goroutine a chance to misbehave before asserting.
+	time.Sleep(150 * time.Millisecond)
+
+	out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	assert.Empty(t, out.Items, "a draft announcement must not notify anyone")
+}
+
+// AC-10 positive — publishing notifies the target audience.
+func TestNotification_Announcement_PublishNotifiesAudience(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	annSvc := newAnnouncementSvcWithFeed(t, notifSvc)
+
+	author, _ := makeEmpUser(t, "author-pub@x.com", "Pub Author")
+	recipient, _ := makeEmpUser(t, "recipient-pub@x.com", "Pub Recipient")
+
+	created, err := annSvc.Create(ctx, author.ID, dto.AnnouncementCreate{
+		Title:       "Office closed Friday",
+		Description: "<p>The office is <b>closed</b> this Friday.</p>",
+	})
+	require.NoError(t, err)
+
+	annID := created.ID
+	_, err = annSvc.Publish(ctx, annID, author.ID, true)
+	require.NoError(t, err)
+
+	// Dispatch is asynchronous (broadcastPublished launches a goroutine).
+	// Eventually beats a fixed sleep: it returns as soon as the row lands and
+	// does not fail merely because the machine was busy.
+	require.Eventually(t, func() bool {
+		out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
+		return aerr == nil && len(out.Items) == 1
+	}, 3*time.Second, 25*time.Millisecond, "recipient should receive a notification on publish")
+
+	out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
 	require.Nil(t, aerr)
 	require.Len(t, out.Items, 1)
-	assert.Equal(t, "Original title", out.Items[0].Title,
+	assert.Equal(t, "Office closed Friday", out.Items[0].Title)
+	assert.Equal(t, string(models.NotificationTypeAnnouncement), out.Items[0].Type)
+	assert.Equal(t, annID, out.Items[0].SourceID, "source_id must point at the announcement")
+	assert.False(t, out.Items[0].IsRead, "DR Rule 6 — notifications are created unread")
+	// Body is stored as plain text, not the raw HTML of the description.
+	assert.NotContains(t, out.Items[0].Body, "<b>")
+	assert.Contains(t, out.Items[0].Body, "closed")
+}
+
+// DR Rule 12 against a REAL published announcement: editing the source row
+// afterwards must not rewrite the notification the employee already received.
+func TestNotification_Announcement_SnapshotSurvivesRealSourceEdit(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	annSvc := newAnnouncementSvcWithFeed(t, notifSvc)
+
+	author, _ := makeEmpUser(t, "author-snap@x.com", "Snap Author")
+	recipient, _ := makeEmpUser(t, "recipient-snap@x.com", "Snap Recipient")
+
+	created, err := annSvc.Create(ctx, author.ID, dto.AnnouncementCreate{
+		Title:       "Original announcement title",
+		Description: "<p>original body</p>",
+	})
+	require.NoError(t, err)
+
+	annID := created.ID
+	_, err = annSvc.Publish(ctx, annID, author.ID, true)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
+		return aerr == nil && len(out.Items) == 1
+	}, 3*time.Second, 25*time.Millisecond)
+
+	// Edit the real source row.
+	require.NoError(t, testDB.Exec(
+		`UPDATE announcements SET title = 'Edited announcement title' WHERE id = ?`, annID,
+	).Error)
+
+	var liveTitle string
+	require.NoError(t, testDB.Raw(`SELECT title FROM announcements WHERE id = ?`, annID).Scan(&liveTitle).Error)
+	require.Equal(t, "Edited announcement title", liveTitle, "the source edit must actually have applied")
+
+	out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	require.Len(t, out.Items, 1)
+	assert.Equal(t, "Original announcement title", out.Items[0].Title,
 		"notification text is a snapshot and must not follow source edits")
 }
 
-// DR Rule 13 — the notification outlives its source. Tapping it should show
-// "no longer available" rather than the row vanishing from the list.
-func TestNotification_SurvivesSourceDeletion(t *testing.T) {
+// DR Rule 13 against a REAL announcement: hard-deleting the source leaves the
+// notification listed and markable.
+func TestNotification_Announcement_SurvivesRealSourceDeletion(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
+	ctx := context.Background()
 
-	svc, _ := newNotificationSvc(t)
-	u := makeUser(t, "orphan@example.com", "pw-Aa123456")
-	sourceID := uuid.New()
+	notifSvc, _ := newNotificationSvc(t)
+	annSvc := newAnnouncementSvcWithFeed(t, notifSvc)
 
-	require.NoError(t, svc.CreateMany(context.Background(), []models.Notification{{
-		UserID:   u.ID,
-		Type:     models.NotificationTypeAnnouncement,
-		Title:    "Orphaned soon",
-		Body:     "body",
-		SourceID: sourceID,
-	}}))
+	author, _ := makeEmpUser(t, "author-orphan@x.com", "Orphan Author")
+	recipient, _ := makeEmpUser(t, "recipient-orphan@x.com", "Orphan Recipient")
 
-	// There is no FK on source_id, so deleting the source must not cascade.
-	require.NoError(t, testDB.Exec(`DELETE FROM announcements WHERE id = ?`, sourceID).Error)
+	created, err := annSvc.Create(ctx, author.ID, dto.AnnouncementCreate{
+		Title:       "Soon to be deleted",
+		Description: "<p>body</p>",
+	})
+	require.NoError(t, err)
 
-	out, aerr := svc.List(context.Background(), u.ID, dto.NotificationListQuery{})
+	annID := created.ID
+	_, err = annSvc.Publish(ctx, annID, author.ID, true)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
+		return aerr == nil && len(out.Items) == 1
+	}, 3*time.Second, 25*time.Millisecond)
+
+	// Hard delete the source. source_id carries no FK, so nothing cascades.
+	require.NoError(t, testDB.Exec(`DELETE FROM announcement_views WHERE announcement_id = ?`, annID).Error)
+	require.NoError(t, testDB.Exec(`DELETE FROM announcements WHERE id = ?`, annID).Error)
+
+	var remaining int64
+	require.NoError(t, testDB.Raw(`SELECT COUNT(*) FROM announcements WHERE id = ?`, annID).Scan(&remaining).Error)
+	require.Equal(t, int64(0), remaining, "the source delete must actually have applied")
+
+	out, aerr := notifSvc.List(ctx, recipient.ID, dto.NotificationListQuery{})
 	require.Nil(t, aerr)
 	require.Len(t, out.Items, 1, "deleting the source must not remove the notification")
-	assert.Equal(t, "Orphaned soon", out.Items[0].Title)
+	assert.Equal(t, "Soon to be deleted", out.Items[0].Title)
 
-	// And it is still markable.
-	_, aerr = svc.MarkRead(context.Background(), out.Items[0].ID, u.ID)
-	require.Nil(t, aerr)
+	_, aerr = notifSvc.MarkRead(ctx, out.Items[0].ID, recipient.ID)
+	require.Nil(t, aerr, "an orphaned notification must still be markable")
 }

@@ -97,6 +97,12 @@ func main() {
 	positionSvc := services.NewPositionService(positionRepo)
 	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
+
+	// Notifications are constructed early: both the announcement notifier and
+	// the leave notifier below depend on them.
+	notificationRepo := repositories.NewNotificationRepository(db)
+	notificationSvc := services.NewNotificationService(notificationRepo)
+
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
@@ -118,7 +124,7 @@ func main() {
 	pushClient := services.NewPushClient(cfg)
 	pushSvc := services.NewPushNotificationService(pushClient, tokenRepo)
 
-	annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo)
+	annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo, notificationSvc)
 	announcementSvc := services.NewAnnouncementService(
 		announcementRepo, employeeRepo, departmentRepo, labelRepo,
 		sseHubAdapter{hub: sseHub},
