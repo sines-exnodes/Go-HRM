@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 **Stopped at:** Mobile notification feed (EP-005 / DR-MOB-005-001-01) implemented, verified, and **MERGED to `main` via PR [#35](https://github.com/sines-exnodes/Go-HRM/pull/35) (`73be1eb`)**. Migration **000028** applied to **both** the test DB and dev `exnodes_hrm` (data intact: 20 users / 20 employees / 25 leaves / 14 announcements; app boots clean).
-**Branch:** none in flight — `main` is in sync with `origin/main`. Post-merge suite re-verified on the merged tree: build + vet clean, **331 pass / 0 fail / 1 opt-in skip**.
+**Branch:** none in flight — `main` is in sync with `origin/main`. Post-merge suite re-verified on the merged tree: build + vet clean, **334 pass / 0 fail / 1 opt-in skip** (PR #35 feed + PR #36 leave push).
 
 > **2026-07-20 session — mobile in-app notifications (DR-MOB-005-001-01):**
 >
@@ -21,6 +21,9 @@
 > - **Not verified:** announcement department/custom audiences (only `all` exercised live).
 >
 > **Shipped:** PR [#35](https://github.com/sines-exnodes/Go-HRM/pull/35) merged as `73be1eb`; dev migrated 27→28. The leave test fix rode along in the same PR, so `main`'s suite is genuinely green for the first time since `0132dd8`.
+>
+> **Follow-up — PR [#36](https://github.com/sines-exnodes/Go-HRM/pull/36) merged as `97d2c6d`: leave approve/reject now sends an OS push**, closing an asymmetry (announcements have pushed since Phase 9; leave wrote only the in-app row). Dispatch is **detached** — `NotifyLeaveDecision` runs synchronously inside `Approve`/`Reject`, so an inline FCM call would put network latency on the approval and fail it when FCM is unreachable. Uses `context.Background()` because the request ctx is cancelled when the handler returns. Payload `{type:"leave_request", id:<leaveID>}` mirrors the announcement push for deep-linking. **Push only, not email** — mailing every employee on every leave decision was not requested. Suite 331→334.
+> - ⚠️ **Push may not be delivering anywhere.** `.env` sets `FIREBASE_CREDENTIALS_PATH=/secret/exnodes-hrm-firebase-adminsdk-fbsvc-prod.json`; if that file is absent the FCM client silently falls back to a no-op (`push: skipped (no-op)`) and boot does not fail. Unverified for announcements too. Worth confirming before trusting any push behaviour.
 > **Next:** EP-003 Request Tickets (migration **000029** — see priority 2 below). Still open with BA: the two deliberate DR deviations (pagination vs DR §8, client-side icon registry vs AC-20).
 
 > **2026-07-16 session — mobile forgot-password OTP (DR-001-001-02):**
