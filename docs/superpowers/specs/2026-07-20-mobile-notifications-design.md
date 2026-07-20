@@ -15,7 +15,7 @@ Build the in-app notification list for the mobile app: a per-employee, reverse-c
 
 - `notifications` table + model + repository + service
 - Three mobile endpoints: list, unread count, mark-read
-- `unread_count` added to the existing dashboard response
+- `unread_notification_count` added to the existing dashboard response
 - Notification generation on announcement publish (DR Rules 2, 3)
 - Notification generation on leave request approve/reject (DR Rule 4)
 
@@ -102,7 +102,7 @@ const (
 
 ## 4. Producers
 
-Both producers live in `internal/services/notification_notifier.go` and share one `NotificationService.CreateMany`.
+Both producers share one `NotificationService.CreateMany`. The leave notifier is new and lives in `internal/services/notification_notifier.go`; the announcement producer is an extension of the existing `announcementNotifier`, so it stays in `internal/services/announcement_notifier.go` beside the push and email dispatch it runs alongside.
 
 ### Announcements — no change to `AnnouncementService`
 
@@ -194,7 +194,7 @@ No filter or sort parameters — Rule 16 makes the screen read-and-navigate only
 
 ### Dashboard widget
 
-`unread_count` is added to the existing `GET /dashboard` response so the header bell renders on first paint without a second request (Rule 14). The dedicated `unread-count` endpoint serves cheap refreshes after a mark-read, avoiding a full dashboard refetch.
+`unread_notification_count` is added to the existing `GET /dashboard` response so the header bell renders on first paint without a second request (Rule 14). The field is named in full because at the dashboard root, a bare `unread_count` does not say unread *what* — the dedicated endpoint keeps the short `unread_count` since its envelope already supplies the context. That endpoint serves cheap refreshes after a mark-read, avoiding a full dashboard refetch.
 
 ---
 
@@ -246,12 +246,12 @@ This work touches `LeaveService.Approve` and `Reject`, so that broken baseline s
 | `internal/dto/notification.go` | new |
 | `internal/repositories/notification_repo.go` | new |
 | `internal/services/notification_service.go` | new |
-| `internal/services/notification_notifier.go` | new — both producers |
+| `internal/services/notification_notifier.go` | new — leave producer + shared copy helpers |
 | `internal/services/notification_service_test.go` | new |
 | `internal/handlers/notification_handler.go` | extend — existing file owns `/notifications/test` |
 | `internal/services/announcement_notifier.go` | extend — add notifications collaborator |
 | `internal/services/leave_service.go` | extend — `LeaveNotifier` seam + calls in Approve/Reject |
-| `internal/services/dashboard_service.go` | extend — `unread_count` widget |
+| `internal/services/dashboard_service.go` | extend — `unread_notification_count` |
 | `internal/dto/dashboard.go` | extend |
 | `cmd/server/main.go` | wire + 3 routes |
 | `docs/swagger/` | regenerate via `make swag` |
