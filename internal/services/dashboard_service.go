@@ -30,6 +30,7 @@ type DashboardService struct {
 	attendance    repositories.AttendanceRepository
 	announcements repositories.AnnouncementRepository
 	holidays      repositories.HolidayRepository
+	notifications repositories.NotificationRepository
 }
 
 func NewDashboardService(
@@ -40,6 +41,7 @@ func NewDashboardService(
 	attendance repositories.AttendanceRepository,
 	announcements repositories.AnnouncementRepository,
 	holidays repositories.HolidayRepository,
+	notifications repositories.NotificationRepository,
 ) *DashboardService {
 	return &DashboardService{
 		cfg:           cfg,
@@ -49,6 +51,7 @@ func NewDashboardService(
 		attendance:    attendance,
 		announcements: announcements,
 		holidays:      holidays,
+		notifications: notifications,
 	}
 }
 
@@ -107,6 +110,16 @@ func (s *DashboardService) Get(ctx context.Context, user *models.User) (*dto.Das
 		return nil, err
 	} else if ok {
 		out.Widgets = append(out.Widgets, w)
+	}
+
+	// The bell count is independent of the widget list — an employee with no
+	// visible widgets can still have unread notifications.
+	if s.notifications != nil {
+		unread, err := s.notifications.CountUnread(ctx, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		out.UnreadNotificationCount = unread
 	}
 
 	out.Empty = len(out.Widgets) == 0

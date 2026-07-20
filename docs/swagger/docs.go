@@ -4928,6 +4928,140 @@ const docTemplate = `{
                 }
             }
         },
+        "/mobile/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reverse-chronological feed of the authenticated employee's notifications. Always scoped to the caller — there is no way to read another employee's feed.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "List the caller's in-app notifications",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size (default 50, max 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_NotificationRead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/mobile/notifications/unread-count": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Backs the dashboard header notification bell. Cheap to poll after marking a notification read.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Count the caller's unread notifications",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_NotificationUnreadCountRead"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
+        "/mobile/notifications/{id}/read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks the notification read for the caller and returns it. Read is terminal — re-marking an already-read notification is a 200 no-op, not a conflict. A notification belonging to another employee returns 404, indistinguishable from a missing one.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark a notification read",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "notification id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_NotificationRead"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-any"
+                        }
+                    }
+                }
+            }
+        },
         "/users/{id}/contracts": {
             "get": {
                 "security": [
@@ -5769,6 +5903,10 @@ const docTemplate = `{
                 },
                 "greeting": {
                     "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardGreetingRead"
+                },
+                "unread_notification_count": {
+                    "description": "UnreadNotificationCount backs the mobile dashboard header bell\n(DR-MOB-005-001-01 Rule 14). Unlike the widgets, this is never omitted:\nnotifications carry no permission gate, so every caller has a count.\nNamed in full because at the dashboard root a bare \"unread_count\" does\nnot say unread what.",
+                    "type": "integer"
                 },
                 "widgets": {
                     "type": "array",
@@ -6685,6 +6823,35 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.NotificationRead": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_read": {
+                    "type": "boolean"
+                },
+                "read_at": {
+                    "type": "string"
+                },
+                "source_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.NotificationSettingsRequest": {
             "type": "object",
             "properties": {
@@ -6709,6 +6876,14 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.NotificationUnreadCountRead": {
+            "type": "object",
+            "properties": {
+                "unread_count": {
+                    "type": "integer"
                 }
             }
         },
@@ -6770,6 +6945,29 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.HolidayRead"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_NotificationRead": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.NotificationRead"
                     }
                 },
                 "page": {
@@ -7003,6 +7201,34 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_NotificationRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.NotificationRead"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_NotificationUnreadCountRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.NotificationUnreadCountRead"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_OTPRequestResponse": {
             "type": "object",
             "properties": {
@@ -7036,6 +7262,20 @@ const docTemplate = `{
             "properties": {
                 "data": {
                     "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_HolidayRead"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_PaginatedData-github_com_exnodes_hrm-api_internal_dto_NotificationRead": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/github_com_exnodes_hrm-api_internal_dto.PaginatedData-github_com_exnodes_hrm-api_internal_dto_NotificationRead"
                 },
                 "message": {
                     "type": "string"

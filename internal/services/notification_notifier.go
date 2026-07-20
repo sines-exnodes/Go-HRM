@@ -1,0 +1,82 @@
+package services
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/exnodes/hrm-api/internal/models"
+	"github.com/exnodes/hrm-api/internal/repositories"
+)
+
+// leaveDecisionDateFormat matches the date rendering in the notification body
+// copy specified by DR-MOB-005-001-01 section 3.
+const leaveDecisionDateFormat = "2006-01-02"
+
+// leaveNotifier writes an in-app notification when a leave request is
+// approved or rejected (DR Rule 4).
+//
+// The leave aggregate keys on employees(id) but notifications key on
+// users(id), so this type owns the employee → user resolution. That
+// translation is exactly why the notifier is a separate collaborator rather
+// than a method on LeaveService.
+type leaveNotifier struct {
+	notifs *NotificationService
+	emps   repositories.EmployeeRepository
+}
+
+// NewLeaveNotifier constructs the concrete LeaveNotifier.
+func NewLeaveNotifier(notifs *NotificationService, emps repositories.EmployeeRepository) LeaveNotifier {
+	return &leaveNotifier{notifs: notifs, emps: emps}
+}
+
+func (n *leaveNotifier) NotifyLeaveDecision(
+	ctx context.Context,
+	employeeID, leaveID uuid.UUID,
+	approved bool,
+	from, to time.Time,
+) {
+	if n.notifs == nil || n.emps == nil {
+		return
+	}
+
+	emp, err := n.emps.FindByID(ctx, employeeID)
+	if err != nil {
+		log.Printf("leave: resolve employee %s for notification: %v", employeeID, err)
+		return
+	}
+
+	title, body := leaveDecisionCopy(approved, from, to)
+
+	err = n.notifs.CreateMany(ctx, []models.Notification{{
+		UserID:   emp.UserID,
+		Type:     models.NotificationTypeLeaveRequest,
+		Title:    title,
+		Body:     body,
+		SourceID: leaveID,
+	}})
+	if err != nil {
+		log.Printf("leave: create notification for leave %s: %v", leaveID, err)
+	}
+}
+
+// leaveDecisionCopy renders the DR section 3 / AC-09 copy. Extracted so the
+// exact wording is testable without a database.
+func leaveDecisionCopy(approved bool, from, to time.Time) (title, body string) {
+	verb := "rejected"
+	title = "Leave Request Rejected"
+	if approved {
+		verb = "approved"
+		title = "Leave Request Approved"
+	}
+	body = fmt.Sprintf(
+		"Your leave request from %s to %s has been %s.",
+		from.Format(leaveDecisionDateFormat),
+		to.Format(leaveDecisionDateFormat),
+		verb,
+	)
+	return title, body
+}

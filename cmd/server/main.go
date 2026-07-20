@@ -97,7 +97,14 @@ func main() {
 	positionSvc := services.NewPositionService(positionRepo)
 	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
-	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo)
+
+	// Notifications are constructed early: both the announcement notifier and
+	// the leave notifier below depend on them.
+	notificationRepo := repositories.NewNotificationRepository(db)
+	notificationSvc := services.NewNotificationService(notificationRepo)
+
+	leaveNotifier := services.NewLeaveNotifier(notificationSvc, employeeRepo)
+	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo, leaveNotifier)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
 	// Phase 7 — SSE hub singleton + announcement service + handler.
@@ -118,7 +125,7 @@ func main() {
 	pushClient := services.NewPushClient(cfg)
 	pushSvc := services.NewPushNotificationService(pushClient, tokenRepo)
 
-	annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo)
+	annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo, notificationSvc)
 	announcementSvc := services.NewAnnouncementService(
 		announcementRepo, employeeRepo, departmentRepo, labelRepo,
 		sseHubAdapter{hub: sseHub},
@@ -133,7 +140,7 @@ func main() {
 	workdaySvc := services.NewWorkdayService(holidayRepo)
 	passwordResetSvc := services.NewPasswordResetService(userRepo, passwordResetTokenRepo, emailSvc, cfg)
 	passwordResetOTPSvc := services.NewPasswordResetOTPService(userRepo, passwordResetOTPRepo, passwordResetTokenRepo, emailSvc, cfg)
-	dashboardSvc := services.NewDashboardService(cfg, employeeRepo, leaveRepo, quotaRepo, attendanceRepo, announcementRepo, holidayRepo)
+	dashboardSvc := services.NewDashboardService(cfg, employeeRepo, leaveRepo, quotaRepo, attendanceRepo, announcementRepo, holidayRepo, notificationRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {
@@ -156,7 +163,7 @@ func main() {
 	sseH := handlers.NewSSEHandler(sseHub)
 	orgSettingsH := handlers.NewOrganizationSettingsHandler(orgSettingsSvc)
 	inviteH := handlers.NewInviteHandler(inviteSvc)
-	notifH := handlers.NewNotificationHandler(pushSvc)
+	notifH := handlers.NewNotificationHandler(pushSvc, notificationSvc)
 	userContractH := handlers.NewUserContractHandler(userContractSvc)
 	holidayH := handlers.NewHolidayHandler(holidaySvc)
 	workdayH := handlers.NewWorkdayHandler(workdaySvc)
@@ -386,6 +393,20 @@ func main() {
 		mobileAnnounce.GET("/list", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MobileList)
 		mobileAnnounce.GET(":id", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MobileGet)
 		mobileAnnounce.POST(":id/read", middleware.RequirePerms(authSvc, permissions.PermAnnounceRead), announcementH.MarkViewed)
+
+		// ---- /mobile/notifications (EP-005 — in-app notification feed) ----
+		// JWT-only, no permission gate: every authenticated employee is
+		// entitled to their own notifications by definition, and the service
+		// scopes every query to the caller's user_id. A notifications:read
+		// permission would have to be seeded to all five roles immediately,
+		// making it a permission that can never be false.
+		//
+		// Gin route precedence: the literal /unread-count is registered
+		// before any wildcard segment on this group.
+		mobileNotif := authed.Group("/mobile/notifications")
+		mobileNotif.GET("/unread-count", notifH.UnreadCount)
+		mobileNotif.GET("", notifH.List)
+		mobileNotif.POST(":id/read", notifH.MarkRead)
 
 		// ---- /attendance (Phase 6) ----
 		// Gin route precedence: literal segments (today/me/matrix) must be

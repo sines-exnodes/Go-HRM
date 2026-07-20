@@ -9,6 +9,13 @@ type DashboardRead struct {
 	Widgets      []DashboardWidgetRead `json:"widgets"`
 	Empty        bool                  `json:"empty"`
 	EmptyMessage string                `json:"empty_message,omitempty"`
+
+	// UnreadNotificationCount backs the mobile dashboard header bell
+	// (DR-MOB-005-001-01 Rule 14). Unlike the widgets, this is never omitted:
+	// notifications carry no permission gate, so every caller has a count.
+	// Named in full because at the dashboard root a bare "unread_count" does
+	// not say unread what.
+	UnreadNotificationCount int64 `json:"unread_notification_count"`
 }
 
 type DashboardGreetingRead struct {
