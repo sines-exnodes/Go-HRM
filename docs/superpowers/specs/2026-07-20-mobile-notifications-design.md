@@ -217,11 +217,18 @@ The Rule 5 test is the one that fails if someone later drops the unique index. T
 
 **Live HTTP smoke** (required before this counts as done per the repo's verification bar): publish an announcement, approve a leave request, list as the recipient, mark one read, re-list, check the unread count, spot-check rows in the DB. Log to `docs/superpowers/verification/`.
 
-### Known-red baseline
+### Baseline — fixed before this work starts
 
-The services suite is **currently red on `main`** — 4 leave-request tests fail (`TestApprove_TeamScope_CanApproveSubordinate`, `TestApprove_TeamScope_RejectsNonSubordinate`, `TestReject_TeamScope_CanRejectSubordinate`, `TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus`), all with `forbidden: Only an admin can edit an approved leave request`. Confirmed pre-existing in CHECKPOINT.md.
+The services suite used to be red on `main` with 4 failing leave tests. Since this module modifies `LeaveService.Approve` and `Reject`, those were diagnosed and fixed first on `fix/leave-test-failures` (`1dd371b`), which must be merged before implementation begins.
 
-This work touches `LeaveService.Approve` and `Reject`, so that broken baseline sits directly under the code being changed. Capture the exact failure set before starting to prove nothing was added to it. **"Tests pass" is not claimable for this module until those four are fixed** — that fix is tracked separately.
+CHECKPOINT.md described them as one failure mode with a shared error message. They were actually **two unrelated bugs, both test-side, neither ever passing**:
+
+1. `setupApproveChain` wrote to `employees.line_manager_id`, a column that has never existed — it is `manager_id` (migration 000003); `line_manager_id` is the *feature* name from PR #10. Postgres rejected the UPDATE with SQLSTATE 42703, so all three approve/reject scope tests died in the helper before reaching any approval logic. They never produced the error CHECKPOINT.md attributed to them.
+2. `TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus` patched as a non-admin. The Approved→Pending revert it guards is admin-only — a non-admin owner is refused earlier by `Update`'s documented `approved (owner) -> 403` contract. The test hit that 403 and proved nothing about G3. Fixed by patching as admin, then verified meaningful by mutation: disabling the no-op guard fails it on exactly the revert assertion.
+
+Both date to the commits that introduced them (`0132dd8`, `d632a69`), whose verification recorded "full suite green (all PASS or SKIP)" — from a run with no `TEST_DATABASE_URL`, where every DB-backed test skipped. **Count passes and skips explicitly; `ok` is not evidence.**
+
+Post-fix baseline: 314 pass, 0 fail, 1 skip (`TestUploadServiceLiveAWS`, opt-in on `RUN_AWS_S3_INTEGRATION`).
 
 ---
 

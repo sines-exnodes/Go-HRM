@@ -30,34 +30,40 @@ export TEST_DATABASE_URL="postgres://postgres:devpassword@localhost:5432/exnodes
 
 ---
 
-## Task 0: Capture the red baseline
+## Task 0: Confirm a green baseline
 
-The services suite is already failing on `main` for reasons unrelated to this work, and this plan modifies `LeaveService.Approve`/`Reject` — the exact code those failures sit under. Capture the failure set now so you can prove you didn't add to it.
+The four leave-test failures that used to sit under `LeaveService.Approve`/`Reject` were **fixed** on branch `fix/leave-test-failures` (commit `1dd371b`) before this plan runs. That branch must be merged first — this plan modifies the same methods, and starting from a red suite would make it impossible to tell what you broke.
+
+They were two unrelated bugs, both test-side: `setupApproveChain` wrote to a non-existent `line_manager_id` column, and `TestUpdate_EmptyPatch` patched as a non-admin so it hit the 403 guard instead of the admin-only revert path it was written to protect.
 
 **Files:** none (read-only)
 
-- [ ] **Step 1: Run the leave suite and record what fails**
+- [ ] **Step 1: Confirm the fix is in your working branch**
+
+```bash
+git log --oneline | grep 1dd371b || echo "MISSING — merge fix/leave-test-failures first"
+```
+
+- [ ] **Step 2: Confirm the suite is green before you touch anything**
 
 ```bash
 cd /Users/panda/work/Go-HRM
 export TEST_DATABASE_URL="postgres://postgres:devpassword@localhost:5432/exnodes_hrm_test?sslmode=disable"
-go test ./internal/services -run 'TestApprove|TestReject|TestUpdate_EmptyPatch' -v 2>&1 | grep -E '^(--- )?(FAIL|PASS|ok)' | sort | uniq -c
+go test ./internal/services -v 2>&1 | grep -cE '^--- PASS'
+go test ./internal/services -v 2>&1 | grep -E '^--- (SKIP|FAIL)'
 ```
 
-Expected: exactly these four FAIL, each with `forbidden: Only an admin can edit an approved leave request`:
+Expected: 314 passing, and the only SKIP is `TestUploadServiceLiveAWS` (opt-in on `RUN_AWS_S3_INTEGRATION`). Any FAIL means stop and investigate before writing code.
 
-- `TestApprove_TeamScope_CanApproveSubordinate`
-- `TestApprove_TeamScope_RejectsNonSubordinate`
-- `TestReject_TeamScope_CanRejectSubordinate`
-- `TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus`
+Note the skip check is not optional. The bugs above shipped because a suite where every DB-backed test skipped for want of `TEST_DATABASE_URL` was recorded as "full suite green". Count passes, don't trust `ok`.
 
-- [ ] **Step 2: Save the baseline to the scratchpad**
+- [ ] **Step 3: Confirm Postgres is actually running**
 
 ```bash
-go test ./internal/services -run 'TestApprove|TestReject|TestUpdate_EmptyPatch' 2>&1 | tail -40 > /tmp/leave-baseline.txt
+docker compose up -d postgres
+until docker exec exnodes-hrm-postgres pg_isready -U postgres >/dev/null 2>&1; do sleep 2; done
+echo "postgres ready"
 ```
-
-If **more** than those four fail, stop and report before writing any code — the baseline has drifted and you need to know why first.
 
 ---
 
@@ -1340,153 +1346,139 @@ Expected: no output. A compile error here almost certainly means a call site of 
 
 - [ ] **Step 7: Add the leave trigger tests**
 
-Append to `internal/services/notification_service_test.go`:
+These use the real helper signatures from `leave_service_test.go`: `newLeaveSvc` returns three values, `Create` takes `(ctx, userID, asAdmin, dto, attachment)`, `makeEmpUser` returns `(*models.User, *models.Employee)`, dates come from `dateAt`, and `res.Request.ID` is a **string** that needs `uuid.MustParse`.
+
+First add a notifier-aware constructor. Append to `internal/services/notification_service_test.go`:
 
 ```go
+// newLeaveSvcWithNotifier mirrors newLeaveSvc but wires a real LeaveNotifier
+// so approve/reject actually write notification rows.
+func newLeaveSvcWithNotifier(t *testing.T, notifs *services.NotificationService) *services.LeaveService {
+	t.Helper()
+	emps := repositories.NewEmployeeRepository(testDB)
+	return services.NewLeaveService(
+		repositories.NewLeaveRequestRepository(testDB),
+		emps,
+		repositories.NewDepartmentRepository(testDB),
+		repositories.NewPositionRepository(testDB),
+		repositories.NewLeaveQuotaRepository(testDB),
+		nil, // uploads — attachments not exercised here
+		repositories.NewHolidayRepository(testDB),
+		services.NewLeaveNotifier(notifs, emps),
+	)
+}
+
 // AC-09 — approve produces the approved title and a body naming the range.
 func TestNotification_Leave_ApproveProducesNotification(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
+	ctx := context.Background()
 
-	notifRepo := repositories.NewNotificationRepository(testDB)
-	notifSvc := services.NewNotificationService(notifRepo)
-	empRepo := repositories.NewEmployeeRepository(testDB)
+	notifSvc := services.NewNotificationService(repositories.NewNotificationRepository(testDB))
+	leaveSvc := newLeaveSvcWithNotifier(t, notifSvc)
 
-	leaveSvc := services.NewLeaveService(
-		repositories.NewLeaveRequestRepository(testDB),
-		empRepo,
-		repositories.NewDepartmentRepository(testDB),
-		repositories.NewPositionRepository(testDB),
-		repositories.NewLeaveQuotaRepository(testDB),
-		nil,
-		repositories.NewHolidayRepository(testDB),
-		services.NewLeaveNotifier(notifSvc, empRepo),
-	)
+	user, emp := makeEmpUser(t, "leave-approve@x.com", "Leave Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
 
-	u := makeUser(t, "leave-approve@example.com", "pw-Aa123456")
-	emp := makeEmployee(t, u, "Leave Taker")
-	makeLeaveQuota(t, emp.ID, 12, 6)
-
-	from := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
-	to := time.Date(2026, 8, 5, 0, 0, 0, 0, time.UTC)
-
-	created, err := leaveSvc.Create(context.Background(), u.ID, dto.LeaveRequestCreate{
-		FromDate:  from,
-		ToDate:    to,
-		LeaveType: models.LeaveTypeAnnual,
-		Reason:    "family trip",
-	})
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 8, 3),
+		ToDate:      dateAt(2026, 8, 5),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "family trip",
+	}, nil)
 	require.NoError(t, err)
 
-	_, err = leaveSvc.Approve(context.Background(), created.ID, u.ID, services.ApproveScopeAll)
+	leaveID := uuid.MustParse(res.Request.ID)
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
 	require.NoError(t, err)
 
-	out, aerr := notifSvc.List(context.Background(), u.ID, dto.NotificationListQuery{})
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
 	require.Nil(t, aerr)
 	require.Len(t, out.Items, 1)
 	assert.Equal(t, "Leave Request Approved", out.Items[0].Title)
 	assert.Equal(t, string(models.NotificationTypeLeaveRequest), out.Items[0].Type)
-	assert.Equal(t, created.ID, out.Items[0].SourceID, "source_id must point at the leave request")
+	assert.Equal(t, leaveID, out.Items[0].SourceID, "source_id must point at the leave request")
 	assert.Contains(t, out.Items[0].Body, "2026-08-03")
 	assert.Contains(t, out.Items[0].Body, "2026-08-05")
 	assert.Contains(t, out.Items[0].Body, "approved")
-}
-
-// DR Rule 5 at the leave layer — a repeat approve must not double-notify.
-func TestNotification_Leave_ReApproveDoesNotDuplicate(t *testing.T) {
-	skipIfNoDB(t)
-	truncateAll(t)
-
-	notifRepo := repositories.NewNotificationRepository(testDB)
-	notifSvc := services.NewNotificationService(notifRepo)
-	empRepo := repositories.NewEmployeeRepository(testDB)
-
-	leaveSvc := services.NewLeaveService(
-		repositories.NewLeaveRequestRepository(testDB),
-		empRepo,
-		repositories.NewDepartmentRepository(testDB),
-		repositories.NewPositionRepository(testDB),
-		repositories.NewLeaveQuotaRepository(testDB),
-		nil,
-		repositories.NewHolidayRepository(testDB),
-		services.NewLeaveNotifier(notifSvc, empRepo),
-	)
-
-	u := makeUser(t, "leave-twice@example.com", "pw-Aa123456")
-	emp := makeEmployee(t, u, "Twice Taker")
-	makeLeaveQuota(t, emp.ID, 12, 6)
-
-	created, err := leaveSvc.Create(context.Background(), u.ID, dto.LeaveRequestCreate{
-		FromDate:  time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
-		ToDate:    time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
-		LeaveType: models.LeaveTypeAnnual,
-		Reason:    "appointment",
-	})
-	require.NoError(t, err)
-
-	_, err = leaveSvc.Approve(context.Background(), created.ID, u.ID, services.ApproveScopeAll)
-	require.NoError(t, err)
-
-	// Second approve is rejected by the status guard, so no second
-	// notification should exist either way.
-	_, _ = leaveSvc.Approve(context.Background(), created.ID, u.ID, services.ApproveScopeAll)
-
-	out, aerr := notifSvc.List(context.Background(), u.ID, dto.NotificationListQuery{})
-	require.Nil(t, aerr)
-	assert.Len(t, out.Items, 1)
 }
 
 // AC-09 rejected variant.
 func TestNotification_Leave_RejectProducesRejectedCopy(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
+	ctx := context.Background()
 
-	notifRepo := repositories.NewNotificationRepository(testDB)
-	notifSvc := services.NewNotificationService(notifRepo)
-	empRepo := repositories.NewEmployeeRepository(testDB)
+	notifSvc := services.NewNotificationService(repositories.NewNotificationRepository(testDB))
+	leaveSvc := newLeaveSvcWithNotifier(t, notifSvc)
 
-	leaveSvc := services.NewLeaveService(
-		repositories.NewLeaveRequestRepository(testDB),
-		empRepo,
-		repositories.NewDepartmentRepository(testDB),
-		repositories.NewPositionRepository(testDB),
-		repositories.NewLeaveQuotaRepository(testDB),
-		nil,
-		repositories.NewHolidayRepository(testDB),
-		services.NewLeaveNotifier(notifSvc, empRepo),
-	)
+	user, emp := makeEmpUser(t, "leave-reject@x.com", "Reject Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
 
-	u := makeUser(t, "leave-reject@example.com", "pw-Aa123456")
-	emp := makeEmployee(t, u, "Reject Taker")
-	makeLeaveQuota(t, emp.ID, 12, 6)
-
-	created, err := leaveSvc.Create(context.Background(), u.ID, dto.LeaveRequestCreate{
-		FromDate:  time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC),
-		ToDate:    time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC),
-		LeaveType: models.LeaveTypeAnnual,
-		Reason:    "personal",
-	})
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 10, 12),
+		ToDate:      dateAt(2026, 10, 13),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "personal",
+	}, nil)
 	require.NoError(t, err)
 
-	_, err = leaveSvc.Reject(context.Background(), created.ID, u.ID, services.ApproveScopeAll)
+	_, err = leaveSvc.Reject(ctx, uuid.MustParse(res.Request.ID), user.ID, services.ApproveScopeAll)
 	require.NoError(t, err)
 
-	out, aerr := notifSvc.List(context.Background(), u.ID, dto.NotificationListQuery{})
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
 	require.Nil(t, aerr)
 	require.Len(t, out.Items, 1)
 	assert.Equal(t, "Leave Request Rejected", out.Items[0].Title)
 	assert.Contains(t, out.Items[0].Body, "rejected")
 }
+
+// A failed transition must not notify. The second approve is rejected by the
+// status guard, so it must not produce a second row claiming success.
+func TestNotification_Leave_FailedTransitionDoesNotNotify(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc := services.NewNotificationService(repositories.NewNotificationRepository(testDB))
+	leaveSvc := newLeaveSvcWithNotifier(t, notifSvc)
+
+	user, emp := makeEmpUser(t, "leave-twice@x.com", "Twice Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 9, 1),
+		ToDate:      dateAt(2026, 9, 1),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "appointment",
+	}, nil)
+	require.NoError(t, err)
+
+	leaveID := uuid.MustParse(res.Request.ID)
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+
+	// Already approved — this transition is refused.
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.Error(t, err, "re-approving an approved request must be refused")
+
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	assert.Len(t, out.Items, 1, "a refused transition must not add a notification")
+}
 ```
 
-- [ ] **Step 8: Run the notification tests plus the leave baseline**
+- [ ] **Step 8: Run the notification tests and the whole leave suite**
 
 ```bash
 go test ./internal/services -run 'TestNotification_' -v
-go test ./internal/services -run 'TestApprove|TestReject|TestUpdate_EmptyPatch' 2>&1 | tail -40
+go test ./internal/services -run 'TestApprove|TestReject|TestUpdate|TestLeave|TestCancel' -v 2>&1 | grep -E '^--- (PASS|FAIL|SKIP)'
 ```
 
-Expected: all `TestNotification_*` PASS. The leave run must show **exactly the same four failures** as `/tmp/leave-baseline.txt` from Task 0 — no more. Diff them if unsure. If a fifth test now fails, you broke it; fix before continuing.
+Expected: all `TestNotification_*` PASS, and **zero FAIL** in the leave run. The baseline is green as of Task 0 — adding a notifier call to `Approve`/`Reject` must keep it that way. Any failure here is yours.
 
 If `dto.LeaveRequestCreate` field names or `models.LeaveTypeAnnual` differ, check with `grep -n "type LeaveRequestCreate struct" -A 15 internal/dto/leave.go` and `grep -n "LeaveType.*=" internal/models/leave_request.go`.
 
@@ -1964,9 +1956,16 @@ export TEST_DATABASE_URL="postgres://postgres:devpassword@localhost:5432/exnodes
 go test ./... 2>&1 | tail -30
 ```
 
-Expected: every package `ok` except `internal/services`, which fails with **exactly the four pre-existing leave failures** from Task 0 and nothing else.
+Expected: every package `ok`, zero failures.
 
-Report the result honestly. "Tests pass" is false while those four are red — the correct statement is "all new tests pass; the four pre-existing leave failures from the Task 0 baseline are unchanged."
+Then verify the skip count, which is the check that matters:
+
+```bash
+go test ./internal/services -v 2>&1 | grep -cE '^--- PASS'
+go test ./internal/services -v 2>&1 | grep -E '^--- (SKIP|FAIL)'
+```
+
+Expected: the Task 0 count plus your new tests, and `TestUploadServiceLiveAWS` as the only SKIP. If anything else skipped, `TEST_DATABASE_URL` was unset for part of the run and the green result is meaningless — that is exactly how the leave bugs shipped.
 
 - [ ] **Step 4: Commit**
 
@@ -2066,7 +2065,7 @@ Confirm the leave row's `title` reads `Leave Request Approved` and its `source_i
 
 - [ ] **Step 5: Write the verification log**
 
-Create `docs/superpowers/verification/mobile-notifications.md` with the actual commands run, the actual responses (not idealised ones), the DB spot-check output, and an explicit note that the four pre-existing leave test failures were present before this work and remain unchanged.
+Create `docs/superpowers/verification/mobile-notifications.md` with the actual commands run, the actual responses (not idealised ones), the DB spot-check output, and the explicit pass/skip counts from Task 14 Step 3 — not just "suite green".
 
 - [ ] **Step 6: Commit**
 
@@ -2108,7 +2107,7 @@ git commit -m "docs(checkpoint): mobile notifications module"
 
 | Item | Why deferred |
 |---|---|
-| Fix the 4 pre-existing leave test failures | Unrelated to this work; blocks a clean suite |
+| ~~Fix the 4 pre-existing leave test failures~~ | **DONE** — `fix/leave-test-failures` (`1dd371b`); merge before starting Task 1 |
 | BA sign-off on the pagination deviation from DR §8 | Product decision |
 | BA decision on client-side vs server-side icon registry (AC-20) | Changes the response shape if reversed |
 | Retention/purge policy (DR Rule 11) | PO decision; table grows unbounded until then |
