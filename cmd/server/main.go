@@ -103,7 +103,8 @@ func main() {
 	notificationRepo := repositories.NewNotificationRepository(db)
 	notificationSvc := services.NewNotificationService(notificationRepo)
 
-	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo)
+	leaveNotifier := services.NewLeaveNotifier(notificationSvc, employeeRepo)
+	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo, leaveNotifier)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
 	// Phase 7 — SSE hub singleton + announcement service + handler.

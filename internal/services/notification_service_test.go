@@ -416,3 +416,124 @@ func TestNotification_Announcement_SurvivesRealSourceDeletion(t *testing.T) {
 	_, aerr = notifSvc.MarkRead(ctx, out.Items[0].ID, recipient.ID)
 	require.Nil(t, aerr, "an orphaned notification must still be markable")
 }
+
+// ---- Leave producer ----
+
+// newLeaveSvcWithNotifier mirrors newLeaveSvc but wires a real LeaveNotifier
+// so approve/reject actually write notification rows.
+func newLeaveSvcWithNotifier(t *testing.T, notifs *services.NotificationService) *services.LeaveService {
+	t.Helper()
+	emps := repositories.NewEmployeeRepository(testDB)
+	return services.NewLeaveService(
+		repositories.NewLeaveRequestRepository(testDB),
+		emps,
+		repositories.NewDepartmentRepository(testDB),
+		repositories.NewPositionRepository(testDB),
+		repositories.NewLeaveQuotaRepository(testDB),
+		nil, // uploads — attachments not exercised here
+		repositories.NewHolidayRepository(testDB),
+		services.NewLeaveNotifier(notifs, emps),
+	)
+}
+
+// AC-09 — approve produces the approved title and a body naming the range.
+func TestNotification_Leave_ApproveProducesNotification(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	leaveSvc := newLeaveSvcWithNotifier(t, notifSvc)
+
+	user, emp := makeEmpUser(t, "leave-approve@x.com", "Leave Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 8, 3),
+		ToDate:      dateAt(2026, 8, 5),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "family trip",
+	}, nil)
+	require.NoError(t, err)
+
+	leaveID := uuid.MustParse(res.Request.ID)
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	require.Len(t, out.Items, 1)
+	assert.Equal(t, "Leave Request Approved", out.Items[0].Title)
+	assert.Equal(t, string(models.NotificationTypeLeaveRequest), out.Items[0].Type)
+	assert.Equal(t, leaveID, out.Items[0].SourceID, "source_id must point at the leave request")
+	assert.Contains(t, out.Items[0].Body, "2026-08-03")
+	assert.Contains(t, out.Items[0].Body, "2026-08-05")
+	assert.Contains(t, out.Items[0].Body, "approved")
+}
+
+// AC-09 rejected variant.
+func TestNotification_Leave_RejectProducesRejectedCopy(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	leaveSvc := newLeaveSvcWithNotifier(t, notifSvc)
+
+	user, emp := makeEmpUser(t, "leave-reject@x.com", "Reject Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 10, 12),
+		ToDate:      dateAt(2026, 10, 13),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "personal",
+	}, nil)
+	require.NoError(t, err)
+
+	_, err = leaveSvc.Reject(ctx, uuid.MustParse(res.Request.ID), user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	require.Len(t, out.Items, 1)
+	assert.Equal(t, "Leave Request Rejected", out.Items[0].Title)
+	assert.Contains(t, out.Items[0].Body, "rejected")
+}
+
+// A refused transition must not notify. The second approve is rejected by the
+// status guard, so it must not produce a second row claiming success.
+func TestNotification_Leave_RefusedTransitionDoesNotNotify(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	leaveSvc := newLeaveSvcWithNotifier(t, notifSvc)
+
+	user, emp := makeEmpUser(t, "leave-twice@x.com", "Twice Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 9, 1),
+		ToDate:      dateAt(2026, 9, 1),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "appointment",
+	}, nil)
+	require.NoError(t, err)
+
+	leaveID := uuid.MustParse(res.Request.ID)
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+
+	// Already approved — this transition is refused.
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.Error(t, err, "re-approving an approved request must be refused")
+
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	assert.Len(t, out.Items, 1, "a refused transition must not add a notification")
+}

@@ -69,6 +69,14 @@ type AttachmentUpload struct {
 // DependentService's owner-or-admin shape): the handler precomputes an
 // `asAdmin` bool from the user's effective permission set and passes it
 // down. The service enforces ownership + status invariants.
+// LeaveNotifier receives leave decision events (DR-MOB-005-001-01 Rule 4).
+// Optional — a nil notifier disables in-app notifications, which keeps every
+// existing caller that constructs a LeaveService without one working
+// unchanged. Mirrors the AnnouncementNotifier seam.
+type LeaveNotifier interface {
+	NotifyLeaveDecision(ctx context.Context, employeeID, leaveID uuid.UUID, approved bool, from, to time.Time)
+}
+
 type LeaveService struct {
 	leaves   repositories.LeaveRequestRepository
 	emps     repositories.EmployeeRepository
@@ -77,11 +85,13 @@ type LeaveService struct {
 	quota    repositories.LeaveQuotaRepository
 	uploads  Uploader // optional; nil means attachment upload is unavailable
 	holidays repositories.HolidayRepository
+	notifier LeaveNotifier // optional; nil disables in-app notifications
 }
 
 // NewLeaveService constructs a LeaveService. Pass nil for `uploads` if the
 // storage backend is unconfigured — attachment endpoints will then return
-// a 500 with a clear message but the rest of the API stays usable.
+// a 500 with a clear message but the rest of the API stays usable. Pass nil
+// for `notifier` to disable in-app leave notifications.
 func NewLeaveService(
 	leaves repositories.LeaveRequestRepository,
 	emps repositories.EmployeeRepository,
@@ -90,6 +100,7 @@ func NewLeaveService(
 	quota repositories.LeaveQuotaRepository,
 	uploads Uploader,
 	holidays repositories.HolidayRepository,
+	notifier LeaveNotifier,
 ) *LeaveService {
 	return &LeaveService{
 		leaves:   leaves,
@@ -99,6 +110,7 @@ func NewLeaveService(
 		quota:    quota,
 		uploads:  uploads,
 		holidays: holidays,
+		notifier: notifier,
 	}
 }
 
@@ -608,7 +620,16 @@ func (s *LeaveService) Approve(ctx context.Context, id uuid.UUID, approverUserID
 	if err := s.checkCanApproveOrReject(ctx, approverUserID, scope, row); err != nil {
 		return nil, err
 	}
-	return s.transitionStatus(ctx, id, models.LeaveStatusApproved, []models.LeaveStatus{models.LeaveStatusPending})
+	read, err := s.transitionStatus(ctx, id, models.LeaveStatusApproved, []models.LeaveStatus{models.LeaveStatusPending})
+	if err != nil {
+		return nil, err
+	}
+	// After the transition commits, never before — a refused or conflicting
+	// transition must not produce a notification claiming it succeeded.
+	if s.notifier != nil {
+		s.notifier.NotifyLeaveDecision(ctx, row.EmployeeID, row.ID, true, row.FromDate, row.ToDate)
+	}
+	return read, nil
 }
 
 // Reject transitions a pending request to rejected.
@@ -623,7 +644,14 @@ func (s *LeaveService) Reject(ctx context.Context, id uuid.UUID, approverUserID 
 	if err := s.checkCanApproveOrReject(ctx, approverUserID, scope, row); err != nil {
 		return nil, err
 	}
-	return s.transitionStatus(ctx, id, models.LeaveStatusRejected, []models.LeaveStatus{models.LeaveStatusPending})
+	read, err := s.transitionStatus(ctx, id, models.LeaveStatusRejected, []models.LeaveStatus{models.LeaveStatusPending})
+	if err != nil {
+		return nil, err
+	}
+	if s.notifier != nil {
+		s.notifier.NotifyLeaveDecision(ctx, row.EmployeeID, row.ID, false, row.FromDate, row.ToDate)
+	}
+	return read, nil
 }
 
 // checkCanApproveOrReject enforces BFS team-scoped approval authority.
