@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/exnodes/hrm-api/internal/dto"
 	"github.com/exnodes/hrm-api/internal/models"
 	"github.com/exnodes/hrm-api/internal/repositories"
 )
@@ -26,11 +27,17 @@ const leaveDecisionDateFormat = "2006-01-02"
 type leaveNotifier struct {
 	notifs *NotificationService
 	emps   repositories.EmployeeRepository
+	push   *PushNotificationService // optional — nil disables OS-level push
 }
 
-// NewLeaveNotifier constructs the concrete LeaveNotifier.
-func NewLeaveNotifier(notifs *NotificationService, emps repositories.EmployeeRepository) LeaveNotifier {
-	return &leaveNotifier{notifs: notifs, emps: emps}
+// NewLeaveNotifier constructs the concrete LeaveNotifier. Pass nil for `push`
+// to write only the in-app feed row (what most service tests do).
+func NewLeaveNotifier(
+	notifs *NotificationService,
+	emps repositories.EmployeeRepository,
+	push *PushNotificationService,
+) LeaveNotifier {
+	return &leaveNotifier{notifs: notifs, emps: emps, push: push}
 }
 
 func (n *leaveNotifier) NotifyLeaveDecision(
@@ -61,6 +68,35 @@ func (n *leaveNotifier) NotifyLeaveDecision(
 	if err != nil {
 		log.Printf("leave: create notification for leave %s: %v", leaveID, err)
 	}
+
+	// OS-level push is best-effort and deliberately detached.
+	//
+	// Unlike the announcement path, NotifyLeaveDecision runs SYNCHRONOUSLY
+	// inside Approve/Reject. Calling FCM inline would put network latency on
+	// the approval response and make approving fail when FCM is unreachable —
+	// the in-app row above is the durable surface and must not depend on it.
+	//
+	// context.Background() rather than ctx: the request context is cancelled
+	// the moment the handler returns, which would abort the push mid-flight.
+	if n.push != nil {
+		go n.sendDecisionPush(context.Background(), emp.UserID, leaveID, title, body)
+	}
+}
+
+func (n *leaveNotifier) sendDecisionPush(ctx context.Context, userID, leaveID uuid.UUID, title, body string) {
+	result, err := n.push.SendToUser(ctx, userID, dto.NotificationTestRequest{
+		Title: title,
+		Body:  body,
+		// Mirrors the announcement payload so the app can deep-link from the
+		// OS notification straight to the leave request detail screen.
+		Data: map[string]any{"type": string(models.NotificationTypeLeaveRequest), "id": leaveID.String()},
+	})
+	if err != nil {
+		log.Printf("leave: push for leave %s to user %s: %v", leaveID, userID, err)
+		return
+	}
+	log.Printf("leave: push user=%s leave=%s sent=%d skipped=%d errors=%v",
+		userID, leaveID, result.Sent, result.Skipped, result.Errors)
 }
 
 // leaveDecisionCopy renders the DR section 3 / AC-09 copy. Extracted so the

@@ -98,12 +98,14 @@ func main() {
 	roleSvc := services.NewRoleService(roleRepo)
 	labelSvc := services.NewLabelService(labelRepo)
 
-	// Notifications are constructed early: both the announcement notifier and
-	// the leave notifier below depend on them.
+	// Notifications and push are constructed early: both the leave notifier
+	// here and the announcement notifier further down depend on them.
 	notificationRepo := repositories.NewNotificationRepository(db)
 	notificationSvc := services.NewNotificationService(notificationRepo)
+	pushClient := services.NewPushClient(cfg)
+	pushSvc := services.NewPushNotificationService(pushClient, tokenRepo)
 
-	leaveNotifier := services.NewLeaveNotifier(notificationSvc, employeeRepo)
+	leaveNotifier := services.NewLeaveNotifier(notificationSvc, employeeRepo, pushSvc)
 	leaveSvc := services.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, positionRepo, quotaRepo, uploadSvc, holidayRepo, leaveNotifier)
 	attendanceSvc := services.NewAttendanceService(cfg, attendanceRepo, employeeRepo, departmentRepo, positionRepo, leaveRepo)
 
@@ -122,9 +124,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("email service: %v", err)
 	}
-	pushClient := services.NewPushClient(cfg)
-	pushSvc := services.NewPushNotificationService(pushClient, tokenRepo)
-
 	annNotifier := services.NewAnnouncementNotifier(pushSvc, emailSvc, userRepo, notificationSvc)
 	announcementSvc := services.NewAnnouncementService(
 		announcementRepo, employeeRepo, departmentRepo, labelRepo,
