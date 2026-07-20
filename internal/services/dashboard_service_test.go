@@ -26,6 +26,7 @@ func newDashboardSvc(t *testing.T) *services.DashboardService {
 		repositories.NewAttendanceRepository(testDB),
 		repositories.NewAnnouncementRepository(testDB),
 		repositories.NewHolidayRepository(testDB),
+		repositories.NewNotificationRepository(testDB),
 	)
 }
 

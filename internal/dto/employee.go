@@ -91,20 +91,20 @@ type ManagerCandidateQuery struct {
 // ---- Employee Read ----
 
 type EmployeeRead struct {
-	ID               uuid.UUID  `json:"id"`
-	UserID           uuid.UUID  `json:"user_id"`
-	Email            string     `json:"email"`
-	FirstName        string     `json:"first_name"`
-	LastName         string     `json:"last_name"`
-	Phone            *string    `json:"phone,omitempty"`
-	PersonalEmail    *string    `json:"personal_email,omitempty"`
-	Gender           *string    `json:"gender,omitempty"`
-	DOB              *time.Time `json:"dob,omitempty"`
-	Nationality      *string    `json:"nationality,omitempty"`
-	IDNumber         *string    `json:"id_number,omitempty"`
-	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
-	IDFrontImage     *string    `json:"id_front_image,omitempty"`
-	IDBackImage      *string    `json:"id_back_image,omitempty"`
+	ID                      uuid.UUID  `json:"id"`
+	UserID                  uuid.UUID  `json:"user_id"`
+	Email                   string     `json:"email"`
+	FirstName               string     `json:"first_name"`
+	LastName                string     `json:"last_name"`
+	Phone                   *string    `json:"phone,omitempty"`
+	PersonalEmail           *string    `json:"personal_email,omitempty"`
+	Gender                  *string    `json:"gender,omitempty"`
+	DOB                     *time.Time `json:"dob,omitempty"`
+	Nationality             *string    `json:"nationality,omitempty"`
+	IDNumber                *string    `json:"id_number,omitempty"`
+	IDIssueDate             *time.Time `json:"id_issue_date,omitempty"`
+	IDFrontImage            *string    `json:"id_front_image,omitempty"`
+	IDBackImage             *string    `json:"id_back_image,omitempty"`
 	PermanentAddress        *string    `json:"permanent_address,omitempty"`
 	CurrentAddress          *string    `json:"current_address,omitempty"`
 	Education               *string    `json:"education,omitempty"`
@@ -178,17 +178,17 @@ type EmployeeCreate struct {
 	SendInvite bool `json:"send_invite,omitempty"`
 
 	// HR personal info
-	FirstName        string     `json:"first_name" binding:"required,min=1,max=100"`
-	LastName         string     `json:"last_name"  binding:"required,min=1,max=100"`
-	Phone            *string    `json:"phone,omitempty"`
-	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
-	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
-	DOB              *time.Time `json:"dob,omitempty"`
-	Nationality      *string    `json:"nationality,omitempty"`
-	IDNumber         *string    `json:"id_number,omitempty"`
-	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
-	IDFrontImage     *string    `json:"id_front_image,omitempty"`
-	IDBackImage      *string    `json:"id_back_image,omitempty"`
+	FirstName               string     `json:"first_name" binding:"required,min=1,max=100"`
+	LastName                string     `json:"last_name"  binding:"required,min=1,max=100"`
+	Phone                   *string    `json:"phone,omitempty"`
+	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	Gender                  *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
+	DOB                     *time.Time `json:"dob,omitempty"`
+	Nationality             *string    `json:"nationality,omitempty"`
+	IDNumber                *string    `json:"id_number,omitempty"`
+	IDIssueDate             *time.Time `json:"id_issue_date,omitempty"`
+	IDFrontImage            *string    `json:"id_front_image,omitempty"`
+	IDBackImage             *string    `json:"id_back_image,omitempty"`
 	PermanentAddress        *string    `json:"permanent_address,omitempty"`
 	CurrentAddress          *string    `json:"current_address,omitempty"`
 	Education               *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
@@ -229,17 +229,17 @@ type EmployeeCreate struct {
 // ---- Employee Update (admin — anything allowed) ----
 
 type EmployeeUpdate struct {
-	FirstName        *string    `json:"first_name,omitempty" binding:"omitempty,min=1,max=100"`
-	LastName         *string    `json:"last_name,omitempty"  binding:"omitempty,min=1,max=100"`
-	Phone            *string    `json:"phone,omitempty"`
-	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
-	Gender           *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
-	DOB              *time.Time `json:"dob,omitempty"`
-	Nationality      *string    `json:"nationality,omitempty"`
-	IDNumber         *string    `json:"id_number,omitempty"`
-	IDIssueDate      *time.Time `json:"id_issue_date,omitempty"`
-	IDFrontImage     *string    `json:"id_front_image,omitempty"`
-	IDBackImage      *string    `json:"id_back_image,omitempty"`
+	FirstName               *string    `json:"first_name,omitempty" binding:"omitempty,min=1,max=100"`
+	LastName                *string    `json:"last_name,omitempty"  binding:"omitempty,min=1,max=100"`
+	Phone                   *string    `json:"phone,omitempty"`
+	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	Gender                  *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
+	DOB                     *time.Time `json:"dob,omitempty"`
+	Nationality             *string    `json:"nationality,omitempty"`
+	IDNumber                *string    `json:"id_number,omitempty"`
+	IDIssueDate             *time.Time `json:"id_issue_date,omitempty"`
+	IDFrontImage            *string    `json:"id_front_image,omitempty"`
+	IDBackImage             *string    `json:"id_back_image,omitempty"`
 	PermanentAddress        *string    `json:"permanent_address,omitempty"`
 	CurrentAddress          *string    `json:"current_address,omitempty"`
 	Education               *string    `json:"education,omitempty"        binding:"omitempty,oneof=high_school college bachelor master doctorate"`
@@ -289,12 +289,12 @@ type EmployeeUpdate struct {
 // The service enforces the whitelist with a manual field-by-field copy, so
 // even a future DTO widening cannot mutate those admin-only columns.
 type EmployeeSelfUpdate struct {
-	FirstName        *string    `json:"first_name,omitempty"     binding:"omitempty,min=1,max=100"`
-	LastName         *string    `json:"last_name,omitempty"      binding:"omitempty,min=1,max=100"`
-	Gender           *string    `json:"gender,omitempty"         binding:"omitempty,oneof=male female other"`
-	DOB              *time.Time `json:"dob,omitempty"`
-	Phone            *string    `json:"phone,omitempty"`
-	PersonalEmail    *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	FirstName               *string    `json:"first_name,omitempty"     binding:"omitempty,min=1,max=100"`
+	LastName                *string    `json:"last_name,omitempty"      binding:"omitempty,min=1,max=100"`
+	Gender                  *string    `json:"gender,omitempty"         binding:"omitempty,oneof=male female other"`
+	DOB                     *time.Time `json:"dob,omitempty"`
+	Phone                   *string    `json:"phone,omitempty"`
+	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
 	PermanentAddress        *string    `json:"permanent_address,omitempty"`
 	CurrentAddress          *string    `json:"current_address,omitempty"`
 	MaritalStatus           *string    `json:"marital_status,omitempty" binding:"omitempty,oneof=single married other"`

@@ -13,15 +13,15 @@ type Employee struct {
 	UserID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
 
 	// Personal info
-	FirstName        string     `gorm:"type:text;not null;default:''" json:"first_name"`
-	LastName         string     `gorm:"type:text;not null;default:''" json:"last_name"`
-	Phone            *string    `gorm:"type:text" json:"phone,omitempty"`
-	PersonalEmail    *string    `gorm:"type:citext" json:"personal_email,omitempty"`
-	Gender           *string    `gorm:"type:text" json:"gender,omitempty"`
-	PermanentAddress *string    `gorm:"type:text" json:"permanent_address,omitempty"`
-	CurrentAddress   *string    `gorm:"type:text" json:"current_address,omitempty"`
-	DOB              *time.Time `gorm:"type:date" json:"dob,omitempty"`
-	Nationality      *string    `gorm:"type:text" json:"nationality,omitempty"`
+	FirstName               string     `gorm:"type:text;not null;default:''" json:"first_name"`
+	LastName                string     `gorm:"type:text;not null;default:''" json:"last_name"`
+	Phone                   *string    `gorm:"type:text" json:"phone,omitempty"`
+	PersonalEmail           *string    `gorm:"type:citext" json:"personal_email,omitempty"`
+	Gender                  *string    `gorm:"type:text" json:"gender,omitempty"`
+	PermanentAddress        *string    `gorm:"type:text" json:"permanent_address,omitempty"`
+	CurrentAddress          *string    `gorm:"type:text" json:"current_address,omitempty"`
+	DOB                     *time.Time `gorm:"type:date" json:"dob,omitempty"`
+	Nationality             *string    `gorm:"type:text" json:"nationality,omitempty"`
 	IDNumber                *string    `gorm:"type:text" json:"id_number,omitempty"`
 	IDIssueDate             *time.Time `gorm:"type:date" json:"id_issue_date,omitempty"`
 	IDFrontImage            *string    `gorm:"type:text" json:"id_front_image,omitempty"`
@@ -31,8 +31,8 @@ type Employee struct {
 	MaritalStatus           *string    `gorm:"type:text" json:"marital_status,omitempty"`
 	SocialInsuranceNumber   *string    `gorm:"type:text" json:"social_insurance_number,omitempty"`
 	TaxIdentificationNumber *string    `gorm:"type:text" json:"tax_identification_number,omitempty"`
-	ExperienceYear   *int       `gorm:"type:int" json:"experience_year,omitempty"`
-	CVURL            *string    `gorm:"type:text" json:"cv_url,omitempty"`
+	ExperienceYear          *int       `gorm:"type:int" json:"experience_year,omitempty"`
+	CVURL                   *string    `gorm:"type:text" json:"cv_url,omitempty"`
 
 	// Emergency contacts are a 1-N list (migration 000017); the former single
 	// emergency_contact_{name,relation,phone} columns were dropped. See the

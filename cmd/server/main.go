@@ -140,7 +140,7 @@ func main() {
 	workdaySvc := services.NewWorkdayService(holidayRepo)
 	passwordResetSvc := services.NewPasswordResetService(userRepo, passwordResetTokenRepo, emailSvc, cfg)
 	passwordResetOTPSvc := services.NewPasswordResetOTPService(userRepo, passwordResetOTPRepo, passwordResetTokenRepo, emailSvc, cfg)
-	dashboardSvc := services.NewDashboardService(cfg, employeeRepo, leaveRepo, quotaRepo, attendanceRepo, announcementRepo, holidayRepo)
+	dashboardSvc := services.NewDashboardService(cfg, employeeRepo, leaveRepo, quotaRepo, attendanceRepo, announcementRepo, holidayRepo, notificationRepo)
 
 	// ---- run idempotent seed on boot ----
 	if err := seedSvc.Seed(context.Background()); err != nil {

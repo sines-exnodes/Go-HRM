@@ -247,8 +247,6 @@ func TestNotification_UnreadCount_CountsOnlyOwnUnread(t *testing.T) {
 	assert.Equal(t, int64(2), count.UnreadCount)
 }
 
-
-
 // ---- Announcement producer ----
 
 // newAnnouncementSvcWithFeed wires a real announcement notifier backed by the
@@ -536,4 +534,33 @@ func TestNotification_Leave_RefusedTransitionDoesNotNotify(t *testing.T) {
 	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
 	require.Nil(t, aerr)
 	assert.Len(t, out.Items, 1, "a refused transition must not add a notification")
+}
+
+// DR Rule 14 — the count reaches the dashboard so the header bell renders on
+// first paint without a second request.
+func TestNotification_DashboardCarriesUnreadCount(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, notifRepo := newNotificationSvc(t)
+	user, _ := makeEmpUser(t, "dash-notif@x.com", "Dash User")
+
+	seedNotification(t, notifRepo, user.ID, models.NotificationTypeAnnouncement, "d1", uuid.New())
+	seedNotification(t, notifRepo, user.ID, models.NotificationTypeLeaveRequest, "d2", uuid.New())
+
+	dashSvc := newDashboardSvc(t)
+	out, err := dashSvc.Get(ctx, user)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), out.UnreadNotificationCount)
+
+	// Reading one decrements it — this is what makes the bell tick down.
+	list, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	_, aerr = notifSvc.MarkRead(ctx, list.Items[0].ID, user.ID)
+	require.Nil(t, aerr)
+
+	out, err = dashSvc.Get(ctx, user)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), out.UnreadNotificationCount)
 }
