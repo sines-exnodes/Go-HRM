@@ -13,9 +13,15 @@ import (
 	"github.com/exnodes/hrm-api/internal/repositories"
 )
 
-// leaveDecisionDateFormat matches the date rendering in the notification body
-// copy specified by DR-MOB-005-001-01 section 3.
-const leaveDecisionDateFormat = "2006-01-02"
+// leaveDecisionDateFormat renders dates as "10 June, 2026" — the D MMMM, YYYY
+// style DR-MOB-005-001-01 uses for user-facing dates (see AC-16). The day is
+// unpadded, so 3 August reads "3 August, 2026", not "03 August, 2026".
+//
+// This is the one place notification dates are formatted, and unlike the
+// timestamp on the row (which the client formats from RFC3339), this text is
+// baked into the stored body at creation time — a snapshot, per Rule 12.
+// Changing it does NOT rewrite notifications that already exist.
+const leaveDecisionDateFormat = "2 January, 2006"
 
 // leaveNotifier writes an in-app notification when a leave request is
 // approved or rejected (DR Rule 4).
