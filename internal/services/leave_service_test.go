@@ -713,6 +713,11 @@ func TestLeaveService_Create_AttachmentPDF_OK(t *testing.T) {
 // PATCH body does not reset an Approved request back to Pending. This was a
 // Go-specific regression: status-transition logic ran unconditionally even when
 // no fields changed (G3 fix).
+//
+// The patch MUST be made as an admin. A non-admin owner is rejected by the
+// "only an admin can edit an approved leave request" guard long before the
+// revert code is reached, so an asAdmin=false version of this test exercises
+// the 403 guard and proves nothing about G3.
 func TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus(t *testing.T) {
 	skipIfNoDB(t)
 	truncateAll(t)
@@ -736,7 +741,7 @@ func TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus(t *testing.T) {
 		Where("id = ?", id).
 		Update("status", models.LeaveStatusApproved).Error)
 
-	updateRes, err := svc.Update(ctx, id, emp.UserID, false, dto.LeaveRequestUpdate{}, nil)
+	updateRes, err := svc.Update(ctx, id, emp.UserID, true, dto.LeaveRequestUpdate{}, nil)
 	require.NoError(t, err, "empty PATCH must not error")
 	assert.Equal(t, string(models.LeaveStatusApproved), string(updateRes.Request.Status),
 		"empty PATCH must not revert Approved→Pending (G3 regression)")
