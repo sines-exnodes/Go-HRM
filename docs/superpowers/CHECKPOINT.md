@@ -167,8 +167,8 @@ Merged via **PR #18** (`9a1b511`); `main` in sync with `origin/main`. No further
 
 ### IMMEDIATE next & subsequent priorities (in descending value):
 
-0. **Push `feat/mobile-forgot-password-otp` + open a PR** (commit `3433715`, migration 000027). Verified but unreviewed and unpushed. **Flag for the reviewer:** the deliberate 404-on-unknown-email enumeration divergence (decision 2) wants a security sign-off, and the deferred SR-09 session-kill.
-0b. **Fix the 4 pre-existing leave-request test failures** — the services suite is red on `main` right now, which masks future regressions.
+0. ~~**Push `feat/mobile-forgot-password-otp` + open a PR**~~ — **DONE**, PR #34 merged 2026-07-16. ⚠️ **Two follow-ups from it are still open and were never separately tracked:** the deliberate 404-on-unknown-email enumeration divergence wants a **security sign-off**, and **SR-09 cross-device session-kill is unimplemented** (`password_reset_at` is stamped but unenforced, so old access tokens live out their TTL — needs a JWT middleware change).
+0b. ~~**Fix the 4 pre-existing leave-request test failures**~~ — **DONE 2026-07-20** (`1dd371b`, merged in PR #35). Suite is green: 331 pass / 0 fail / 1 opt-in skip.
 1. ~~**Merge PR #20** (`feat/forgot-password`)~~ — superseded: the web forgot-password flow is on `main` (migration 000024 is in the tree).
 2. **Request Tickets module (EP-003/US-003) — biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000029**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
 3. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
