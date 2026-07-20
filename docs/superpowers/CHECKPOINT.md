@@ -1,8 +1,8 @@
 # Resume Checkpoint — Mobile in-app notifications implemented
 
 **Last updated:** 2026-07-20
-**Stopped at:** Mobile notification feed (EP-005 / DR-MOB-005-001-01) implemented + verified on `feat/mobile-notifications`. **Not pushed, no PR yet.** Migration **000028** applied to the *test* DB only — dev `exnodes_hrm` is still at **27**.
-**Branch:** `feat/mobile-notifications` (off `main` @ `97bd62f`).
+**Stopped at:** Mobile notification feed (EP-005 / DR-MOB-005-001-01) implemented, verified, and **MERGED to `main` via PR [#35](https://github.com/sines-exnodes/Go-HRM/pull/35) (`73be1eb`)**. Migration **000028** applied to **both** the test DB and dev `exnodes_hrm` (data intact: 20 users / 20 employees / 25 leaves / 14 announcements; app boots clean).
+**Branch:** none in flight — `main` is in sync with `origin/main`. Post-merge suite re-verified on the merged tree: build + vet clean, **331 pass / 0 fail / 1 opt-in skip**.
 
 > **2026-07-20 session — mobile in-app notifications (DR-MOB-005-001-01):**
 >
@@ -20,7 +20,8 @@
 > - **Verified:** 331 service tests pass / 0 fail / 1 opt-in skip (was 314 — 17 new), migration up/down/up round-trip clean, live 8-step HTTP smoke on `:8082`, DB spot-check proving 3 rows = 3 distinct `(user, type, source)` triples. Log: [`verification/mobile-notifications.md`](verification/mobile-notifications.md).
 > - **Not verified:** announcement department/custom audiences (only `all` exercised live).
 >
-> **Next:** apply 000028 to dev `exnodes_hrm`, push the branch, open a PR. Then EP-003 Request Tickets (migration **000029** — see priority 2 below).
+> **Shipped:** PR [#35](https://github.com/sines-exnodes/Go-HRM/pull/35) merged as `73be1eb`; dev migrated 27→28. The leave test fix rode along in the same PR, so `main`'s suite is genuinely green for the first time since `0132dd8`.
+> **Next:** EP-003 Request Tickets (migration **000029** — see priority 2 below). Still open with BA: the two deliberate DR deviations (pagination vs DR §8, client-side icon registry vs AC-20).
 
 > **2026-07-16 session — mobile forgot-password OTP (DR-001-001-02):**
 > - New flow **alongside** the untouched web link flow (000024). `POST /auth/mobile/forgot-password` (mails a 6-digit code, also backs Resend) + `POST /auth/mobile/verify-otp` (consumes the code, returns a 10-min single-use `reset_token`). Screen 3 reuses the existing `POST /auth/reset-password` — no third endpoint.
