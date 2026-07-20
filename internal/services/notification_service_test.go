@@ -466,9 +466,12 @@ func TestNotification_Leave_ApproveProducesNotification(t *testing.T) {
 	assert.Equal(t, "Leave Request Approved", out.Items[0].Title)
 	assert.Equal(t, string(models.NotificationTypeLeaveRequest), out.Items[0].Type)
 	assert.Equal(t, leaveID, out.Items[0].SourceID, "source_id must point at the leave request")
-	assert.Contains(t, out.Items[0].Body, "2026-08-03")
-	assert.Contains(t, out.Items[0].Body, "2026-08-05")
-	assert.Contains(t, out.Items[0].Body, "approved")
+	// Exact body, not substrings — this pins the "D MMMM, YYYY" date style and
+	// the surrounding wording, both of which are user-facing copy from the DR.
+	// Day is unpadded: "3 August, 2026", never "03 August, 2026".
+	assert.Equal(t,
+		"Your leave request from 3 August, 2026 to 5 August, 2026 has been approved.",
+		out.Items[0].Body)
 }
 
 // AC-09 rejected variant.
@@ -499,7 +502,11 @@ func TestNotification_Leave_RejectProducesRejectedCopy(t *testing.T) {
 	require.Nil(t, aerr)
 	require.Len(t, out.Items, 1)
 	assert.Equal(t, "Leave Request Rejected", out.Items[0].Title)
-	assert.Contains(t, out.Items[0].Body, "rejected")
+	// Two-digit days here, single-digit in the approve test — between them they
+	// pin that the day is never zero-padded.
+	assert.Equal(t,
+		"Your leave request from 12 October, 2026 to 13 October, 2026 has been rejected.",
+		out.Items[0].Body)
 }
 
 // A refused transition must not notify. The second approve is rejected by the
@@ -660,7 +667,9 @@ func TestNotification_Leave_ApproveSendsPush(t *testing.T) {
 	msg := client.last()
 	assert.Equal(t, "device-token-abc", msg.Token)
 	assert.Equal(t, "Leave Request Approved", msg.Title)
-	assert.Contains(t, msg.Body, "2026-08-03")
+	assert.Equal(t,
+		"Your leave request from 3 August, 2026 to 5 August, 2026 has been approved.",
+		msg.Body, "push body must match the in-app body exactly")
 	// Deep-link payload, mirroring the announcement push.
 	assert.Equal(t, string(models.NotificationTypeLeaveRequest), msg.Data["type"])
 	assert.Equal(t, leaveID.String(), msg.Data["id"])
