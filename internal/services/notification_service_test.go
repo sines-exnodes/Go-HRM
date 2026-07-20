@@ -3,6 +3,7 @@ package services_test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -430,7 +431,7 @@ func newLeaveSvcWithNotifier(t *testing.T, notifs *services.NotificationService)
 		repositories.NewLeaveQuotaRepository(testDB),
 		nil, // uploads — attachments not exercised here
 		repositories.NewHolidayRepository(testDB),
-		services.NewLeaveNotifier(notifs, emps),
+		services.NewLeaveNotifier(notifs, emps, nil),
 	)
 }
 
@@ -563,4 +564,178 @@ func TestNotification_DashboardCarriesUnreadCount(t *testing.T) {
 	out, err = dashSvc.Get(ctx, user)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), out.UnreadNotificationCount)
+}
+
+// ---- Leave push dispatch ----
+
+// capturePushClient records every message the service tries to deliver.
+type capturePushClient struct {
+	mu   sync.Mutex
+	msgs []services.PushMessage
+}
+
+func (c *capturePushClient) Send(_ context.Context, msg services.PushMessage) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.msgs = append(c.msgs, msg)
+	return nil
+}
+
+func (c *capturePushClient) IsConfigured() bool { return true }
+
+func (c *capturePushClient) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.msgs)
+}
+
+func (c *capturePushClient) last() services.PushMessage {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.msgs[len(c.msgs)-1]
+}
+
+// newLeaveSvcWithPush wires the full leave notifier: in-app feed + push.
+func newLeaveSvcWithPush(t *testing.T, notifs *services.NotificationService, client services.PushClient) *services.LeaveService {
+	t.Helper()
+	emps := repositories.NewEmployeeRepository(testDB)
+	pushSvc := services.NewPushNotificationService(client, repositories.NewDeviceTokenRepository(testDB))
+	return services.NewLeaveService(
+		repositories.NewLeaveRequestRepository(testDB),
+		emps,
+		repositories.NewDepartmentRepository(testDB),
+		repositories.NewPositionRepository(testDB),
+		repositories.NewLeaveQuotaRepository(testDB),
+		nil,
+		repositories.NewHolidayRepository(testDB),
+		services.NewLeaveNotifier(notifs, emps, pushSvc),
+	)
+}
+
+func registerDeviceToken(t *testing.T, userID uuid.UUID, token string) {
+	t.Helper()
+	repo := repositories.NewDeviceTokenRepository(testDB)
+	require.NoError(t, repo.Upsert(context.Background(), &models.DeviceToken{
+		UserID:   userID,
+		Token:    token,
+		DeviceID: "test-device",
+		Platform: "ios",
+	}))
+}
+
+// Approving a leave request must push to the submitter's devices, not just
+// write the in-app row. Announcements have always pushed; leave did not until
+// this was added, which made the two paths silently inconsistent.
+func TestNotification_Leave_ApproveSendsPush(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	client := &capturePushClient{}
+	leaveSvc := newLeaveSvcWithPush(t, notifSvc, client)
+
+	user, emp := makeEmpUser(t, "leave-push@x.com", "Push Taker")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+	registerDeviceToken(t, user.ID, "device-token-abc")
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 8, 3),
+		ToDate:      dateAt(2026, 8, 5),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "push test",
+	}, nil)
+	require.NoError(t, err)
+
+	leaveID := uuid.MustParse(res.Request.ID)
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+
+	// Push is dispatched on a detached goroutine so it cannot slow or fail
+	// the approval — poll rather than assert immediately.
+	require.Eventually(t, func() bool { return client.count() == 1 },
+		3*time.Second, 25*time.Millisecond, "approve should push to the submitter")
+
+	msg := client.last()
+	assert.Equal(t, "device-token-abc", msg.Token)
+	assert.Equal(t, "Leave Request Approved", msg.Title)
+	assert.Contains(t, msg.Body, "2026-08-03")
+	// Deep-link payload, mirroring the announcement push.
+	assert.Equal(t, string(models.NotificationTypeLeaveRequest), msg.Data["type"])
+	assert.Equal(t, leaveID.String(), msg.Data["id"])
+
+	// The in-app row is still written — push does not replace it.
+	out, aerr := notifSvc.List(ctx, user.ID, dto.NotificationListQuery{})
+	require.Nil(t, aerr)
+	require.Len(t, out.Items, 1)
+}
+
+func TestNotification_Leave_RejectSendsPush(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	client := &capturePushClient{}
+	leaveSvc := newLeaveSvcWithPush(t, notifSvc, client)
+
+	user, emp := makeEmpUser(t, "leave-push-rej@x.com", "Push Rejectee")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+	registerDeviceToken(t, user.ID, "device-token-xyz")
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 11, 2),
+		ToDate:      dateAt(2026, 11, 2),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "push reject test",
+	}, nil)
+	require.NoError(t, err)
+
+	_, err = leaveSvc.Reject(ctx, uuid.MustParse(res.Request.ID), user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool { return client.count() == 1 },
+		3*time.Second, 25*time.Millisecond, "reject should push to the submitter")
+	assert.Equal(t, "Leave Request Rejected", client.last().Title)
+}
+
+// A refused transition must not push, for the same reason it must not write a
+// feed row — the notification would claim something that did not happen.
+func TestNotification_Leave_RefusedTransitionDoesNotPush(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	ctx := context.Background()
+
+	notifSvc, _ := newNotificationSvc(t)
+	client := &capturePushClient{}
+	leaveSvc := newLeaveSvcWithPush(t, notifSvc, client)
+
+	user, emp := makeEmpUser(t, "leave-push-twice@x.com", "Push Twice")
+	makeLeaveQuota(t, emp.ID, 10, 5)
+	registerDeviceToken(t, user.ID, "device-token-once")
+
+	res, err := leaveSvc.Create(ctx, user.ID, false, dto.LeaveRequestCreate{
+		FromDate:    dateAt(2026, 12, 1),
+		ToDate:      dateAt(2026, 12, 1),
+		LeavePeriod: models.LeavePeriodFullDay,
+		LeaveType:   models.LeaveTypeAnnual,
+		Reason:      "push once",
+	}, nil)
+	require.NoError(t, err)
+
+	leaveID := uuid.MustParse(res.Request.ID)
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { return client.count() == 1 },
+		3*time.Second, 25*time.Millisecond)
+
+	// Already approved — refused.
+	_, err = leaveSvc.Approve(ctx, leaveID, user.ID, services.ApproveScopeAll)
+	require.Error(t, err)
+
+	// Give a stray goroutine time to misbehave before asserting the negative.
+	time.Sleep(300 * time.Millisecond)
+	assert.Equal(t, 1, client.count(), "a refused transition must not push")
 }
