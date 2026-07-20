@@ -2043,7 +2043,7 @@ curl -s -H "Authorization: Bearer $TOKEN" "$BASE/dashboard" | jq '.data.unread_n
 # 9. Create a leave request as the employee, approve it as an approver,
 #    then re-list as the employee
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"from_date":"2026-08-03","to_date":"2026-08-05","leave_type":"annual","reason":"smoke test"}' \
+  -d '{"from_date":"2026-08-03T00:00:00Z","to_date":"2026-08-05T00:00:00Z","leave_period":"full_day","leave_type":"annual","reason":"smoke test"}' \
   "$BASE/leave-requests" | jq -r '.data.id'
 curl -s -X POST -H "Authorization: Bearer $ADMIN_TOKEN" "$BASE/leave-requests/<LEAVE_ID>/approve" | jq
 curl -s -H "Authorization: Bearer $TOKEN" "$BASE/mobile/notifications" | jq '.data.items[0]'
