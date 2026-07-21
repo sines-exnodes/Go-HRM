@@ -62,11 +62,17 @@ type Config struct {
 	LateThresholdMinute     int
 	CheckoutThresholdHour   int
 	CheckoutThresholdMinute int
-	OfficeGPSEnabled        bool
-	OfficeLatitude          float64
-	OfficeLongitude         float64
-	OfficeRadiusMeters      float64
-	HalfDayHoursThreshold   float64
+
+	// In-process daily auto-checkout scheduler. When enabled, a goroutine
+	// closes any session left open at AutoCheckoutHour:00 in CompanyTimezone.
+	// Idempotent, so a second replica double-firing is harmless.
+	AutoCheckoutEnabled   bool
+	AutoCheckoutHour      int
+	OfficeGPSEnabled      bool
+	OfficeLatitude        float64
+	OfficeLongitude       float64
+	OfficeRadiusMeters    float64
+	HalfDayHoursThreshold float64
 
 	// Email + Invite + Push (Phase 9). When SMTP_HOST is empty the
 	// EmailService logs the would-be email and writes last_email_error
@@ -138,6 +144,8 @@ func Load() *Config {
 		CompanyTimezone:         getEnv("COMPANY_TIMEZONE", "Asia/Ho_Chi_Minh"),
 		LateThresholdHour:       getEnvInt("LATE_THRESHOLD_HOUR", 9),
 		LateThresholdMinute:     getEnvInt("LATE_THRESHOLD_MINUTE", 0),
+		AutoCheckoutEnabled:     getEnvBool("ATTENDANCE_AUTO_CHECKOUT_ENABLED", true),
+		AutoCheckoutHour:        getEnvInt("ATTENDANCE_AUTO_CHECKOUT_HOUR", 23),
 		CheckoutThresholdHour:   getEnvInt("CHECKOUT_THRESHOLD_HOUR", 18),
 		CheckoutThresholdMinute: getEnvInt("CHECKOUT_THRESHOLD_MINUTE", 0),
 		OfficeGPSEnabled:        getEnvBool("OFFICE_GPS_ENABLED", false),
