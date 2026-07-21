@@ -478,6 +478,16 @@ func main() {
 		sseGroup.GET("/announcements", sseH.Stream)
 	}
 
+	// Daily in-process auto-checkout. Closes any session left open at
+	// AutoCheckoutHour:00 company time. Idempotent, so a second replica
+	// double-firing is harmless. context.Background() = process-lifetime;
+	// the process has no graceful-shutdown path to cancel it through today.
+	if cfg.AutoCheckoutEnabled {
+		go services.StartAutoCheckoutScheduler(context.Background(), attendanceSvc, cfg.CompanyTimezone, cfg.AutoCheckoutHour)
+	} else {
+		log.Printf("auto-checkout: scheduler disabled (ATTENDANCE_AUTO_CHECKOUT_ENABLED=false)")
+	}
+
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("exnodes-hrm-api listening on %s (env=%s, swagger=%t)", addr, cfg.AppEnv, cfg.SwaggerEnabled)
 	if err := r.Run(addr); err != nil {
