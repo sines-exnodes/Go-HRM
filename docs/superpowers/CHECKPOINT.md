@@ -2,7 +2,15 @@
 
 **Last updated:** 2026-07-20
 **Stopped at:** Mobile notification feed (EP-005 / DR-MOB-005-001-01) implemented, verified, and **MERGED to `main` via PR [#35](https://github.com/sines-exnodes/Go-HRM/pull/35) (`73be1eb`)**. Migration **000028** applied to **both** the test DB and dev `exnodes_hrm` (data intact: 20 users / 20 employees / 25 leaves / 14 announcements; app boots clean).
-**Branch:** none in flight — `main` is in sync with `origin/main`. Post-merge suite re-verified on the merged tree: build + vet clean, **334 pass / 0 fail / 1 opt-in skip** (PR #35 feed + PR #36 leave push).
+**Branch:** none in flight — `main` is in sync with `origin/main`. Latest suite: **337 pass / 0 fail / 1 opt-in skip**.
+
+> **2026-07-21 follow-ups merged (all on `main`):**
+> - **PR #36 `97d2c6d`** — leave approve/reject now sends OS push (detached goroutine; in-app row is durable and inline). Push-only, not email.
+> - **PR #37 `3a7d0aa`** — leave notification dates render as `3 August, 2026` (D MMMM, YYYY, unpadded day), not `2026-08-03`. Snapshot text — pre-existing rows keep old wording.
+> - **PR #38 `bf1c9d0`** — `personal_email:""` no longer 400s. Root cause: `omitempty` on a `*string` tests pointer nil-ness, not emptiness, so a non-nil ptr to `""` reaches the `email` tag. Fix = custom `optemail` tag (`dto.RegisterValidators()` in main.go). **Same bug exists in `omitempty,oneof` pointer fields (gender/education/marital_status/relationship/contract_type/work_location) — owner chose to LEAVE them; FE must OMIT the key to clear, not send `""`.** See `mem:decisions/optional-pointer-validation`.
+> - **PR #39 `de88a4d`** — in-process daily auto-checkout scheduler (goroutine at 23:00 ICT). Takes effect on **redeploy**. `mem:decisions/attendance-auto-checkout`.
+>
+> ⚠️ **FCM push may not deliver anywhere** — `.env` `FIREBASE_CREDENTIALS_PATH` points at a `/secret/...prod.json`; if absent, the client silently no-ops. Unverified for announcements too. Independent of the code being correct.
 
 > **2026-07-20 session — mobile in-app notifications (DR-MOB-005-001-01):**
 >
@@ -157,7 +165,7 @@ Python↔Go attendance audit → locked decisions D1–D6 → two plans, execute
 - **Plan A — leave-integrated matrix** (`cc60537`): approved leave rendered in matrix cells (G1, AC-016); combined half-day cells with `worked_half_status` + AM/PM thresholds 09:00/13:15/12:00/18:00 (G2, AC-026–031); leave-aware SR-011 Total Late/Early summaries (G6); `on_leave` status filter + combined multi-match (G4); **root `GET /api/v1/attendance` now returns the matrix** (D1, `43fdda6`) — flat list moved to `/attendance/records`, `/matrix` kept as alias.
 - **Plan B** — Excel export `GET /attendance/export` + `/export/{employee_id}` via `xuri/excelize/v2`, reusing the leave-aware `buildAllRows` so totals match the matrix (G3, AC-011/012/025); check-in/out now return `TodayStatusRead` (D2); `is_half_day` hours-based auto-flip removed — half-day is leave-driven (D5); `AutoCheckOut(cutoff)` service + `POST /attendance/auto-checkout` admin trigger gated `attendance:manage_data` (G5).
 - **Decisions:** D1 root=matrix · D2 TodayStatusRead · D3 excelize · D4 service+admin-endpoint now · D5 follow-BA (drop flip) · D6 keep admin CRUD.
-- **Deferred / follow-ups:** **G7 holiday "H" cells + streak-excludes-holidays — BLOCKED** (no holiday-calendar source; BA open question). Real **23:00 scheduler** trigger for `AutoCheckOut` (admin endpoint lands the logic now). **BA back-fill DR** for the Go-only admin-CRUD surface (kept per D6, currently unspecced).
+- **Deferred / follow-ups:** **G7 holiday "H" cells + streak-excludes-holidays — BLOCKED** (no holiday-calendar source; BA open question). ~~Real **23:00 scheduler** trigger for `AutoCheckOut`~~ **DONE (PR #39).** **BA back-fill DR** for the Go-only admin-CRUD surface (kept per D6, currently unspecced).
 - **FE doc — DONE:** `worktree`/repo handoff `docs/superpowers/handoff-2026-06-08-attendance-fe-api-changes.md` + web repo `exnodes-hrm-web-nextjs/api_info_go/attendance.md` (created, untracked there). Leads with the breaking changes (root=matrix, check-in/out→TodayStatusRead, `is_half_day` no longer hours-driven).
 - **Deployed to dev (`:8080`) — DONE:** the app container runs **Air hot-reload, bind-mounted from the `E:\Work\Go-HRM` checkout** (now on `main`). After merge, the main checkout was switched to `main` and the container restarted; live smoke verified root matrix (leave cells + combined half-day + `worked_half_status`), `?status=on_leave`, `GET /export` (valid xlsx), `/records`, boot at migration 21. (A WIP stash from `fix/skill-icon-cleanup-2mb-cap` was set aside on that branch — `git stash list`.)
 - **Demo data — SEEDED** (dev DB `exnodes_hrm`): April + May 2026 across **6 employees** (added Mai/Long/Huong/Tuan), covering on_time/late/absent/weekend/multi-session, all 5 full-day leave types, and half-day-off with all 3 `worked_half_status` variants (on_time/late/absent) for both morning & afternoon halves; June 1–5 light fill for the default view. Idempotent script: `seed-attendance-demo.sql` (currently in the redundant worktree; not yet moved to `scripts/`).
@@ -176,7 +184,7 @@ Merged via **PR #18** (`9a1b511`); `main` in sync with `origin/main`. No further
 2. **Request Tickets module (EP-003/US-003) — biggest remaining gap.** Entirely unbuilt: no `request_tickets:*` perms, no model/migration/repo/service/handler/routes. FE matrix P11/P12/P13 have no backing. Full vertical slice: ticket model + migration (**000029**) + CRUD + status transitions (In Progress/On Hold/Resume/Resolve) + row-level own-records scoping + submitter-exclusive Close/Reopen. Read EP-003 DRs in `ba-requirements/` first.
 3. **Attendance G7 — holidays now available.** Holiday calendar (migration 000023) unlocks the blocked "H" cell type in the attendance matrix + streak-excludes-holidays. Can now proceed.
 4. **Announcement view-permission tier.** FE matrix wants P23 (Announcement View, read-only) + P24 (Management); Go has only `announcements:manage`. Decide with BA.
-5. **Attendance follow-ups**: real **23:00 scheduler** for `AutoCheckOut`; switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
+5. **Attendance follow-ups**: ~~real **23:00 scheduler** for `AutoCheckOut`~~ **DONE** (PR #39 `de88a4d`, in-process goroutine, daily 23:00 ICT, `ATTENDANCE_AUTO_CHECKOUT_ENABLED`/`_HOUR`; takes effect on redeploy). Still open: switch thresholds to `system_config` lookup; move `seed-attendance-demo.sql` into `scripts/`.
 6. **Bundled code review** — Phases 4-9 have not been formally reviewed.
 7. **Phase 7 attachment-upload HTTP handler** — model + repo in place; route is the missing piece.
 8. **Production env wiring** — `FIREBASE_CREDENTIALS_PATH` + real SMTP host.
