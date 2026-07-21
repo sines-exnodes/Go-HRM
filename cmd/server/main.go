@@ -21,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/exnodes/hrm-api/internal/config"
+	"github.com/exnodes/hrm-api/internal/dto"
 	"github.com/exnodes/hrm-api/internal/handlers"
 	"github.com/exnodes/hrm-api/internal/middleware"
 	"github.com/exnodes/hrm-api/internal/permissions"
@@ -181,6 +182,12 @@ func main() {
 
 	gin.SetMode(cfg.GinMode)
 	r := gin.New()
+
+	// Install custom struct-tag validators (e.g. `optemail`) onto gin's
+	// binding engine before any route is served.
+	if err := dto.RegisterValidators(); err != nil {
+		log.Fatalf("register validators: %v", err)
+	}
 
 	// Middleware order matters: Recovery first (catches panics from later
 	// middleware too), then logger, then CORS, then ErrorHandler (writes

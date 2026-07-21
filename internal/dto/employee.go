@@ -181,7 +181,7 @@ type EmployeeCreate struct {
 	FirstName               string     `json:"first_name" binding:"required,min=1,max=100"`
 	LastName                string     `json:"last_name"  binding:"required,min=1,max=100"`
 	Phone                   *string    `json:"phone,omitempty"`
-	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,optemail"`
 	Gender                  *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
 	DOB                     *time.Time `json:"dob,omitempty"`
 	Nationality             *string    `json:"nationality,omitempty"`
@@ -232,7 +232,7 @@ type EmployeeUpdate struct {
 	FirstName               *string    `json:"first_name,omitempty" binding:"omitempty,min=1,max=100"`
 	LastName                *string    `json:"last_name,omitempty"  binding:"omitempty,min=1,max=100"`
 	Phone                   *string    `json:"phone,omitempty"`
-	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,optemail"`
 	Gender                  *string    `json:"gender,omitempty"          binding:"omitempty,oneof=male female other"`
 	DOB                     *time.Time `json:"dob,omitempty"`
 	Nationality             *string    `json:"nationality,omitempty"`
@@ -294,7 +294,7 @@ type EmployeeSelfUpdate struct {
 	Gender                  *string    `json:"gender,omitempty"         binding:"omitempty,oneof=male female other"`
 	DOB                     *time.Time `json:"dob,omitempty"`
 	Phone                   *string    `json:"phone,omitempty"`
-	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,email"`
+	PersonalEmail           *string    `json:"personal_email,omitempty" binding:"omitempty,optemail"`
 	PermanentAddress        *string    `json:"permanent_address,omitempty"`
 	CurrentAddress          *string    `json:"current_address,omitempty"`
 	MaritalStatus           *string    `json:"marital_status,omitempty" binding:"omitempty,oneof=single married other"`
