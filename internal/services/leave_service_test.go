@@ -707,6 +707,8 @@ func TestLeaveService_Create_AttachmentPDF_OK(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res.Request.AttachmentURL)
 	require.Equal(t, int32(1), up.uploaded)
+	require.Contains(t, *res.Request.AttachmentURL, "hrm-app/leave-attachments/",
+		"leave attachment keys must use the hrm-app namespace (avatar pattern)")
 }
 
 // TestUpdate_EmptyPatch_DoesNotRevertApprovedStatus verifies that an empty
