@@ -58,6 +58,24 @@ func TestImportCSV_CreatesValidRows(t *testing.T) {
 	assert.Equal(t, int64(2), n)
 }
 
+// TestImportCSV_SemicolonDelimiter: Excel in many locales exports ";" as the
+// field separator. Without auto-detect the whole header becomes one unknown column.
+func TestImportCSV_SemicolonDelimiter(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+
+	file := []byte("email;first_name;last_name;phone\n" +
+		"semi@example.com;Semi;Colon;+84901112233\n")
+	out, err := svc.ImportCSV(context.Background(), file, services.AllEmployeeFieldPerms)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, 1, out.Created)
+	assert.Equal(t, 0, out.Failed)
+	assert.True(t, out.Results[0].OK)
+	assert.Equal(t, "semi@example.com", out.Results[0].Email)
+}
+
 // TestImportCSV_DuplicateEmail_IsRowError: a pre-existing email must not abort
 // the rest of the file — partial success is the product contract (D1/D12).
 func TestImportCSV_DuplicateEmail_IsRowError(t *testing.T) {

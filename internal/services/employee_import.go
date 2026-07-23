@@ -62,7 +62,11 @@ func (s *EmployeeService) ImportCSV(
 	// Excel/Windows exports often prefix UTF-8 BOM; strip so "email" is not "\ufeffemail".
 	file = bytes.TrimPrefix(file, []byte{0xEF, 0xBB, 0xBF})
 
+	// Many Excel locales (EU/VN) export "CSV" with ';' as the separator. Default
+	// encoding/csv expects ',' and would treat the whole header as one unknown column.
+	comma := detectEmployeeImportDelimiter(file)
 	r := csv.NewReader(bytes.NewReader(file))
+	r.Comma = comma
 	r.LazyQuotes = true
 	r.FieldsPerRecord = -1 // allow short rows; missing cells treated as empty
 	records, err := r.ReadAll()
@@ -131,6 +135,24 @@ func (s *EmployeeService) ImportCSV(
 	}
 
 	return out, nil
+}
+
+// detectEmployeeImportDelimiter picks ',' or ';' from the first non-empty line.
+// Prefer the delimiter that appears more often on the header line so Excel
+// semicolon exports work without a separate format switch.
+func detectEmployeeImportDelimiter(file []byte) rune {
+	// First line only (header).
+	line := file
+	if i := bytes.IndexByte(file, '\n'); i >= 0 {
+		line = file[:i]
+	}
+	line = bytes.TrimRight(line, "\r")
+	commas := bytes.Count(line, []byte{','})
+	semis := bytes.Count(line, []byte{';'})
+	if semis > commas {
+		return ';'
+	}
+	return ','
 }
 
 func normalizeImportHeaders(raw []string) ([]string, error) {
