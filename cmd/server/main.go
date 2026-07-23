@@ -297,9 +297,11 @@ func main() {
 		adminEmps := authed.Group("/employees")
 		adminEmps.GET("", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), empH.List)
 		adminEmps.POST("", middleware.RequirePerms(authSvc, permissions.PermEmployeesCreate), empH.Create)
-		// Static segment registered alongside :id — gin's radix tree prioritizes
-		// the literal "manager-candidates" over the :id wildcard (employees parity #10).
+		// Static segments registered alongside :id — gin's radix tree prioritizes
+		// the literals over the :id wildcard (employees parity #10).
 		adminEmps.GET("/manager-candidates", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), empH.ManagerCandidates)
+		adminEmps.POST("/import", middleware.RequirePerms(authSvc, permissions.PermEmployeesCreate), empH.Import)
+		adminEmps.GET("/import/template", middleware.RequirePerms(authSvc, permissions.PermEmployeesCreate), empH.ImportTemplate)
 		adminEmps.GET(":id", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), empH.Get)
 		adminEmps.GET(":id/direct-reports", middleware.RequirePerms(authSvc, permissions.PermEmployeesRead), empH.DirectReports)
 		adminEmps.PATCH(":id", middleware.RequirePerms(authSvc, permissions.PermEmployeesUpdate), empH.Update)
