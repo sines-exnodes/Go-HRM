@@ -504,12 +504,12 @@ func (h *EmployeeHandler) UpdateMyAvatar(c *gin.Context) {
 
 // Import godoc
 // @Summary      Import employees from CSV
+// @Description  Each successfully created employee is sent a set-password email (same best-effort path as create with send_invite). Import still succeeds if SMTP fails.
 // @Tags         employees
 // @Security     BearerAuth
 // @Accept       multipart/form-data
 // @Produce      json
-// @Param        file         formData  file    true   "CSV file"
-// @Param        send_invite  formData  bool    false  "send set-password email per created row"
+// @Param        file  formData  file  true  "CSV file"
 // @Success      200  {object}  dto.Response[dto.EmployeeImportResult]
 // @Failure      400  {object}  map[string]interface{}
 // @Router       /api/v1/employees/import [post]
@@ -538,16 +538,16 @@ func (h *EmployeeHandler) Import(c *gin.Context) {
 		_ = c.Error(apperrors.ErrBadRequest("file exceeds 2MB limit"))
 		return
 	}
-	sendInvite := strings.EqualFold(c.PostForm("send_invite"), "true") || c.PostForm("send_invite") == "1"
 
 	out, err := h.svc.ImportCSV(c.Request.Context(), content, employeeFieldPerms(c))
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	// Best-effort invite fan-out (same as Create): never fail the import
-	// response on email errors.
-	if sendInvite && h.reset != nil {
+	// Always send set-password email for each successful create — same path
+	// as Create with SendInvite (PasswordResetService.RequestReset). Best-effort:
+	// never fail the import response when SMTP is unconfigured or a send fails.
+	if h.reset != nil {
 		for _, r := range out.Results {
 			if r.OK && r.Email != "" {
 				_ = h.reset.RequestReset(c.Request.Context(), r.Email)

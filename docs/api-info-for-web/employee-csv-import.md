@@ -77,15 +77,15 @@ Content-Type: multipart/form-data
 | Form field | Type | Required | Default | Description |
 |------------|------|----------|---------|-------------|
 | `file` | file | **yes** | — | `.csv` body, max **2 MiB** |
-| `send_invite` | string | no | `false` | `"true"` or `"1"` (case-insensitive) → send set-password email per **successfully created** row (best-effort; import still succeeds if SMTP fails) |
+
+**Welcome / set-password email:** for **every successfully created row**, the API always sends the same set-password email used by single create with `send_invite` (`PasswordResetService.RequestReset`). Best-effort — import response still returns 200 if SMTP is down or one send fails. Failed rows get no email. There is no form flag to disable this.
 
 Example (`curl`):
 
 ```bash
 curl -X POST "$BASE/api/v1/employees/import" \
   -H "Authorization: Bearer $TOKEN" \
-  -F "file=@employees.csv;type=text/csv" \
-  -F "send_invite=false"
+  -F "file=@employees.csv;type=text/csv"
 ```
 
 ### Response envelope (always JSON)
@@ -267,13 +267,12 @@ User list (has employees:create)
   ├─ [Download template] → GET …/import/template → save blob
   └─ [Import employees]
         → file picker (.csv)
-        → optional toggle “Send set-password email” → send_invite
-        → POST multipart
+        → POST multipart (set-password emails sent automatically per success)
         → if HTTP 4xx: show envelope message
         → if HTTP 200:
              summary: created / failed
              if failed > 0: error table from results where !ok
-             if created > 0: refresh list
+             if created > 0: refresh list; toast that invites were sent
 ```
 
 ### TypeScript shapes (illustrative)
@@ -320,7 +319,6 @@ const blob = await res.blob();
 ```ts
 const form = new FormData();
 form.append('file', file); // File from <input type="file" accept=".csv,text/csv">
-if (sendInvite) form.append('send_invite', 'true');
 
 const res = await fetch(`${base}/api/v1/employees/import`, {
   method: 'POST',
