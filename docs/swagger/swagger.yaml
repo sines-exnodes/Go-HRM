@@ -560,6 +560,34 @@ definitions:
     - first_name
     - last_name
     type: object
+  github_com_exnodes_hrm-api_internal_dto.EmployeeImportResult:
+    properties:
+      created:
+        type: integer
+      failed:
+        type: integer
+      results:
+        items:
+          $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeImportRowResult'
+        type: array
+      total_rows:
+        type: integer
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.EmployeeImportRowResult:
+    properties:
+      email:
+        type: string
+      employee_id:
+        type: string
+      error:
+        type: string
+      ok:
+        type: boolean
+      row:
+        type: integer
+      user_id:
+        type: string
+    type: object
   github_com_exnodes_hrm-api_internal_dto.EmployeeSelfUpdate:
     properties:
       current_address:
@@ -1169,6 +1197,15 @@ definitions:
     properties:
       data:
         $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.DashboardRead'
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_EmployeeImportResult:
+    properties:
+      data:
+        $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.EmployeeImportResult'
       message:
         type: string
       success:
@@ -3147,6 +3184,51 @@ paths:
       summary: Replace an employee's skill set (PUT semantics)
       tags:
       - skills
+  /api/v1/employees/import:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: CSV file
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: send set-password email per created row
+        in: formData
+        name: send_invite
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_exnodes_hrm-api_internal_dto.Response-github_com_exnodes_hrm-api_internal_dto_EmployeeImportResult'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Import employees from CSV
+      tags:
+      - employees
+  /api/v1/employees/import/template:
+    get:
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Download employee CSV import template
+      tags:
+      - employees
   /api/v1/employees/manager-candidates:
     get:
       description: Active employees eligible as a line manager. Excludes the target

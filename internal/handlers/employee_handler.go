@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -499,4 +500,74 @@ func (h *EmployeeHandler) UpdateMyAvatar(c *gin.Context) {
 	}
 	services.ApplyEmployeeFieldVisibility(view, employeeFieldPerms(c), true) // own write echo
 	ok(c, http.StatusOK, view, "Avatar updated")
+}
+
+// Import godoc
+// @Summary      Import employees from CSV
+// @Tags         employees
+// @Security     BearerAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file         formData  file    true   "CSV file"
+// @Param        send_invite  formData  bool    false  "send set-password email per created row"
+// @Success      200  {object}  dto.Response[dto.EmployeeImportResult]
+// @Failure      400  {object}  map[string]interface{}
+// @Router       /api/v1/employees/import [post]
+func (h *EmployeeHandler) Import(c *gin.Context) {
+	fh, err := c.FormFile("file")
+	if err != nil {
+		_ = c.Error(apperrors.ErrBadRequest("file is required"))
+		return
+	}
+	if fh.Size > 2*1024*1024 {
+		_ = c.Error(apperrors.ErrBadRequest("file exceeds 2MB limit"))
+		return
+	}
+	f, err := fh.Open()
+	if err != nil {
+		_ = c.Error(apperrors.ErrBadRequest("cannot open file"))
+		return
+	}
+	defer f.Close()
+	content, err := io.ReadAll(io.LimitReader(f, 2*1024*1024+1))
+	if err != nil {
+		_ = c.Error(apperrors.ErrInternal("failed to read file"))
+		return
+	}
+	if len(content) > 2*1024*1024 {
+		_ = c.Error(apperrors.ErrBadRequest("file exceeds 2MB limit"))
+		return
+	}
+	sendInvite := strings.EqualFold(c.PostForm("send_invite"), "true") || c.PostForm("send_invite") == "1"
+
+	out, err := h.svc.ImportCSV(c.Request.Context(), content, employeeFieldPerms(c))
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+	// Best-effort invite fan-out (same as Create): never fail the import
+	// response on email errors.
+	if sendInvite && h.reset != nil {
+		for _, r := range out.Results {
+			if r.OK && r.Email != "" {
+				_ = h.reset.RequestReset(c.Request.Context(), r.Email)
+			}
+		}
+	}
+	msg := fmt.Sprintf("Import finished: %d created, %d failed", out.Created, out.Failed)
+	ok(c, http.StatusOK, out, msg)
+}
+
+// ImportTemplate godoc
+// @Summary      Download employee CSV import template
+// @Tags         employees
+// @Security     BearerAuth
+// @Produce      text/csv
+// @Success      200  {string}  string
+// @Router       /api/v1/employees/import/template [get]
+func (h *EmployeeHandler) ImportTemplate(c *gin.Context) {
+	const body = "email,first_name,last_name,phone,department,position,role,manager_email,join_date,is_active\n" +
+		"jane.doe@example.com,Jane,Doe,+84901234567,Engineering,Software Engineer,Employee,,2026-07-01,true\n"
+	c.Header("Content-Disposition", `attachment; filename="employee-import-template.csv"`)
+	c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(body))
 }

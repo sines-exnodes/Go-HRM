@@ -63,6 +63,8 @@ func newEmpSvc(db *gorm.DB) (*services.EmployeeService, empSvcDeps) {
 		repositories.NewDependentRepository(db),
 		repositories.NewUserRepository(db),
 		repositories.NewRoleRepository(db),
+		repositories.NewDepartmentRepository(db),
+		repositories.NewPositionRepository(db),
 		repositories.NewLeaveQuotaRepository(db),
 		up,
 		skillSvc,
