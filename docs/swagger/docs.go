@@ -1653,6 +1653,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Each successfully created employee is sent a set-password email (same best-effort path as create with send_invite). Import still succeeds if SMTP fails.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1670,12 +1671,6 @@ const docTemplate = `{
                         "name": "file",
                         "in": "formData",
                         "required": true
-                    },
-                    {
-                        "type": "boolean",
-                        "description": "send set-password email per created row",
-                        "name": "send_invite",
-                        "in": "formData"
                     }
                 ],
                 "responses": {
