@@ -29,7 +29,9 @@ const (
 // ---- Attachment upload constants ----
 
 const (
-	leaveAttachmentSubdir   = "leave-attachments"
+	// App-namespaced key prefix — same pattern as avatarSubdir (hrm-app/avatars)
+	// so multi-app shared buckets do not collide.
+	leaveAttachmentSubdir   = "hrm-app/leave-attachments"
 	leaveAttachmentMaxBytes = 5 * 1024 * 1024 // 5 MB
 )
 
