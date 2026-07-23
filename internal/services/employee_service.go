@@ -183,14 +183,16 @@ type skillAssigner interface {
 // EmployeeService owns the HR-profile business logic. All repository fields
 // use the repository INTERFACE types for mockability.
 type EmployeeService struct {
-	db      *gorm.DB
-	emps    repositories.EmployeeRepository
-	deps    repositories.DependentRepository
-	users   repositories.UserRepository
-	roles   repositories.RoleRepository
-	quota   repositories.LeaveQuotaRepository
-	uploads Uploader
-	skills  skillAssigner
+	db        *gorm.DB
+	emps      repositories.EmployeeRepository
+	deps      repositories.DependentRepository
+	users     repositories.UserRepository
+	roles     repositories.RoleRepository
+	depts     repositories.DepartmentRepository
+	positions repositories.PositionRepository
+	quota     repositories.LeaveQuotaRepository
+	uploads   Uploader
+	skills    skillAssigner
 }
 
 func NewEmployeeService(
@@ -199,11 +201,17 @@ func NewEmployeeService(
 	deps repositories.DependentRepository,
 	users repositories.UserRepository,
 	roles repositories.RoleRepository,
+	depts repositories.DepartmentRepository,
+	positions repositories.PositionRepository,
 	quota repositories.LeaveQuotaRepository,
 	uploads Uploader,
 	skills skillAssigner,
 ) *EmployeeService {
-	return &EmployeeService{db: db, emps: emps, deps: deps, users: users, roles: roles, quota: quota, uploads: uploads, skills: skills}
+	return &EmployeeService{
+		db: db, emps: emps, deps: deps, users: users, roles: roles,
+		depts: depts, positions: positions,
+		quota: quota, uploads: uploads, skills: skills,
+	}
 }
 
 // ---- Read ----
