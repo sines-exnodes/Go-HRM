@@ -159,7 +159,8 @@ func TestSkillService_Create_WithIcon_StubUpload(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, s.IconURL)
-	require.Contains(t, *s.IconURL, "skill-icons/")
+	require.Contains(t, *s.IconURL, "hrm-app/skill-icons/",
+		"skill icon keys must use the hrm-app namespace (avatar pattern)")
 	require.Equal(t, int32(1), atomic.LoadInt32(&up.uploaded))
 }
 
