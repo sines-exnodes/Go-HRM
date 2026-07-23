@@ -1,8 +1,16 @@
-# Resume Checkpoint — Mobile in-app notifications implemented
+# Resume Checkpoint — Employee CSV import (service layer)
 
-**Last updated:** 2026-07-20
-**Stopped at:** Mobile notification feed (EP-005 / DR-MOB-005-001-01) implemented, verified, and **MERGED to `main` via PR [#35](https://github.com/sines-exnodes/Go-HRM/pull/35) (`73be1eb`)**. Migration **000028** applied to **both** the test DB and dev `exnodes_hrm` (data intact: 20 users / 20 employees / 25 leaves / 14 announcements; app boots clean).
-**Branch:** none in flight — `main` is in sync with `origin/main`. Latest suite: **337 pass / 0 fail / 1 opt-in skip**.
+**Last updated:** 2026-07-23
+**Stopped at:** Tasks 1–3 of employee CSV import done on branch `feat/employee-csv-import`. Service + tests green; **handler/routes (Task 4) not started**.
+**Branch:** `feat/employee-csv-import` (from `main`). Commits: `6071315` (DTOs), `169c9d6` (ImportCSV service + DI).
+**Suite:** services **346 PASS / 0 FAIL / 1 SKIP** (AWS opt-in only). `go vet ./...` + build clean.
+
+> **2026-07-23 session — employee CSV import (Tasks 1–3):**
+> - DTOs: `EmployeeImportRowResult`, `EmployeeImportResult` in `internal/dto/employee.go`.
+> - `EmployeeService.ImportCSV(ctx, file, perms)` in `internal/services/employee_import.go` — partial success, reuses `Create` per row, name-based dept/position/role/manager resolution, salary/banking gated by `EmployeeFieldPerms`, limits 2MiB / 500 rows.
+> - **DI change:** `NewEmployeeService` now takes `DepartmentRepository` + `PositionRepository` (after `roles`). Call sites: `cmd/server/main.go`, `newEmpSvc`, `invite_service_test.go`.
+> - 9 `TestImportCSV_*` integration tests green.
+> - **Next:** Task 4 — handler `POST /employees/import` + template `GET`, register **before** `:id`, Swagger, live smoke, verification log. Handler owns `send_invite` fan-out (do not inject PasswordReset into EmployeeService).
 
 > **2026-07-21 follow-ups merged (all on `main`):**
 > - **PR #36 `97d2c6d`** — leave approve/reject now sends OS push (detached goroutine; in-app row is durable and inline). Push-only, not email.
