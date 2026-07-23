@@ -6,16 +6,22 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/exnodes/hrm-api/internal/dto"
 	apperrors "github.com/exnodes/hrm-api/internal/errors"
 )
+
+// importEmailValidator reuses go-playground's email check without going through
+// gin binding (import builds DTOs in-process, not from JSON).
+var importEmailValidator = validator.New()
 
 const (
 	employeeImportMaxBytes = 2 * 1024 * 1024
@@ -53,6 +59,8 @@ func (s *EmployeeService) ImportCSV(
 	if len(file) > employeeImportMaxBytes {
 		return nil, apperrors.ErrBadRequest("CSV file exceeds 2MB limit")
 	}
+	// Excel/Windows exports often prefix UTF-8 BOM; strip so "email" is not "\ufeffemail".
+	file = bytes.TrimPrefix(file, []byte{0xEF, 0xBB, 0xBF})
 
 	r := csv.NewReader(bytes.NewReader(file))
 	r.LazyQuotes = true
@@ -165,11 +173,15 @@ func rowMap(headers []string, record []string) map[string]string {
 	return m
 }
 
+// importRowErrMsg maps row failures to client-safe text. Non-AppError failures
+// (e.g. raw GORM/driver errors from Create) must not leak into the HTTP 200
+// import report — that path bypasses ErrorHandler's internal-error sanitization.
 func importRowErrMsg(err error) string {
 	if ae, ok := apperrors.As(err); ok {
 		return ae.Message
 	}
-	return err.Error()
+	log.Printf("employee import row: %v", err)
+	return "internal error processing row"
 }
 
 func (s *EmployeeService) buildImportCreate(
@@ -191,6 +203,9 @@ func (s *EmployeeService) buildImportCreate(
 	if last == "" {
 		return in, apperrors.ErrBadRequest("last_name is required")
 	}
+	if err := importEmailValidator.Var(email, "email"); err != nil {
+		return in, apperrors.ErrBadRequest("invalid email")
+	}
 	in.Email = email
 	in.FirstName = first
 	in.LastName = last
@@ -199,10 +214,18 @@ func (s *EmployeeService) buildImportCreate(
 		in.Phone = &v
 	}
 	if v := cells["personal_email"]; v != "" {
+		if err := importEmailValidator.Var(v, "email"); err != nil {
+			return in, apperrors.ErrBadRequest("invalid personal_email")
+		}
 		in.PersonalEmail = &v
 	}
 	if v := cells["gender"]; v != "" {
-		in.Gender = &v
+		switch v {
+		case "male", "female", "other":
+			in.Gender = &v
+		default:
+			return in, apperrors.ErrBadRequest("invalid gender: use male, female, or other")
+		}
 	}
 	if v := cells["nationality"]; v != "" {
 		in.Nationality = &v
@@ -217,10 +240,20 @@ func (s *EmployeeService) buildImportCreate(
 		in.CurrentAddress = &v
 	}
 	if v := cells["education"]; v != "" {
-		in.Education = &v
+		switch v {
+		case "high_school", "college", "bachelor", "master", "doctorate":
+			in.Education = &v
+		default:
+			return in, apperrors.ErrBadRequest("invalid education: use high_school, college, bachelor, master, or doctorate")
+		}
 	}
 	if v := cells["marital_status"]; v != "" {
-		in.MaritalStatus = &v
+		switch v {
+		case "single", "married", "other":
+			in.MaritalStatus = &v
+		default:
+			return in, apperrors.ErrBadRequest("invalid marital_status: use single, married, or other")
+		}
 	}
 	if v := cells["contract_type"]; v != "" {
 		in.ContractType = &v
@@ -274,12 +307,18 @@ func (s *EmployeeService) buildImportCreate(
 		if err != nil {
 			return in, apperrors.ErrBadRequest("invalid basic_salary")
 		}
+		if f < 0 {
+			return in, apperrors.ErrBadRequest("basic_salary must be >= 0")
+		}
 		in.BasicSalary = &f
 	}
 	if v := cells["insurance_salary"]; v != "" {
 		f, err := strconv.ParseFloat(v, 64)
 		if err != nil {
 			return in, apperrors.ErrBadRequest("invalid insurance_salary")
+		}
+		if f < 0 {
+			return in, apperrors.ErrBadRequest("insurance_salary must be >= 0")
 		}
 		in.InsuranceSalary = &f
 	}

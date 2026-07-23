@@ -270,3 +270,61 @@ func TestImportCSV_OverMaxRows_400(t *testing.T) {
 	assert.Equal(t, apperrors.CodeBadRequest, ae.Code)
 	assert.Contains(t, strings.ToLower(ae.Message), "500")
 }
+
+// TestImportCSV_InvalidEmail_RowError: create-path binding parity — bad email
+// must not create a user/employee (Create itself does not re-check format).
+func TestImportCSV_InvalidEmail_RowError(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+
+	file := csvBytes(
+		"email,first_name,last_name",
+		"not-an-email,Bad,Mail",
+		"ok@example.com,Ok,Person",
+	)
+	out, err := svc.ImportCSV(context.Background(), file, services.AllEmployeeFieldPerms)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, 1, out.Created)
+	assert.Equal(t, 1, out.Failed)
+	assert.False(t, out.Results[0].OK)
+	assert.Contains(t, strings.ToLower(out.Results[0].Error), "email")
+	assert.True(t, out.Results[1].OK)
+}
+
+// TestImportCSV_InvalidGender_RowError: free-text gender is not constrained
+// by the DB; import must reject enums the create handler would refuse.
+func TestImportCSV_InvalidGender_RowError(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+
+	file := csvBytes(
+		"email,first_name,last_name,gender",
+		"g@example.com,G,Person,unknown",
+	)
+	out, err := svc.ImportCSV(context.Background(), file, services.AllEmployeeFieldPerms)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, 0, out.Created)
+	assert.Equal(t, 1, out.Failed)
+	assert.Contains(t, strings.ToLower(out.Results[0].Error), "gender")
+}
+
+// TestImportCSV_UTF8BOM_Accepted: Excel-exported CSVs often start with BOM.
+func TestImportCSV_UTF8BOM_Accepted(t *testing.T) {
+	skipIfNoDB(t)
+	truncateAll(t)
+	svc, _ := newEmpSvc(testDB)
+
+	body := append([]byte{0xEF, 0xBB, 0xBF}, csvBytes(
+		"email,first_name,last_name",
+		"bom@example.com,Bom,User",
+	)...)
+	out, err := svc.ImportCSV(context.Background(), body, services.AllEmployeeFieldPerms)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, 1, out.Created)
+	assert.Equal(t, 0, out.Failed)
+}
