@@ -27,7 +27,8 @@ const (
 	skillNameMaxLen = 100
 	skillDescMaxLen = 500
 
-	skillIconSubdir   = "skill-icons"
+	// App-namespaced key prefix — same pattern as avatarSubdir / leaveAttachmentSubdir.
+	skillIconSubdir   = "hrm-app/skill-icons"
 	skillIconMaxBytes = 2 * 1024 * 1024 // BA DR-008-003-02 AC-09/SR-08: icons capped at 2MB
 )
 
