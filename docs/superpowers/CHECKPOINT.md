@@ -1,16 +1,24 @@
-# Resume Checkpoint — Employee CSV import (service layer)
+# Resume Checkpoint — Employee CSV import ready for PR
 
 **Last updated:** 2026-07-23
-**Stopped at:** Tasks 1–3 of employee CSV import done on branch `feat/employee-csv-import`. Service + tests green; **handler/routes (Task 4) not started**.
-**Branch:** `feat/employee-csv-import` (from `main`). Commits: `6071315` (DTOs), `169c9d6` (ImportCSV service + DI).
-**Suite:** services **346 PASS / 0 FAIL / 1 SKIP** (AWS opt-in only). `go vet ./...` + build clean.
+**Stopped at:** Employee CSV import **implemented + live-verified** on branch `feat/employee-csv-import`. **PR not opened yet.**
+**Branch:** `feat/employee-csv-import` (from `main`). Commits: `6071315` (DTOs) · `169c9d6` (ImportCSV + DI) · `85e11a5` (review fixes) · `e6a00d2` (handler+routes+swag) · verification/checkpoint docs.
+**Suite:** `TestImportCSV_*` **12 PASS**; full services suite green (1 AWS opt-in skip). `go build` / `go vet` / `make swag` clean.
 
-> **2026-07-23 session — employee CSV import (Tasks 1–3):**
-> - DTOs: `EmployeeImportRowResult`, `EmployeeImportResult` in `internal/dto/employee.go`.
-> - `EmployeeService.ImportCSV(ctx, file, perms)` in `internal/services/employee_import.go` — partial success, reuses `Create` per row, name-based dept/position/role/manager resolution, salary/banking gated by `EmployeeFieldPerms`, limits 2MiB / 500 rows.
-> - **DI change:** `NewEmployeeService` now takes `DepartmentRepository` + `PositionRepository` (after `roles`). Call sites: `cmd/server/main.go`, `newEmpSvc`, `invite_service_test.go`.
-> - 9 `TestImportCSV_*` integration tests green.
-> - **Next:** Task 4 — handler `POST /employees/import` + template `GET`, register **before** `:id`, Swagger, live smoke, verification log. Handler owns `send_invite` fan-out (do not inject PasswordReset into EmployeeService).
+> **2026-07-23 session — employee CSV import (full vertical slice):**
+>
+> **API**
+> - `POST /api/v1/employees/import` — multipart `file` (≤2MiB, ≤500 rows) + optional `send_invite` (default false). Perm `employees:create`. Partial success report.
+> - `GET /api/v1/employees/import/template` — sample CSV download.
+> - Plan: [`plans/2026-07-23-employee-csv-import.md`](plans/2026-07-23-employee-csv-import.md). Verify: [`verification/employee-csv-import.md`](verification/employee-csv-import.md).
+>
+> **Service:** `EmployeeService.ImportCSV` reuses `Create` per row; resolves `department`/`position`/`role` by name and `manager_email` by existing user+employee; salary/banking gated by field perms; email/enum validation (create-handler parity); UTF-8 BOM strip; non-AppError row messages sanitized.
+>
+> **DI:** `NewEmployeeService` gained `DepartmentRepository` + `PositionRepository`. **No migration.**
+>
+> **Live smoke (dev DB :8082):** template 200; no-auth 401; mixed file 2 created / 1 invalid email; re-import 3 failed (dups + invalid); DB 2 employee rows present.
+>
+> **Next:** open PR → merge. Then CHECKPOINT priority **Request Tickets (EP-003)** / migration 000029. Optional v2: same-file manager order, dry-run, upsert.
 
 > **2026-07-21 follow-ups merged (all on `main`):**
 > - **PR #36 `97d2c6d`** — leave approve/reject now sends OS push (detached goroutine; in-app row is durable and inline). Push-only, not email.
