@@ -226,6 +226,25 @@ type EmployeeCreate struct {
 	SkillIDs []uuid.UUID `json:"skill_ids,omitempty"`
 }
 
+// EmployeeImportRowResult is one data-row outcome from CSV import.
+// Row is the 1-based line number in the uploaded file (header = 1).
+type EmployeeImportRowResult struct {
+	Row        int        `json:"row"`
+	OK         bool       `json:"ok"`
+	Email      string     `json:"email"`
+	EmployeeID *uuid.UUID `json:"employee_id,omitempty"`
+	UserID     *uuid.UUID `json:"user_id,omitempty"`
+	Error      string     `json:"error,omitempty"`
+}
+
+// EmployeeImportResult is the POST /employees/import response data.
+type EmployeeImportResult struct {
+	TotalRows int                       `json:"total_rows"`
+	Created   int                       `json:"created"`
+	Failed    int                       `json:"failed"`
+	Results   []EmployeeImportRowResult `json:"results"`
+}
+
 // ---- Employee Update (admin — anything allowed) ----
 
 type EmployeeUpdate struct {
